@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IwolPark · Análisis de Demanda</title>
+<style>
+:root {
+  --bg:#F5F5F7; --white:#fff; --border:#D2D2D7;
+  --purple:#7B5EA7; --blue:#0A66C2; --green:#0D9457;
+  --gold:#F5A623; --red:#D93025; --text:#1D1D1F; --muted:#6E6E73;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:center;
+    gap:12px;position:sticky;top:0;z-index:100}
+.nav-logo{font-size:20px;font-weight:900;color:#fff;letter-spacing:-1px}
+.nav-badge{font-size:10px;font-weight:700;background:var(--purple);color:#fff;border-radius:4px;padding:2px 8px}
+.nav-back{background:#333;color:#fff;border:none;border-radius:7px;padding:7px 14px;
+          font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px}
+.container{max-width:1300px;margin:0 auto;padding:20px 24px}
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);
+      padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:14px}
+.card-title{font-size:13px;font-weight:800;margin-bottom:3px}
+.card-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+.filtros{display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.filtros select{border:1.5px solid var(--border);border-radius:7px;
+  padding:7px 12px;font-size:13px;background:#fff;color:var(--text)}
+.btn{background:var(--purple);color:#fff;border:none;border-radius:7px;
+     padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+.kpi{background:var(--bg);border-radius:8px;padding:14px;text-align:center}
+.kpi-val{font-size:28px;font-weight:900;line-height:1;margin-bottom:3px}
+.kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* HEATMAP */
+.heatmap-wrap{overflow-x:auto;margin-top:8px}
+.heatmap{display:grid;grid-template-columns:64px repeat(24,1fr);gap:2px;min-width:720px}
+.hm-cell{border-radius:4px;height:30px;display:flex;align-items:center;
+          justify-content:center;font-size:9px;font-weight:700;cursor:pointer;
+          transition:transform .1s;position:relative}
+.hm-cell:hover{transform:scale(1.2);z-index:10}
+.hm-label{font-size:11px;font-weight:700;color:var(--muted);
+           display:flex;align-items:center;padding-right:8px;white-space:nowrap}
+.hm-header{font-size:9px;color:var(--muted);text-align:center;padding:4px 0}
+.legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--muted)}
+.leg-cell{width:20px;height:14px;border-radius:3px}
+
+/* BARRAS */
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:130px;margin-top:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.bar-fill{width:100%;border-radius:5px 5px 0 0;transition:height .5s ease;min-height:2px}
+.bar-label{font-size:9px;color:var(--muted);font-weight:700;text-align:center}
+.bar-val{font-size:10px;font-weight:800;color:var(--text)}
+
+/* FRANJA */
+.franja-card{border-radius:10px;padding:16px;text-align:center}
+.franja-pct{font-size:36px;font-weight:900;line-height:1;margin-bottom:6px}
+.franja-bar-bg{background:#fff;border-radius:99px;height:10px;overflow:hidden;margin:8px 0}
+.franja-bar-fill{height:100%;border-radius:99px;transition:width .6s}
+
+/* INSIGHTS */
+.insight{background:var(--bg);border-radius:8px;padding:12px 14px;
+         font-size:12px;line-height:1.6;display:flex;gap:10px;align-items:flex-start}
+.insight-ico{font-size:18px;flex-shrink:0;margin-top:1px}
+
+/* TOOLTIP */
+.tooltip{position:fixed;background:#1D1D1F;color:#fff;border-radius:8px;
+         padding:8px 12px;font-size:12px;pointer-events:none;z-index:9999;
+         display:none;line-height:1.5;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">·iwol·</span>
+  <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
+  <span class="nav-badge">DEMANDA</span>
+  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" style="margin-left:auto">
+    ← Volver al dashboard
+  </a>
+</nav>
+
+<div class="container">
+
+  <!-- FILTROS -->
+  <div class="filtros">
+    <select id="sel-semanas" onchange="render()">
+      <option value="4">Últimas 4 semanas</option>
+      <option value="8">Últimas 8 semanas</option>
+      <option value="12">Último trimestre</option>
+    </select>
+    <select id="sel-metrica" onchange="render()">
+      <option value="autos">Número de autos</option>
+      <option value="ingresos">Ingresos $</option>
+    </select>
+    <button class="btn" onclick="render()">↻ Actualizar</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="hm-selected">
+      Clic en celda para ver detalle
+    </span>
+  </div>
+
+  <!-- KPIs RÁPIDOS -->
+  <div class="grid3" id="kpis-rapidos"></div>
+
+  <!-- HEATMAP -->
+  <div class="card">
+    <div class="card-title">🔥 Mapa de calor — Demanda por día y hora</div>
+    <div class="card-sub">Cada celda = promedio de autos. Oscuro = alta demanda. Clic para ver detalle.</div>
+    <div class="heatmap-wrap">
+      <div class="heatmap" id="heatmap"></div>
+    </div>
+    <div class="legend">
+      <span>Baja</span>
+      <div style="display:flex;gap:2px" id="legend-bar"></div>
+      <span>Alta</span>
+    </div>
+  </div>
+
+  <!-- CURVAS -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">⏰ Demanda promedio por hora</div>
+      <div class="card-sub">Azul=Matutino · Morado=Vespertino · Dorado=Nocturno</div>
+      <div class="bar-chart" id="bars-hora"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📅 Demanda por día de semana</div>
+      <div class="card-sub">Rojo=fin de semana · Azul=entre semana</div>
+      <div class="bar-chart" id="bars-dia"></div>
+    </div>
+  </div>
+
+  <!-- FRANJAS -->
+  <div class="card">
+    <div class="card-title">🌅 Análisis por franja horaria</div>
+    <div class="card-sub">Matutino 07–12 · Vespertino 12–19 · Nocturno 19–07</div>
+    <div class="grid3" id="franjas-detail" style="margin-top:10px"></div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="card" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF);border-color:var(--purple)">
+    <div class="card-title" style="color:var(--purple)">💡 Insights automáticos</div>
+    <div class="card-sub">Basado en los patrones del período seleccionado</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px" id="insights"></div>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const HORAS = Array.from({length:24},(_,i)=>i);
+
+// Generar datos realistas de estacionamiento
+function generarDemanda() {
+  const data = {};
+  DIAS.forEach((dia,di) => {
+    data[dia] = {};
+    HORAS.forEach(h => {
+      let base = 0;
+      const esFS = di >= 5;
+      if(esFS) {
+        if(h>=10&&h<=14) base=35+Math.random()*20;
+        else if(h>=14&&h<=19) base=45+Math.random()*20;
+        else if(h>=19&&h<=22) base=25+Math.random()*15;
+        else if(h>=7&&h<10)  base=8+Math.random()*10;
+        else base=2+Math.random()*5;
+      } else {
+        if(h>=9&&h<=11)  base=30+Math.random()*25;
+        else if(h>=12&&h<=14) base=20+Math.random()*15;
+        else if(h>=16&&h<=19) base=38+Math.random()*22;
+        else if(h>=7&&h<9)   base=10+Math.random()*12;
+        else if(h>=19&&h<=21) base=18+Math.random()*10;
+        else if(h>=22||h<7)  base=2+Math.random()*4;
+        else base=8+Math.random()*10;
+      }
+      if(di===0||di===4) base*=1.1;
+      data[dia][h] = Math.round(Math.min(68,base));
+    });
+  });
+  return data;
+}
+
+const DEMANDA = generarDemanda();
+
+function getMax() {
+  let m=0;
+  DIAS.forEach(d=>HORAS.forEach(h=>{if(DEMANDA[d][h]>m)m=DEMANDA[d][h];}));
+  return m;
+}
+
+function heatColor(val,max) {
+  const p=val/max;
+  if(p<0.15) return {bg:'#F3F0FF',text:'#9B8EC4'};
+  if(p<0.35) return {bg:'#C7B8E8',text:'#3C3489'};
+  if(p<0.55) return {bg:'#9B7FD4',text:'#fff'};
+  if(p<0.75) return {bg:'#7B5EA7',text:'#fff'};
+  return {bg:'#4B2D7F',text:'#fff'};
+}
+
+function render() {
+  const max = getMax();
+  renderKPIs();
+  renderHeatmap(max);
+  renderBarsHora(max);
+  renderBarsDia(max);
+  renderFranjas();
+  renderInsights();
+}
+
+function renderKPIs() {
+  let maxVal=0,maxH=0,maxD='';
+  DIAS.forEach(d=>HORAS.forEach(h=>{if(DEMANDA[d][h]>maxVal){maxVal=DEMANDA[d][h];maxH=h;maxD=d;}}));
+  let sum=0,cnt=0;
+  DIAS.forEach(d=>HORAS.forEach(h=>{sum+=DEMANDA[d][h];cnt++;}));
+  const prom=Math.round(sum/cnt);
+  const porDia=DIAS.map(d=>({d,t:HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)})).sort((a,b)=>b.t-a.t)[0];
+  document.getElementById('kpis-rapidos').innerHTML=[
+    {label:'Hora pico',val:`${maxH}:00`,sub:`${maxD} · ${maxVal} autos`,color:'var(--red)'},
+    {label:'Ocupación promedio',val:`${prom} autos`,sub:`${Math.round(prom/68*100)}% de capacidad`,color:'var(--purple)'},
+    {label:'Día más activo',val:porDia.d,sub:`Prom. ${Math.round(porDia.t/24)} autos/hora`,color:'var(--blue)'},
+  ].map(k=>`<div class="card kpi" style="text-align:center;padding:16px">
+    <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+    <div class="kpi-label">${k.label}</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:3px">${k.sub}</div>
+  </div>`).join('');
+}
+
+function renderHeatmap(max) {
+  const el=document.getElementById('heatmap');
+  let html='<div class="hm-cell"></div>';
+  HORAS.forEach(h=>{html+=`<div class="hm-header">${h}</div>`;});
+  DIAS.forEach(dia=>{
+    html+=`<div class="hm-label">${dia}</div>`;
+    HORAS.forEach(h=>{
+      const val=DEMANDA[dia][h];
+      const {bg,text}=heatColor(val,max);
+      const fr=h>=7&&h<12?'Matutino':h>=12&&h<19?'Vespertino':'Nocturno';
+      html+=`<div class="hm-cell" style="background:${bg};color:${text}"
+        onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${val} autos · ${fr}'"
+        onmouseenter="tt(event,'${dia} ${h}:00 — ${val} autos (${fr})')"
+        onmouseleave="ht()">${val>4?val:''}</div>`;
+    });
+  });
+  el.innerHTML=html;
+  // Leyenda
+  document.getElementById('legend-bar').innerHTML=
+    ['#F3F0FF','#C7B8E8','#9B7FD4','#7B5EA7','#4B2D7F']
+    .map(c=>`<div class="leg-cell" style="background:${c}"></div>`).join('');
+}
+
+function renderBarsHora(max) {
+  const prom=HORAS.map(h=>{
+    const s=DIAS.reduce((a,d)=>a+DEMANDA[d][h],0);
+    return Math.round(s/DIAS.length);
+  });
+  const mx=Math.max(...prom);
+  const col=h=>h>=7&&h<12?'#0A66C2':h>=12&&h<19?'#7B5EA7':'#F5A623';
+  document.getElementById('bars-hora').innerHTML=prom.map((v,h)=>`
+    <div class="bar-col" onmouseenter="tt(event,'${h}:00 → prom. ${v} autos')" onmouseleave="ht()">
+      <div class="bar-val">${h%4===0?v:''}</div>
+      <div class="bar-fill" style="background:${col(h)};height:${v/mx*100}%"></div>
+      <div class="bar-label">${h%4===0?h+'h':''}</div>
+    </div>`).join('');
+}
+
+function renderBarsDia(max) {
+  const prom=DIAS.map(dia=>{
+    const s=HORAS.reduce((a,h)=>a+DEMANDA[dia][h],0);
+    return Math.round(s/HORAS.length);
+  });
+  const mx=Math.max(...prom);
+  const cols=['#0A66C2','#0A66C2','#0A66C2','#0A66C2','#0A66C2','#D93025','#D93025'];
+  document.getElementById('bars-dia').innerHTML=prom.map((v,i)=>`
+    <div class="bar-col" onmouseenter="tt(event,'${DIAS[i]} → prom. ${v} autos/hora')" onmouseleave="ht()">
+      <div class="bar-val">${v}</div>
+      <div class="bar-fill" style="background:${cols[i]};height:${v/mx*100}%"></div>
+      <div class="bar-label" style="color:${cols[i]};font-size:10px;transform:none">${DIAS[i]}</div>
+    </div>`).join('');
+}
+
+function renderFranjas() {
+  const franjas=[
+    {n:'🌅 Matutino',h:[7,8,9,10,11],c:'#0A66C2',bg:'#EFF6FF'},
+    {n:'☀ Vespertino',h:[12,13,14,15,16,17,18],c:'#7B5EA7',bg:'#F3F0FF'},
+    {n:'🌙 Nocturno',h:[19,20,21,22,23,0,1,2,3,4,5,6],c:'#F5A623',bg:'#FFFBEB'},
+  ];
+  document.getElementById('franjas-detail').innerHTML=franjas.map(f=>{
+    const vals=[];
+    DIAS.forEach(d=>f.h.forEach(h=>vals.push(DEMANDA[d][h])));
+    const prom=Math.round(vals.reduce((s,v)=>s+v,0)/vals.length);
+    const pico=Math.max(...vals);
+    const pct=Math.round(prom/68*100);
+    return `<div class="franja-card" style="background:${f.bg}">
+      <div style="font-size:13px;font-weight:800;color:${f.c};margin-bottom:10px">${f.n}</div>
+      <div class="franja-pct" style="color:${f.c}">${pct}%</div>
+      <div style="font-size:11px;color:var(--muted)">ocupación promedio</div>
+      <div class="franja-bar-bg">
+        <div class="franja-bar-fill" style="width:${pct}%;background:${f.c}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+        <div style="background:#fff;border-radius:6px;padding:6px;text-align:center">
+          <div style="font-size:16px;font-weight:900;color:${f.c}">${prom}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Prom autos</div>
+        </div>
+        <div style="background:#fff;border-radius:6px;padding:6px;text-align:center">
+          <div style="font-size:16px;font-weight:900;color:${f.c}">${pico}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Pico</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderInsights() {
+  const promHora=HORAS.map(h=>({h,v:Math.round(DIAS.reduce((s,d)=>s+DEMANDA[d][h],0)/DIAS.length)}))
+    .sort((a,b)=>b.v-a.v);
+  const topH=promHora.slice(0,3).map(x=>x.h+':00').join(', ');
+  const bajH=promHora.slice(-3).map(x=>x.h+':00').join(', ');
+  const fsP=Math.round(['Sáb','Dom'].map(d=>HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)/24)
+    .reduce((s,v)=>s+v,0)/2);
+  const wsP=Math.round(['Lun','Mar','Mié','Jue','Vie'].map(d=>HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)/24)
+    .reduce((s,v)=>s+v,0)/5);
+  const dif=Math.round((fsP-wsP)/wsP*100);
+  document.getElementById('insights').innerHTML=[
+    {ico:'🔥',txt:`Las horas de mayor demanda son <strong>${topH}</strong>. Reforzar operación en esos horarios.`,c:'#FEE2E2'},
+    {ico:'😴',txt:`Baja demanda en <strong>${bajH}</strong>. Oportunidad para mantenimiento o descanso.`,c:'#DCFCE7'},
+    {ico:'📅',txt:`Fin de semana tiene <strong>${dif>0?'+':''}${dif}%</strong> ${dif>0?'más':'menos'} autos que entre semana (${fsP} vs ${wsP} prom/hora).`,c:'#EFF6FF'},
+    {ico:'📈',txt:`El <strong>vespertino</strong> concentra la mayor demanda en fin de semana. Horario crítico de atención.`,c:'#F3F0FF'},
+  ].map(i=>`<div class="insight" style="background:${i.c}">
+    <span class="insight-ico">${i.ico}</span>
+    <span>${i.txt}</span>
+  </div>`).join('');
+}
+
+function tt(e,txt) {
+  const t=document.getElementById('tooltip');
+  t.textContent=txt;t.style.display='block';
+  t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-36)+'px';
+}
+function ht(){document.getElementById('tooltip').style.display='none';}
+
+render();
+</script>
+</body>
+</html>

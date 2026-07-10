@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IwolPark · Dashboard Corporativo</title>
+<style>
+:root {
+  --bg:#F5F5F7; --white:#fff; --border:#D2D2D7;
+  --accent:#1D1D1F; --purple:#7B5EA7; --blue:#0A66C2;
+  --green:#0D9457; --gold:#F5A623; --red:#D93025;
+  --text:#1D1D1F; --muted:#6E6E73;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+
+nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:center;
+    gap:12px;position:sticky;top:0;z-index:100}
+.nav-logo{font-size:20px;font-weight:900;color:#fff;letter-spacing:-1px}
+.nav-title{font-size:14px;font-weight:700;color:#fff}
+.nav-badge{font-size:10px;font-weight:700;background:var(--gold);color:#000;
+           border-radius:4px;padding:2px 8px}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.nav-clock{font-size:12px;color:#888;font-family:monospace}
+.nav-user{font-size:12px;color:#ccc}
+
+/* TABS */
+.tabs{background:#fff;border-bottom:2px solid var(--border);
+      display:flex;padding:0 24px;gap:0}
+.tab{padding:14px 20px;font-size:13px;font-weight:600;color:var(--muted);
+     cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+     transition:all .15s}
+.tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.tab:hover{color:var(--text)}
+
+.container{max-width:1400px;margin:0 auto;padding:20px 24px}
+
+/* FILTROS */
+.filtros{display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.filtros select,.filtros input{border:1.5px solid var(--border);border-radius:7px;
+  padding:7px 12px;font-size:13px;background:#fff;color:var(--text)}
+.btn{background:var(--purple);color:#fff;border:none;border-radius:7px;
+     padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer}
+.btn-outline{background:#fff;color:var(--purple);border:1.5px solid var(--purple);
+             border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+.kpi{background:#fff;border-radius:12px;border:1px solid var(--border);
+     padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;
+     transition:transform .15s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+           letter-spacing:.8px;margin-bottom:6px}
+.kpi-val{font-size:28px;font-weight:900;line-height:1;margin-bottom:3px}
+.kpi-sub{font-size:11px;color:var(--muted)}
+.kpi-delta{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;
+           border-radius:3px;margin-top:4px}
+.up{background:#DCFCE7;color:#16A34A} .dn{background:#FEE2E2;color:#DC2626}
+
+/* 2-COL */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);
+      padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.card-title{font-size:13px;font-weight:800;margin-bottom:3px}
+.card-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+
+/* BARRAS HORIZONTALES */
+.hbar-row{display:flex;align-items:center;gap:10px;padding:8px 0;
+          border-bottom:1px solid #F0EEF8;cursor:pointer}
+.hbar-row:hover{background:#FAFAFE;margin:0 -8px;padding:8px}
+.hbar-label{min-width:90px;font-size:12px;font-weight:700}
+.hbar-wrap{flex:1;background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden}
+.hbar-fill{height:100%;border-radius:99px;transition:width .5s}
+.hbar-val{min-width:70px;text-align:right;font-size:12px;font-weight:800;color:var(--gold)}
+
+/* TABLA */
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#F8F5FF;padding:9px 12px;text-align:left;font-size:10px;
+   font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;
+   border-bottom:2px solid var(--border)}
+td{padding:9px 12px;border-bottom:1px solid #F0EEF8}
+tr:hover td{background:#FAFAFE;cursor:pointer}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;
+       font-size:10px;font-weight:700}
+.b-n{background:#EFF6FF;color:#0A66C2}
+.b-p{background:#F3F0FF;color:#7B5EA7}
+.b-x{background:#FEE2E2;color:#D93025}
+.b-c{background:#F5F5F5;color:#888}
+
+/* GAUGE CIRCULAR SVG */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+
+/* MINI CHART BARRAS */
+.mini-bars{display:flex;align-items:flex-end;gap:3px;height:60px}
+.mini-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s}
+
+/* TIMELINE TURNO */
+.turno-row{display:flex;align-items:center;gap:10px;padding:10px 0;
+           border-bottom:1px solid #F0EEF8}
+.turno-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.turno-info{flex:1;font-size:12px}
+.turno-cajero{font-weight:700}
+.turno-time{color:var(--muted);font-size:11px}
+.turno-monto{font-weight:800;color:var(--gold);font-size:13px}
+
+/* SECTION OCULTAS */
+.tab-section{display:none}
+.tab-section.active{display:block}
+
+/* DRILL PANEL */
+.drill{background:#fff;border:2px solid var(--purple);border-radius:12px;
+       padding:18px;margin-bottom:14px;display:none}
+.drill.open{display:block}
+.drill-back{background:var(--purple);color:#fff;border:none;border-radius:6px;
+            padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:#1D1D1F;color:#fff;
+       border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;
+       z-index:9999;transform:translateY(60px);opacity:0;transition:all .3s}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">·iwol·</span>
+  <span class="nav-title">IwolPark</span>
+  <span class="nav-badge">CORPORATIVO</span>
+  <div class="nav-right">
+    <span class="nav-user">Oficina Central</span>
+    <span class="nav-clock" id="clock">--:--:--</span>
+  </div>
+</nav>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('ejecutivo',this)">📊 Ejecutivo</div>
+  <div class="tab" onclick="showTab('operativo',this)">⚙️ Operativo</div>
+  <div class="tab" onclick="showTab('cajeros',this)">👤 Cajeros</div>
+  <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
+  <div class="tab" onclick="showTab('cortes',this)">📋 Cortes</div>
+</div>
+
+<div class="container">
+
+<!-- ══ TAB EJECUTIVO ══ -->
+<div class="tab-section active" id="tab-ejecutivo">
+
+  <div class="filtros">
+    <select id="periodo-ej" onchange="renderEjecutivo()">
+      <option value="hoy">Hoy</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes" selected>Este mes</option>
+      <option value="año">Este año</option>
+    </select>
+    <button class="btn-outline" onclick="exportarCSV('ejecutivo')">⬇ Export</button>
+  </div>
+
+  <!-- KPIs principales -->
+  <div class="kpi-grid">
+    <div class="kpi" onclick="drillKPI('ingresos')">
+      <div class="kpi-label">Ingresos totales</div>
+      <div class="kpi-val" style="color:var(--gold)" id="ej-ingresos">$0</div>
+      <div class="kpi-sub" id="ej-ingresos-sub">cargando...</div>
+      <div class="kpi-delta up" id="ej-ingresos-delta">↑ 0%</div>
+    </div>
+    <div class="kpi" onclick="drillKPI('operaciones')">
+      <div class="kpi-label">Operaciones</div>
+      <div class="kpi-val" style="color:var(--blue)" id="ej-ops">0</div>
+      <div class="kpi-sub" id="ej-ops-sub">cargando...</div>
+      <div class="kpi-delta up" id="ej-ops-delta">↑ 0%</div>
+    </div>
+    <div class="kpi" onclick="drillKPI('ocupacion')">
+      <div class="kpi-label">Ocupación prom.</div>
+      <div class="kpi-val" style="color:var(--purple)" id="ej-ocu">0%</div>
+      <div class="kpi-sub" id="ej-ocu-sub">de 68 lugares</div>
+    </div>
+    <div class="kpi" onclick="drillKPI('ticket')">
+      <div class="kpi-label">Ticket promedio</div>
+      <div class="kpi-val" style="color:var(--green)" id="ej-ticket">$0</div>
+      <div class="kpi-sub" id="ej-ticket-sub">por operación</div>
+    </div>
+    <div class="kpi" onclick="drillKPI('perdidos')">
+      <div class="kpi-label">Boletos perdidos</div>
+      <div class="kpi-val" style="color:var(--red)" id="ej-perdidos">0</div>
+      <div class="kpi-sub" id="ej-perdidos-sub">$0 penalizaciones</div>
+    </div>
+  </div>
+
+  <!-- Drill panel -->
+  <div class="drill" id="drill-panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
+      <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-title">Detalle</span>
+    </div>
+    <div id="drill-content"></div>
+  </div>
+
+  <div class="grid2">
+    <!-- Ingresos por mes -->
+    <div class="card">
+      <div class="card-title">Ingresos mensuales</div>
+      <div class="card-sub">Últimos 6 meses · Clic en barra para detalle</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:120px;margin-top:4px"
+           id="chart-meses"></div>
+    </div>
+    <!-- Mix ingresos -->
+    <div class="card">
+      <div class="card-title">Mix de ingresos por tipo</div>
+      <div class="card-sub">Distribución del período seleccionado</div>
+      <div id="mix-ingresos"></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <!-- Ocupación gauge -->
+    <div class="card">
+      <div class="card-title">Ocupación actual</div>
+      <div class="card-sub">Autos en plaza ahora</div>
+      <div class="gauge-wrap" style="margin-top:8px">
+        <svg width="120" height="70" viewBox="0 0 120 70">
+          <path d="M10 65 A50 50 0 0 1 110 65" fill="none" stroke="#F0EEF8" stroke-width="12" stroke-linecap="round"/>
+          <path d="M10 65 A50 50 0 0 1 110 65" fill="none" stroke="var(--purple)" stroke-width="12"
+                stroke-linecap="round" stroke-dasharray="157" id="gauge-arc"
+                stroke-dashoffset="78" style="transition:stroke-dashoffset .6s"/>
+        </svg>
+        <div style="font-size:32px;font-weight:900;color:var(--purple);margin-top:-16px" id="gauge-pct">0%</div>
+        <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 68 lugares</div>
+      </div>
+    </div>
+    <!-- Pico del día -->
+    <div class="card">
+      <div class="card-title">Actividad hoy</div>
+      <div class="card-sub">Evolución por hora</div>
+      <div class="mini-bars" id="mini-hoy"></div>
+    </div>
+    <!-- Meta vs Real -->
+    <div class="card">
+      <div class="card-title">Meta vs Real</div>
+      <div class="card-sub">Avance del mes</div>
+      <div id="meta-vs-real"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ TAB OPERATIVO ══ -->
+<div class="tab-section" id="tab-operativo">
+
+  <div class="filtros">
+    <select id="periodo-op" onchange="renderOperativo()">
+      <option value="hoy">Hoy</option>
+      <option value="semana" selected>Esta semana</option>
+      <option value="mes">Este mes</option>
+    </select>
+    <button class="btn-outline" onclick="exportarCSV('operativo')">⬇ Export</button>
+  </div>
+
+  <div class="grid2">
+    <!-- Por franja -->
+    <div class="card">
+      <div class="card-title">Operaciones por franja horaria</div>
+      <div class="card-sub">Matutino · Vespertino · Nocturno</div>
+      <div id="op-franjas"></div>
+    </div>
+    <!-- Por tipo -->
+    <div class="card">
+      <div class="card-title">Distribución por tipo de boleto</div>
+      <div class="card-sub">Clic para ver detalle de esa categoría</div>
+      <div id="op-tipos"></div>
+    </div>
+  </div>
+
+  <!-- Tabla operaciones -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div>
+        <div class="card-title">Detalle de operaciones</div>
+        <div class="card-sub">Todas las transacciones del período</div>
+      </div>
+      <select id="filtro-tipo-op" onchange="renderTablaOps()" style="margin-left:auto;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px">
+        <option value="">Todos los tipos</option>
+        <option value="normal">Normal</option>
+        <option value="preferencial">Preferencial</option>
+        <option value="perdido">Boleto perdido</option>
+        <option value="cortesia">Cortesía</option>
+      </select>
+      <select id="filtro-franja-op" onchange="renderTablaOps()" style="border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px">
+        <option value="">Todas las franjas</option>
+        <option value="Matutino">Matutino</option>
+        <option value="Vespertino">Vespertino</option>
+        <option value="Nocturno">Nocturno</option>
+      </select>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead><tr>
+          <th>Folio</th><th>Tipo</th><th>Cajero</th>
+          <th>Entrada</th><th>Min</th><th>Franja</th>
+          <th style="text-align:right">Importe</th>
+        </tr></thead>
+        <tbody id="tabla-ops-corp"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ TAB CAJEROS ══ -->
+<div class="tab-section" id="tab-cajeros">
+
+  <div class="filtros">
+    <select id="periodo-caj" onchange="renderCajeros()">
+      <option value="hoy">Hoy</option>
+      <option value="semana" selected>Esta semana</option>
+      <option value="mes">Este mes</option>
+    </select>
+  </div>
+
+  <div class="grid2">
+    <!-- Ranking -->
+    <div class="card">
+      <div class="card-title">Ranking de cajeros</div>
+      <div class="card-sub">Por ingresos generados · Clic para ver detalle</div>
+      <div id="cajero-ranking-corp"></div>
+    </div>
+    <!-- Turnos del día -->
+    <div class="card">
+      <div class="card-title">Turnos del día</div>
+      <div class="card-sub">Apertura → Relevos → Cierre</div>
+      <div id="turnos-dia"></div>
+    </div>
+  </div>
+
+  <!-- Detalle cajero seleccionado -->
+  <div class="drill" id="drill-cajero">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="drill-back" onclick="document.getElementById('drill-cajero').classList.remove('open')">← Volver</button>
+      <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-cajero-title">Cajero</span>
+    </div>
+    <div id="drill-cajero-content"></div>
+  </div>
+
+</div>
+
+<!-- ══ TAB DEMANDA ══ -->
+<div class="tab-section" id="tab-demanda">
+  <div class="card" style="padding:28px;text-align:center">
+    <div style="font-size:32px;margin-bottom:12px">📊</div>
+    <div style="font-size:15px;font-weight:800;margin-bottom:8px">Análisis de Demanda Temporal</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">
+      Heatmap por día/hora, curvas de demanda, patrones semanales e insights automáticos
+    </div>
+    <a href="IwolPark_Demanda.html" target="_blank"
+       style="background:var(--purple);color:#fff;border:none;border-radius:8px;
+              padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;
+              text-decoration:none;display:inline-block">
+      Abrir tablero de demanda →
+    </a>
+  </div>
+</div>
+
+<!-- ══ TAB CORTES ══ -->
+<div class="tab-section" id="tab-cortes">
+
+  <div class="filtros">
+    <select id="periodo-cor" onchange="renderCortes()">
+      <option value="semana">Esta semana</option>
+      <option value="mes" selected>Este mes</option>
+      <option value="año">Este año</option>
+    </select>
+    <button class="btn-outline" onclick="exportarCSV('cortes')">⬇ Export cortes</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Cortes diarios</div>
+    <div class="card-sub">Resumen por día · Clic para ver detalle del corte</div>
+    <div class="tabla-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th><th>Día</th><th>Turno 1</th><th>Turno 2</th>
+          <th>Ops</th><th>Perdidos</th><th>Cortesías</th>
+          <th style="text-align:right">Total</th>
+        </tr></thead>
+        <tbody id="tabla-cortes"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /container -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ CLOCK ══
+setInterval(()=>document.getElementById('clock').textContent=
+  new Date().toLocaleTimeString('es-MX'),1000);
+
+// ══ TABS ══
+function showTab(id, el) {
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  if(id==='ejecutivo') renderEjecutivo();
+  if(id==='operativo') renderOperativo();
+  if(id==='cajeros')   renderCajeros();
+  if(id==='cortes')    renderCortes();
+}
+
+// ══ DATOS DEMO ══
+const CAJEROS = ['Juan Pérez','María López','Carlos Ruiz'];
+const TIPOS   = ['normal','normal','normal','preferencial','perdido','cortesia'];
+const DIAS_S  = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function generarOps(n=120) {
+  return Array.from({length:n},(_,i)=>{
+    const t = TIPOS[Math.floor(Math.random()*TIPOS.length)];
+    const imp = t==='normal'?15*(1+Math.floor(Math.random()*4))
+              : t==='preferencial'?6*(1+Math.floor(Math.random()*3))
+              : t==='perdido'?150+15*(1+Math.floor(Math.random()*3)):0;
+    const h = 7+Math.floor(Math.random()*15);
+    const d = new Date(); d.setDate(d.getDate()-Math.floor(Math.random()*30));
+    return {
+      folio:'UFC-'+(829+i), tipo:t,
+      cajero:CAJEROS[Math.floor(Math.random()*CAJEROS.length)],
+      hora:`${String(h).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
+      minutos:15+Math.floor(Math.random()*120),
+      franja:h<12?'Matutino':h<19?'Vespertino':'Nocturno',
+      importe:imp, fecha:d.toISOString().slice(0,10),
+      dia:DIAS_S[d.getDay()===0?6:d.getDay()-1]
+    };
+  });
+}
+
+const OPS = generarOps(120);
+const autos_ahora = 14;
+
+// ══ UTILS ══
+function fmt$(n){return '$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}
+let _tt; function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500)}
+
+// ══ EJECUTIVO ══
+function renderEjecutivo() {
+  const ops = OPS;
+  const cobros = ops.filter(o=>o.importe>0);
+  const total  = cobros.reduce((s,o)=>s+o.importe,0);
+  const perdidos = ops.filter(o=>o.tipo==='perdido');
+  const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
+  const ticket = cobros.length?total/cobros.length:0;
+  const pct    = Math.round(autos_ahora/68*100);
+
+  document.getElementById('ej-ingresos').textContent = fmt$(total);
+  document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
+  document.getElementById('ej-ingresos-delta').textContent = '↑ 12% vs mes anterior';
+  document.getElementById('ej-ops').textContent = ops.length;
+  document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
+  document.getElementById('ej-ops-delta').textContent = '↑ 8% vs mes anterior';
+  document.getElementById('ej-ocu').textContent = pct+'%';
+  document.getElementById('ej-ocu-sub').textContent = autos_ahora+' de 68 lugares';
+  document.getElementById('ej-ticket').textContent = fmt$(ticket);
+  document.getElementById('ej-ticket-sub').textContent = 'por operación cobrada';
+  document.getElementById('ej-perdidos').textContent = perdidos.length;
+  document.getElementById('ej-perdidos-sub').textContent = fmt$(pTotal)+' en penalizaciones';
+
+  // Gauge
+  const offset = 157 - (157 * pct/100);
+  document.getElementById('gauge-arc').style.strokeDashoffset = offset;
+  document.getElementById('gauge-pct').textContent = pct+'%';
+  document.getElementById('gauge-sub').textContent = autos_ahora+' / 68 lugares';
+
+  // Chart meses
+  const meses = ['Feb','Mar','Abr','May','Jun','Jul'];
+  const vals  = [28400,31200,29800,35600,38200,total];
+  const maxM  = Math.max(...vals);
+  document.getElementById('chart-meses').innerHTML = meses.map((m,i)=>`
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer"
+         onclick="showToast('${m}: ${fmt$(vals[i])}')">
+      <div style="font-size:10px;font-weight:700;color:var(--muted)">${fmt$(vals[i]).replace('$','$').split('.')[0]}</div>
+      <div style="width:100%;background:${i===5?'var(--purple)':'#D4C5F0'};border-radius:6px 6px 0 0;
+           height:${vals[i]/maxM*90}px;min-height:4px;transition:height .5s"></div>
+      <div style="font-size:10px;color:var(--muted)">${m}</div>
+    </div>`).join('');
+
+  // Mix ingresos
+  const tiposInfo = [
+    {t:'normal',l:'Normal',c:'#0A66C2'},
+    {t:'preferencial',l:'Preferencial',c:'#7B5EA7'},
+    {t:'perdido',l:'Boleto perdido',c:'#D93025'},
+    {t:'cortesia',l:'Cortesía',c:'#888'},
+  ];
+  const maxT = Math.max(...tiposInfo.map(ti=>ops.filter(o=>o.tipo===ti.t).reduce((s,o)=>s+o.importe,0)));
+  document.getElementById('mix-ingresos').innerHTML = tiposInfo.map(ti=>{
+    const sub=ops.filter(o=>o.tipo===ti.t);
+    const tot=sub.reduce((s,o)=>s+o.importe,0);
+    const pct2=maxT?Math.round(tot/maxT*100):0;
+    return `<div class="hbar-row" onclick="showToast('${ti.l}: ${fmt$(tot)} · ${sub.length} ops')">
+      <div class="hbar-label" style="color:${ti.c}">${ti.l}</div>
+      <div class="hbar-wrap"><div class="hbar-fill" style="width:${pct2}%;background:${ti.c}"></div></div>
+      <div class="hbar-val">${fmt$(tot)}</div>
+    </div>`;
+  }).join('');
+
+  // Mini hoy
+  const horas = Array.from({length:16},(_,i)=>i+7);
+  const autosH = horas.map(h=>Math.round(Math.random()*30+5));
+  const maxA = Math.max(...autosH);
+  document.getElementById('mini-hoy').innerHTML = horas.map((h,i)=>`
+    <div style="flex:1;border-radius:3px 3px 0 0;min-height:2px;
+         background:${h<12?'#0A66C2':h<19?'#7B5EA7':'#F5A623'};
+         height:${autosH[i]/maxA*56}px;cursor:pointer"
+         onclick="showToast('${h}:00 → ${autosH[i]} autos')">
+    </div>`).join('');
+
+  // Meta vs real
+  const meta=40000, real=total, avance=Math.round(real/meta*100);
+  document.getElementById('meta-vs-real').innerHTML = `
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+        <span style="font-weight:700">Meta mensual</span><span style="color:var(--muted)">${fmt$(meta)}</span>
+      </div>
+      <div style="background:#F0EEF8;border-radius:99px;height:14px;overflow:hidden">
+        <div style="width:${Math.min(avance,100)}%;height:100%;border-radius:99px;
+             background:${avance>=100?'var(--green)':'var(--purple)'};transition:width .5s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px">
+        <span style="color:var(--muted)">Real: ${fmt$(real)}</span>
+        <span style="font-weight:800;color:${avance>=100?'var(--green)':'var(--purple)'}">${avance}%</span>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px">
+      ${avance>=100?'✅ Meta alcanzada':'⏳ Faltan '+fmt$(meta-real)+' para la meta'}
+    </div>`;
+}
+
+// ══ DRILL KPI ══
+function drillKPI(tipo) {
+  const panel = document.getElementById('drill-panel');
+  const cont  = document.getElementById('drill-content');
+  const title = document.getElementById('drill-title');
+  panel.classList.add('open');
+  const ops = OPS;
+
+  if(tipo==='perdidos') {
+    title.textContent = '⚠ Detalle: Boletos Perdidos';
+    const perdidos = ops.filter(o=>o.tipo==='perdido');
+    cont.innerHTML = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Cajero</th><th>Fecha</th><th>Hora</th><th>Franja</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${perdidos.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.cajero}</td><td>${o.fecha}</td><td>${o.hora}</td>
+        <td>${o.franja}</td>
+        <td style="text-align:right;font-weight:700;color:var(--red)">${fmt$(o.importe)}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } else if(tipo==='ingresos') {
+    title.textContent = '💰 Breakdown de ingresos';
+    const tipos = [{t:'normal',l:'Normal',c:'#0A66C2'},{t:'preferencial',l:'Preferencial',c:'#7B5EA7'},{t:'perdido',l:'Perdido',c:'#D93025'}];
+    const tot = ops.reduce((s,o)=>s+o.importe,0);
+    cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      ${tipos.map(ti=>{
+        const sub=ops.filter(o=>o.tipo===ti.t);
+        const t=sub.reduce((s,o)=>s+o.importe,0);
+        return `<div style="background:var(--bg);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:${ti.c};margin-bottom:4px">${ti.l}</div>
+          <div style="font-size:26px;font-weight:900">${fmt$(t)}</div>
+          <div style="font-size:11px;color:var(--muted)">${sub.length} ops · ${tot?Math.round(t/tot*100):0}%</div>
+        </div>`}).join('')}
+    </div>`;
+  } else {
+    title.textContent = '📊 Detalle: '+tipo;
+    cont.innerHTML = `<div style="padding:16px;color:var(--muted);text-align:center">Ver tabla de operaciones en tab Operativo</div>`;
+  }
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
+
+// ══ OPERATIVO ══
+function renderOperativo() { renderTablaOps(); renderFranjasOp(); renderTiposOp(); }
+
+function renderFranjasOp() {
+  const franjas=[
+    {n:'🌅 Matutino',f:'Matutino',c:'#0A66C2'},
+    {n:'☀ Vespertino',f:'Vespertino',c:'#7B5EA7'},
+    {n:'🌙 Nocturno',f:'Nocturno',c:'#F5A623'}
+  ];
+  const maxF = Math.max(...franjas.map(f=>OPS.filter(o=>o.franja===f.f).length));
+  document.getElementById('op-franjas').innerHTML = franjas.map(f=>{
+    const sub=OPS.filter(o=>o.franja===f.f);
+    const tot=sub.reduce((s,o)=>s+o.importe,0);
+    return `<div class="hbar-row">
+      <div class="hbar-label" style="color:${f.c}">${f.n}</div>
+      <div class="hbar-wrap"><div class="hbar-fill" style="width:${maxF?sub.length/maxF*100:0}%;background:${f.c}"></div></div>
+      <div style="min-width:80px;text-align:right;font-size:11px">
+        <div style="font-weight:700;color:var(--gold)">${fmt$(tot)}</div>
+        <div style="color:var(--muted)">${sub.length} ops</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTiposOp() {
+  const tipos=[
+    {t:'normal',l:'Normal $15/hr',c:'#0A66C2'},
+    {t:'preferencial',l:'Preferencial $6/hr',c:'#7B5EA7'},
+    {t:'perdido',l:'Boleto perdido',c:'#D93025'},
+    {t:'cortesia',l:'Cortesía ≤15min',c:'#888'}
+  ];
+  const tot=OPS.length||1;
+  document.getElementById('op-tipos').innerHTML = tipos.map(ti=>{
+    const sub=OPS.filter(o=>o.tipo===ti.t);
+    const pct=Math.round(sub.length/tot*100);
+    const ing=sub.reduce((s,o)=>s+o.importe,0);
+    return `<div class="hbar-row" onclick="document.getElementById('filtro-tipo-op').value='${ti.t}';renderTablaOps()">
+      <div class="hbar-label" style="color:${ti.c};font-size:11px">${ti.l}</div>
+      <div class="hbar-wrap"><div class="hbar-fill" style="width:${pct}%;background:${ti.c}"></div></div>
+      <div style="min-width:90px;text-align:right;font-size:11px">
+        <div style="font-weight:700">${pct}%</div>
+        <div style="color:var(--muted)">${fmt$(ing)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTablaOps() {
+  const filtroTipo  = document.getElementById('filtro-tipo-op')?.value||'';
+  const filtroFranja= document.getElementById('filtro-franja-op')?.value||'';
+  const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
+  const bl={normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
+  let ops = OPS;
+  if(filtroTipo)   ops=ops.filter(o=>o.tipo===filtroTipo);
+  if(filtroFranja) ops=ops.filter(o=>o.franja===filtroFranja);
+  document.getElementById('tabla-ops-corp').innerHTML = ops.map(o=>`
+    <tr onclick="showToast('${o.folio} · ${o.cajero} · ${fmt$(o.importe)}')">
+      <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+      <td><span class="badge ${bc[o.tipo]||'b-n'}">${bl[o.tipo]||o.tipo}</span></td>
+      <td>${o.cajero}</td>
+      <td>${o.fecha} ${o.hora}</td>
+      <td>${o.minutos}</td>
+      <td><span style="font-size:11px;color:var(--muted)">${o.franja}</span></td>
+      <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">
+        ${o.importe?fmt$(o.importe):'—'}</td>
+    </tr>`).join('');
+}
+
+// ══ CAJEROS ══
+function renderCajeros() {
+  const cajeros={};
+  OPS.forEach(o=>{
+    if(!cajeros[o.cajero]) cajeros[o.cajero]={ops:0,total:0,perdidos:0};
+    cajeros[o.cajero].ops++;
+    cajeros[o.cajero].total+=o.importe;
+    if(o.tipo==='perdido') cajeros[o.cajero].perdidos++;
+  });
+  const sorted=Object.entries(cajeros).sort((a,b)=>b[1].total-a[1].total);
+  const max=sorted[0]?.[1]?.total||1;
+  document.getElementById('cajero-ranking-corp').innerHTML=sorted.map(([nom,d],i)=>`
+    <div class="hbar-row" onclick="drillCajero('${nom}',${JSON.stringify(d).replace(/"/g,"'")})">
+      <div style="min-width:24px;font-size:16px;font-weight:900;color:var(--purple)">${i+1}</div>
+      <div class="hbar-label">${nom}<br>
+        <span style="font-size:10px;color:var(--muted);font-weight:400">${d.ops} ops · ${d.perdidos} perdidos</span>
+      </div>
+      <div class="hbar-wrap"><div class="hbar-fill" style="width:${d.total/max*100}%;background:var(--purple)"></div></div>
+      <div class="hbar-val">${fmt$(d.total)}</div>
+    </div>`).join('');
+
+  // Turnos
+  const turnos=[
+    {cajero:'Juan Pérez',inicio:'07:00',fin:'14:00',tipo:'apertura',monto:18400},
+    {cajero:'María López',inicio:'14:00',fin:'22:00',tipo:'relevo',monto:24200},
+    {cajero:'Carlos Ruiz',inicio:'22:00',fin:'Activo',tipo:'relevo',monto:6800},
+  ];
+  const colores={apertura:'#0D9457',relevo:'#0A66C2',cierre:'#D93025'};
+  document.getElementById('turnos-dia').innerHTML=turnos.map(t=>`
+    <div class="turno-row">
+      <div class="turno-dot" style="background:${colores[t.tipo]}"></div>
+      <div class="turno-info">
+        <div class="turno-cajero">${t.cajero}</div>
+        <div class="turno-time">${t.inicio} → ${t.fin} · ${t.tipo}</div>
+      </div>
+      <div class="turno-monto">${fmt$(t.monto)}</div>
+    </div>`).join('');
+}
+
+function drillCajero(nom) {
+  const panel=document.getElementById('drill-cajero');
+  document.getElementById('drill-cajero-title').textContent='👤 '+nom;
+  const ops=OPS.filter(o=>o.cajero===nom);
+  const tot=ops.reduce((s,o)=>s+o.importe,0);
+  const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
+  const bl={normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
+  document.getElementById('drill-cajero-content').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+      ${[['Operaciones',ops.length,'var(--blue)'],['Total cobrado',fmt$(tot),'var(--gold)'],
+         ['Ticket prom.',fmt$(ops.filter(o=>o.importe>0).length?tot/ops.filter(o=>o.importe>0).length:0),'var(--green)'],
+         ['Perdidos',ops.filter(o=>o.tipo==='perdido').length,'var(--red)']
+        ].map(([l,v,c])=>`<div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">${l}</div>
+          <div style="font-size:22px;font-weight:900;color:${c}">${v}</div>
+        </div>`).join('')}
+    </div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Hora</th><th>Franja</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.slice(0,10).map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td><span class="badge ${bc[o.tipo]||'b-n'}">${bl[o.tipo]||o.tipo}</span></td>
+        <td>${o.hora}</td><td>${o.franja}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">
+          ${o.importe?fmt$(o.importe):'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  panel.classList.add('open');
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ══ CORTES ══
+function renderCortes() {
+  const fechas=[...new Set(OPS.map(o=>o.fecha))].sort().reverse().slice(0,10);
+  const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
+  document.getElementById('tabla-cortes').innerHTML=fechas.map(f=>{
+    const sub=OPS.filter(o=>o.fecha===f);
+    const tot=sub.reduce((s,o)=>s+o.importe,0);
+    const perd=sub.filter(o=>o.tipo==='perdido').length;
+    const cort=sub.filter(o=>o.tipo==='cortesia').length;
+    const d=new Date(f+'T12:00:00');
+    const dia=DIAS_S[d.getDay()===0?6:d.getDay()-1];
+    return `<tr onclick="showToast('${f}: ${fmt$(tot)} · ${sub.length} ops')">
+      <td><strong>${f}</strong></td><td>${dia}</td>
+      <td style="color:var(--muted);font-size:11px">T1</td>
+      <td style="color:var(--muted);font-size:11px">T2</td>
+      <td>${sub.length}</td>
+      <td style="color:var(--red);font-weight:700">${perd}</td>
+      <td style="color:var(--muted)">${cort}</td>
+      <td style="text-align:right;font-weight:800;color:var(--gold)">${fmt$(tot)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══ EXPORT ══
+function exportarCSV(tipo) {
+  const hoy=new Date().toISOString().slice(0,10);
+  const header='Folio,Tipo,Cajero,Fecha,Hora,Min,Franja,Importe';
+  const rows=OPS.map(o=>[o.folio,o.tipo,o.cajero,o.fecha,o.hora,o.minutos||0,o.franja,o.importe].join(','));
+  const csv='\uFEFF'+[header,...rows].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`IwolPark_corporativo_${tipo}_${hoy}.csv`;
+  a.click();
+  showToast('CSV exportado · '+OPS.length+' registros');
+}
+
+// ══ INIT ══
+renderEjecutivo();
+</script>
+</body>
+</html>

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IwolPark · Dashboard Admin</title>
+<style>
+:root {
+  --bg:      #F5F5F7;
+  --white:   #FFFFFF;
+  --border:  #D2D2D7;
+  --accent:  #7B5EA7;
+  --accent2: #0A66C2;
+  --green:   #0D9457;
+  --red:     #D93025;
+  --gold:    #F5A623;
+  --text:    #1D1D1F;
+  --muted:   #6E6E73;
+  --card-sh: 0 2px 12px rgba(0,0,0,.08);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+       color:var(--text); min-height:100vh; }
+
+/* NAV */
+nav { background:#fff; border-bottom:1px solid var(--border);
+      padding:0 24px; height:52px; display:flex; align-items:center;
+      gap:12px; position:sticky; top:0; z-index:100;
+      box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.nav-logo { height:28px; }
+.nav-title { font-size:15px; font-weight:800; color:var(--text); }
+.nav-badge { font-size:10px; font-weight:700; background:var(--accent);
+             color:#fff; border-radius:4px; padding:2px 8px; }
+.nav-right { margin-left:auto; display:flex; align-items:center; gap:16px; }
+.nav-plaza { font-size:13px; font-weight:700; color:var(--accent); }
+.nav-clock { font-size:12px; color:var(--muted); font-family:monospace; }
+.btn-refresh { background:var(--accent); color:#fff; border:none;
+               border-radius:8px; padding:7px 16px; font-size:12px;
+               font-weight:700; cursor:pointer; }
+
+/* LAYOUT */
+.container { max-width:1400px; margin:0 auto; padding:20px 24px; }
+
+/* FILTROS */
+.filtros { display:flex; gap:10px; align-items:center; margin-bottom:20px;
+           flex-wrap:wrap; }
+.filtros label { font-size:12px; font-weight:700; color:var(--muted);
+                 text-transform:uppercase; letter-spacing:.5px; }
+.filtros select, .filtros input[type=date] {
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:7px 12px; font-size:13px; background:#fff;
+  color:var(--text); cursor:pointer; }
+.filtros select:focus, .filtros input:focus {
+  outline:none; border-color:var(--accent); }
+.btn-filtro { background:var(--accent); color:#fff; border:none;
+              border-radius:8px; padding:8px 18px; font-size:13px;
+              font-weight:700; cursor:pointer; }
+
+/* KPI CARDS */
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr);
+            gap:14px; margin-bottom:20px; }
+@media (max-width:900px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
+.kpi-card { background:var(--white); border-radius:12px;
+            border:1px solid var(--border); padding:18px 20px;
+            box-shadow:var(--card-sh); cursor:pointer;
+            transition:transform .15s, box-shadow .15s; position:relative; }
+.kpi-card:hover { transform:translateY(-2px);
+                  box-shadow:0 6px 20px rgba(0,0,0,.12); }
+.kpi-card.selected { border-color:var(--accent); border-width:2px; }
+.kpi-label { font-size:11px; font-weight:700; color:var(--muted);
+             text-transform:uppercase; letter-spacing:.8px; margin-bottom:8px; }
+.kpi-value { font-size:32px; font-weight:900; line-height:1; margin-bottom:4px; }
+.kpi-sub   { font-size:12px; color:var(--muted); }
+.kpi-delta { position:absolute; top:16px; right:16px; font-size:11px;
+             font-weight:700; padding:3px 7px; border-radius:4px; }
+.delta-up   { background:#DCFCE7; color:#16A34A; }
+.delta-down { background:#FEE2E2; color:#DC2626; }
+
+/* CHARTS GRID */
+.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px;
+               margin-bottom:20px; }
+@media (max-width:900px) { .charts-grid { grid-template-columns:1fr; } }
+.chart-card { background:var(--white); border-radius:12px;
+              border:1px solid var(--border); padding:20px;
+              box-shadow:var(--card-sh); }
+.chart-title { font-size:13px; font-weight:800; margin-bottom:4px;
+               color:var(--text); }
+.chart-sub   { font-size:11px; color:var(--muted); margin-bottom:16px; }
+
+/* DRILL-DOWN PANEL */
+.drill-panel { background:var(--white); border-radius:12px;
+               border:2px solid var(--accent); padding:20px;
+               box-shadow:var(--card-sh); margin-bottom:20px;
+               display:none; }
+.drill-panel.open { display:block; }
+.drill-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+.drill-back { background:var(--accent); color:#fff; border:none;
+              border-radius:6px; padding:6px 14px; font-size:12px;
+              font-weight:700; cursor:pointer; }
+.drill-title { font-size:14px; font-weight:800; color:var(--accent); }
+.drill-path  { font-size:11px; color:var(--muted); margin-left:auto; }
+
+/* TABLA DETALLE */
+.tabla-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:#F8F5FF; padding:10px 14px; text-align:left;
+     font-size:11px; font-weight:700; color:var(--muted);
+     text-transform:uppercase; letter-spacing:.5px;
+     border-bottom:2px solid var(--border); }
+td { padding:10px 14px; border-bottom:1px solid #F0EEF8; }
+tr:hover td { background:#FAFAFE; cursor:pointer; }
+.badge { display:inline-block; padding:2px 8px; border-radius:4px;
+         font-size:11px; font-weight:700; }
+.b-normal { background:#EFF6FF; color:#0A66C2; }
+.b-pref   { background:#F3F0FF; color:#7B5EA7; }
+.b-perdido{ background:#FEE2E2; color:#D93025; }
+.b-cortesia{background:#F5F5F5; color:#6E6E73; }
+
+/* OCUPACIÓN GAUGE */
+.ocupacion-wrap { display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+.gauge-num { text-align:center; }
+.gauge-pct { font-size:52px; font-weight:900; color:var(--accent); line-height:1; }
+.gauge-bar-wrap { flex:1; min-width:160px; }
+.gauge-bar-bg { background:#F0EEF8; border-radius:99px; height:20px; overflow:hidden; }
+.gauge-bar-fill { height:100%; border-radius:99px;
+                  background:linear-gradient(90deg,var(--accent),var(--accent2));
+                  transition:width .6s ease; }
+.gauge-labels { display:flex; justify-content:space-between;
+                font-size:11px; color:var(--muted); margin-top:6px; }
+
+/* FRANJA BARRAS */
+.franja-bars { display:flex; gap:12px; align-items:flex-end;
+               height:120px; padding-top:12px; }
+.franja-col { flex:1; display:flex; flex-direction:column;
+              align-items:center; gap:6px; }
+.franja-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; }
+.franja-bar { width:100%; border-radius:6px 6px 0 0;
+              transition:height .5s ease; cursor:pointer; }
+.franja-label { font-size:10px; color:var(--muted); font-weight:700;
+                text-align:center; }
+.franja-value { font-size:12px; font-weight:800; color:var(--text); }
+
+/* RANKING CAJEROS */
+.cajero-row { display:flex; align-items:center; gap:12px;
+              padding:10px 0; border-bottom:1px solid #F0EEF8; }
+.cajero-num  { font-size:18px; font-weight:900; color:var(--accent);
+               min-width:28px; }
+.cajero-name { flex:1; font-size:13px; font-weight:700; }
+.cajero-bar  { flex:2; }
+.cajero-bar-bg { background:#F0EEF8; border-radius:99px; height:8px; }
+.cajero-bar-fill { height:100%; border-radius:99px; background:var(--accent); }
+.cajero-val  { font-size:13px; font-weight:800; color:var(--gold);
+               min-width:70px; text-align:right; }
+
+/* TOAST */
+.toast { position:fixed; bottom:20px; right:20px; background:#1D1D1F;
+         color:#fff; border-radius:10px; padding:12px 18px;
+         font-size:13px; font-weight:600; z-index:9999;
+         transform:translateY(60px); opacity:0; transition:all .3s; }
+.toast.show { transform:translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span style="font-size:22px;font-weight:900;color:var(--accent)">·iwol·</span>
+  <span class="nav-title">IwolPark</span>
+  <span class="nav-badge">ADMIN PLAZA</span>
+  <div class="nav-right">
+    <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
+    <span class="nav-clock" id="nav-clock">--:--:--</span>
+    <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- FILTROS -->
+  <div class="filtros">
+    <label>Período</label>
+    <select id="filtro-periodo" onchange="onFiltroCambio()">
+      <option value="hoy">Hoy</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes">Este mes</option>
+      <option value="custom">Personalizado</option>
+    </select>
+    <input type="date" id="filtro-desde" style="display:none">
+    <input type="date" id="filtro-hasta" style="display:none">
+    <select id="filtro-cajero" onchange="cargarDatos()">
+      <option value="">Todos los cajeros</option>
+    </select>
+    <button class="btn-filtro" onclick="cargarDatos()">Aplicar</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--muted)"
+          id="ultima-actualizacion">Cargando...</span>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card" onclick="drillDown('ingresos')" title="Ver detalle">
+      <div class="kpi-label">Ingresos del día</div>
+      <div class="kpi-value" style="color:var(--gold)" id="kpi-ingresos">$0</div>
+      <div class="kpi-sub" id="kpi-ingresos-sub">0 operaciones</div>
+      <div class="kpi-delta delta-up" id="kpi-ingresos-delta">↑ vs ayer</div>
+    </div>
+    <div class="kpi-card" onclick="drillDown('ocupacion')" title="Ver detalle">
+      <div class="kpi-label">Ocupación ahora</div>
+      <div class="kpi-value" style="color:var(--accent)" id="kpi-ocupacion">0%</div>
+      <div class="kpi-sub" id="kpi-ocupacion-sub">0 de 68 lugares</div>
+    </div>
+    <div class="kpi-card" onclick="drillDown('boletos_perdidos')" title="Ver detalle">
+      <div class="kpi-label">Boletos perdidos</div>
+      <div class="kpi-value" style="color:var(--red)" id="kpi-perdidos">0</div>
+      <div class="kpi-sub" id="kpi-perdidos-sub">$0 en penalizaciones</div>
+    </div>
+    <div class="kpi-card" onclick="drillDown('ticket_promedio')" title="Ver detalle">
+      <div class="kpi-label">Ticket promedio</div>
+      <div class="kpi-value" style="color:var(--green)" id="kpi-ticket">$0</div>
+      <div class="kpi-sub" id="kpi-ticket-sub">Tiempo prom: 0 min</div>
+    </div>
+  </div>
+
+  <!-- DRILL-DOWN PANEL -->
+  <div class="drill-panel" id="drill-panel">
+    <div class="drill-header">
+      <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
+      <span class="drill-title" id="drill-title">Detalle</span>
+      <span class="drill-path" id="drill-path"></span>
+    </div>
+    <div id="drill-content"></div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-grid">
+
+    <!-- Ingresos por franja horaria -->
+    <div class="chart-card">
+      <div class="chart-title">Ingresos por franja horaria</div>
+      <div class="chart-sub">Clic en barra para ver detalle · Matutino 07–12 · Vespertino 12–19 · Nocturno 19–07</div>
+      <div class="franja-bars" id="franja-bars">
+        <div class="franja-col">
+          <div class="franja-value" id="fv-mat">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-mat" style="background:#0A66C2;height:0%"
+                 onclick="drillFranja('Matutino')"></div>
+          </div>
+          <div class="franja-label">Matutino<br>07–12</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-ves">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-ves" style="background:#7B5EA7;height:0%"
+                 onclick="drillFranja('Vespertino')"></div>
+          </div>
+          <div class="franja-label">Vespertino<br>12–19</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-noc">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-noc" style="background:#F5A623;height:0%"
+                 onclick="drillFranja('Nocturno')"></div>
+          </div>
+          <div class="franja-label">Nocturno<br>19–07</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ocupación actual -->
+    <div class="chart-card">
+      <div class="chart-title">Ocupación actual</div>
+      <div class="chart-sub">Autos en plaza en este momento</div>
+      <div class="ocupacion-wrap">
+        <div class="gauge-num">
+          <div class="gauge-pct" id="gauge-pct">0%</div>
+          <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 68</div>
+        </div>
+        <div class="gauge-bar-wrap">
+          <div class="gauge-bar-bg">
+            <div class="gauge-bar-fill" id="gauge-fill" style="width:0%"></div>
+          </div>
+          <div class="gauge-labels">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100% (68)</span>
+          </div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);font-weight:700">Normales</div>
+              <div style="font-size:20px;font-weight:900;color:#0A66C2" id="ocu-normal">0</div>
+            </div>
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);font-weight:700">Preferenciales</div>
+              <div style="font-size:20px;font-weight:900;color:#7B5EA7" id="ocu-pref">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-grid">
+
+    <!-- Mix por tipo de boleto -->
+    <div class="chart-card">
+      <div class="chart-title">Mix por tipo de boleto</div>
+      <div class="chart-sub">Distribución de operaciones del período</div>
+      <div id="mix-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+    </div>
+
+    <!-- Ranking cajeros -->
+    <div class="chart-card">
+      <div class="chart-title">Rendimiento por cajero</div>
+      <div class="chart-sub">Clic para ver detalle del turno</div>
+      <div id="cajero-ranking"></div>
+    </div>
+  </div>
+
+  <!-- TABLA CORTE DIARIO -->
+  <div class="chart-card" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div>
+        <div class="chart-title">Corte del día — Detalle de operaciones</div>
+        <div class="chart-sub">Todas las transacciones del período · Clic en fila para drill-through</div>
+      </div>
+      <button onclick="exportarCSV()" style="margin-left:auto;background:var(--accent);
+              color:#fff;border:none;border-radius:8px;padding:8px 16px;
+              font-size:12px;font-weight:700;cursor:pointer">⬇ Export CSV</button>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Folio</th><th>Tipo</th><th>Cajero</th>
+            <th>Entrada</th><th>Salida</th><th>Min</th>
+            <th>Franja</th><th style="text-align:right">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-ops"></tbody>
+      </table>
+    </div>
+    <div id="tabla-empty" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;display:none">
+      Sin operaciones para el período seleccionado
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ CONFIG ══
+const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
+const PLAZA_ID     = ''; // Se obtiene automáticamente
+
+// ══ ESTADO ══
+let DATOS = {
+  operaciones: [],
+  turno_actual: null,
+  autos_en_plaza: 0,
+  capacidad: 68
+};
+let _drillActual = null;
+
+// ══ CLOCK ══
+setInterval(() => {
+  document.getElementById('nav-clock').textContent =
+    new Date().toLocaleTimeString('es-MX');
+}, 1000);
+
+// ══ FILTROS ══
+function onFiltroCambio() {
+  const p = document.getElementById('filtro-periodo').value;
+  document.getElementById('filtro-desde').style.display = p==='custom'?'':'none';
+  document.getElementById('filtro-hasta').style.display = p==='custom'?'':'none';
+  if (p !== 'custom') cargarDatos();
+}
+
+function getFechas() {
+  const p = document.getElementById('filtro-periodo').value;
+  const hoy = new Date();
+  const fmt = d => d.toISOString().slice(0,10);
+  if (p === 'hoy')    return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (p === 'semana') {
+    const ini = new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1);
+    return { desde: fmt(ini), hasta: fmt(hoy) };
+  }
+  if (p === 'mes') {
+    return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
+  }
+  return {
+    desde: document.getElementById('filtro-desde').value,
+    hasta: document.getElementById('filtro-hasta').value
+  };
+}
+
+// ══ DATOS (Supabase o DEMO) ══
+async function cargarDatos() {
+  try {
+    const {desde, hasta} = getFechas();
+    const cajeroFiltro = document.getElementById('filtro-cajero')?.value || '';
+
+    // Query a Supabase: tabla 'tickets' del período
+    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc&limit=1000`;
+    if(cajeroFiltro) query += `&cajero=eq.${encodeURIComponent(cajeroFiltro)}`;
+
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?${query}`, {
+      headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
+    });
+
+    if(r.ok) {
+      const rows = await r.json();
+      // Solo operaciones completadas (cobrado/perdido/cortesia) alimentan KPIs de ingresos
+      const completadas = rows.filter(o => o.estatus !== 'abierto');
+      DATOS.operaciones = completadas.map(o => ({
+        folio:        o.folio,
+        tipo:         o.tipo || 'normal',
+        cajero:       o.cajero || '—',
+        hora_entrada: o.hora_entrada || '—',
+        hora_salida:  o.hora_salida || '—',
+        minutos:      o.minutos_estancia || 0,
+        franja:       o.franja || '—',
+        importe:      parseFloat(o.importe) || 0,
+        fecha:        o.fecha_op || desde
+      }));
+      // Ocupación real = tickets con estatus 'abierto' (vehículos aún en plaza)
+      DATOS.autos_en_plaza = rows.filter(o => o.estatus === 'abierto').length;
+
+      // Poblar select de cajeros
+      const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
+      const sel = document.getElementById('filtro-cajero');
+      if(sel) {
+        sel.innerHTML = '<option value="">Todos los cajeros</option>' +
+          cajeros.map(c=>`<option value="${c}">${c}</option>`).join('');
+      }
+    } else {
+      // Sin datos reales — usar demo
+      DATOS = generarDatosDemo();
+    }
+
+    renderTodo();
+    document.getElementById('ultima-actualizacion').textContent =
+      'Actualizado: ' + new Date().toLocaleTimeString('es-MX');
+  } catch(e) {
+    console.warn('Supabase no disponible, usando datos demo:', e);
+    DATOS = generarDatosDemo();
+    renderTodo();
+    document.getElementById('ultima-actualizacion').textContent =
+      'Sin conexión · datos demo';
+  }
+}
+
+// ══ DATOS DEMO (reemplazar con Supabase queries) ══
+function generarDatosDemo() {
+  const ops = [];
+  const tipos = ['normal','normal','normal','preferencial','perdido','cortesia'];
+  const cajeros = ['Juan Pérez','María López','Carlos Ruiz'];
+  const hoy = new Date();
+  for (let i=0; i<28; i++) {
+    const t = tipos[Math.floor(Math.random()*tipos.length)];
+    const imp = t==='normal' ? 15*(1+Math.floor(Math.random()*4))
+               : t==='preferencial' ? 6*(1+Math.floor(Math.random()*3))
+               : t==='perdido' ? 150+15*(1+Math.floor(Math.random()*3))
+               : 0;
+    const h = 7 + Math.floor(Math.random()*15);
+    const franja = h<12?'Matutino':h<19?'Vespertino':'Nocturno';
+    ops.push({
+      folio: 'UFC-'+(829+i),
+      tipo: t,
+      cajero: cajeros[Math.floor(Math.random()*cajeros.length)],
+      hora_entrada: `${String(h).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
+      hora_salida:  `${String(h+1+Math.floor(Math.random()*2)).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
+      minutos: 15 + Math.floor(Math.random()*120),
+      franja,
+      importe: imp
+    });
+  }
+  return { operaciones: ops, autos_en_plaza: 12, capacidad: 68 };
+}
+
+// ══ RENDER TODO ══
+function renderTodo() {
+  const ops = DATOS.operaciones;
+  renderKPIs(ops);
+  renderFranjas(ops);
+  renderOcupacion();
+  renderMix(ops);
+  renderCajeros(ops);
+  renderTabla(ops);
+}
+
+function renderKPIs(ops) {
+  const cobros  = ops.filter(o => o.importe > 0);
+  const total   = cobros.reduce((s,o) => s+o.importe, 0);
+  const perdidos= ops.filter(o => o.tipo==='perdido');
+  const pTotal  = perdidos.reduce((s,o) => s+o.importe, 0);
+  const ticket  = cobros.length ? total/cobros.length : 0;
+  const minProm = ops.filter(o=>o.minutos>0).reduce((s,o,_,a)=>s+o.minutos/a.length,0);
+
+  document.getElementById('kpi-ingresos').textContent    = fmt$(total);
+  document.getElementById('kpi-ingresos-sub').textContent= ops.length + ' operaciones';
+  document.getElementById('kpi-perdidos').textContent    = perdidos.length;
+  document.getElementById('kpi-perdidos-sub').textContent= fmt$(pTotal) + ' en penalizaciones';
+  document.getElementById('kpi-ticket').textContent      = fmt$(ticket);
+  document.getElementById('kpi-ticket-sub').textContent  = 'Tiempo prom: ' + Math.round(minProm) + ' min';
+}
+
+function renderFranjas(ops) {
+  const mat = ops.filter(o=>o.franja==='Matutino').reduce((s,o)=>s+o.importe,0);
+  const ves = ops.filter(o=>o.franja==='Vespertino').reduce((s,o)=>s+o.importe,0);
+  const noc = ops.filter(o=>o.franja==='Nocturno').reduce((s,o)=>s+o.importe,0);
+  const max = Math.max(mat,ves,noc,1);
+  document.getElementById('fv-mat').textContent = fmt$(mat);
+  document.getElementById('fv-ves').textContent = fmt$(ves);
+  document.getElementById('fv-noc').textContent = fmt$(noc);
+  document.getElementById('fb-mat').style.height = (mat/max*90)+'%';
+  document.getElementById('fb-ves').style.height = (ves/max*90)+'%';
+  document.getElementById('fb-noc').style.height = (noc/max*90)+'%';
+}
+
+function renderOcupacion() {
+  const pct = Math.round(DATOS.autos_en_plaza / DATOS.capacidad * 100);
+  document.getElementById('kpi-ocupacion').textContent     = pct+'%';
+  document.getElementById('kpi-ocupacion-sub').textContent = DATOS.autos_en_plaza+' de '+DATOS.capacidad+' lugares';
+  document.getElementById('gauge-pct').textContent  = pct+'%';
+  document.getElementById('gauge-sub').textContent  = DATOS.autos_en_plaza+' / '+DATOS.capacidad;
+  document.getElementById('gauge-fill').style.width = pct+'%';
+  document.getElementById('ocu-normal').textContent = Math.floor(DATOS.autos_en_plaza*.7);
+  document.getElementById('ocu-pref').textContent   = Math.ceil(DATOS.autos_en_plaza*.3);
+}
+
+function renderMix(ops) {
+  const tipos = ['normal','preferencial','perdido','cortesia'];
+  const labels = {normal:'Normal',preferencial:'Preferencial',perdido:'Perdido',cortesia:'Cortesía'};
+  const colors = {normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025',cortesia:'#888'};
+  const total  = ops.length || 1;
+  const el = document.getElementById('mix-bars');
+  el.innerHTML = tipos.map(t => {
+    const cnt = ops.filter(o=>o.tipo===t).length;
+    const pct = Math.round(cnt/total*100);
+    const ing = ops.filter(o=>o.tipo===t).reduce((s,o)=>s+o.importe,0);
+    return `<div onclick="drillTipo('${t}')" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="font-weight:700;color:${colors[t]}">${labels[t]}</span>
+        <span style="color:var(--muted)">${cnt} ops · ${fmt$(ing)}</span>
+        <span style="font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;border-radius:99px;background:${colors[t]};transition:width .5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCajeros(ops) {
+  const cajeros = {};
+  ops.forEach(o => {
+    if (!cajeros[o.cajero]) cajeros[o.cajero] = {ops:0,total:0};
+    cajeros[o.cajero].ops++;
+    cajeros[o.cajero].total += o.importe;
+  });
+  const sorted = Object.entries(cajeros).sort((a,b)=>b[1].total-a[1].total);
+  const max = sorted[0]?.[1]?.total || 1;
+  const el = document.getElementById('cajero-ranking');
+  el.innerHTML = sorted.map(([nom,d],i) => `
+    <div class="cajero-row" onclick="drillCajero('${nom}')">
+      <div class="cajero-num">${i+1}</div>
+      <div class="cajero-name">${nom}<br>
+        <span style="font-size:11px;color:var(--muted);font-weight:400">${d.ops} operaciones</span>
+      </div>
+      <div class="cajero-bar">
+        <div class="cajero-bar-bg">
+          <div class="cajero-bar-fill" style="width:${d.total/max*100}%"></div>
+        </div>
+      </div>
+      <div class="cajero-val">${fmt$(d.total)}</div>
+    </div>`).join('');
+}
+
+function renderTabla(ops) {
+  const el = document.getElementById('tabla-ops');
+  const em = document.getElementById('tabla-empty');
+  if (!ops.length) { el.innerHTML=''; em.style.display='block'; return; }
+  em.style.display='none';
+  const badgeClass = {normal:'b-normal',preferencial:'b-pref',perdido:'b-perdido',cortesia:'b-cortesia'};
+  const badgeLabel = {normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
+  el.innerHTML = ops.map(o => `
+    <tr onclick="drillTicket('${o.folio}')">
+      <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+      <td><span class="badge ${badgeClass[o.tipo]||'b-normal'}">${badgeLabel[o.tipo]||o.tipo}</span></td>
+      <td>${o.cajero}</td>
+      <td>${o.hora_entrada}</td>
+      <td>${o.hora_salida||'—'}</td>
+      <td>${o.minutos||'—'}</td>
+      <td><span style="font-size:11px;color:var(--muted)">${o.franja}</span></td>
+      <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">
+        ${o.importe?fmt$(o.importe):'$0.00'}
+      </td>
+    </tr>`).join('');
+}
+
+// ══ DRILL-DOWN ══
+function drillDown(tipo) {
+  const panel = document.getElementById('drill-panel');
+  const cont  = document.getElementById('drill-content');
+  const title = document.getElementById('drill-title');
+  const path  = document.getElementById('drill-path');
+  _drillActual = tipo;
+  panel.classList.add('open');
+  const ops = DATOS.operaciones;
+
+  const titulos = {
+    ingresos: '💰 Detalle de ingresos',
+    ocupacion: '🅿 Análisis de ocupación',
+    boletos_perdidos: '⚠ Boletos perdidos',
+    ticket_promedio: '📊 Análisis de ticket promedio'
+  };
+  title.textContent = titulos[tipo] || tipo;
+  path.textContent  = 'Inicio → ' + (titulos[tipo]||tipo);
+
+  if (tipo === 'boletos_perdidos') {
+    const perdidos = ops.filter(o=>o.tipo==='perdido');
+    cont.innerHTML = perdidos.length ? `
+      <div class="tabla-wrap"><table>
+        <thead><tr><th>Folio</th><th>Cajero</th><th>Hora</th><th>Franja</th><th style="text-align:right">Importe</th></tr></thead>
+        <tbody>${perdidos.map(o=>`<tr>
+          <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+          <td>${o.cajero}</td><td>${o.hora_entrada}</td>
+          <td>${o.franja}</td>
+          <td style="text-align:right;font-weight:700;color:var(--red)">${fmt$(o.importe)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin boletos perdidos</div>';
+  } else if (tipo === 'ingresos') {
+    // Breakdown por tipo
+    const tipos = ['normal','preferencial','perdido'];
+    cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${tipos.map(t=>{
+        const sub = ops.filter(o=>o.tipo===t);
+        const tot = sub.reduce((s,o)=>s+o.importe,0);
+        const colors={normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025'};
+        const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Perdido'};
+        return `<div style="background:var(--bg);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:${colors[t]};margin-bottom:4px">${labels[t]}</div>
+          <div style="font-size:24px;font-weight:900">${fmt$(tot)}</div>
+          <div style="font-size:11px;color:var(--muted)">${sub.length} ops</div>
+        </div>`;
+      }).join('')}</div>`;
+  }
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function drillFranja(franja) {
+  const ops = DATOS.operaciones.filter(o=>o.franja===franja);
+  drillGenerico('Franja: '+franja, ops);
+}
+
+function drillTipo(tipo) {
+  const labels = {normal:'Normal',preferencial:'Preferencial',perdido:'Perdido',cortesia:'Cortesía'};
+  const ops = DATOS.operaciones.filter(o=>o.tipo===tipo);
+  drillGenerico('Tipo: '+labels[tipo], ops);
+}
+
+function drillCajero(cajero) {
+  const ops = DATOS.operaciones.filter(o=>o.cajero===cajero);
+  drillGenerico('Cajero: '+cajero, ops);
+}
+
+function drillTicket(folio) {
+  const op = DATOS.operaciones.find(o=>o.folio===folio);
+  if (!op) return;
+  const panel = document.getElementById('drill-panel');
+  const cont  = document.getElementById('drill-content');
+  document.getElementById('drill-title').textContent = '🎫 Ticket '+folio;
+  document.getElementById('drill-path').textContent  = 'Inicio → Operaciones → '+folio;
+  _drillActual = 'ticket';
+  panel.classList.add('open');
+  const colors={normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025',cortesia:'#888'};
+  const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Boleto Perdido',cortesia:'Cortesía'};
+  cont.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      ${[['Folio',folio],['Tipo',labels[op.tipo]||op.tipo],
+         ['Cajero',op.cajero],['Franja',op.franja],
+         ['Entrada',op.hora_entrada],['Salida',op.hora_salida||'—'],
+         ['Minutos',op.minutos||'—'],['Importe',fmt$(op.importe)]
+        ].map(([k,v])=>`<div style="background:var(--bg);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${k}</div>
+          <div style="font-size:16px;font-weight:800;margin-top:4px">${v}</div>
+        </div>`).join('')}
+    </div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function drillGenerico(titulo, ops) {
+  const panel = document.getElementById('drill-panel');
+  const cont  = document.getElementById('drill-content');
+  document.getElementById('drill-title').textContent = titulo;
+  document.getElementById('drill-path').textContent  = 'Inicio → '+titulo;
+  panel.classList.add('open');
+  const tot = ops.reduce((s,o)=>s+o.importe,0);
+  const badgeClass = {normal:'b-normal',preferencial:'b-pref',perdido:'b-perdido',cortesia:'b-cortesia'};
+  const badgeLabel = {normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
+  cont.innerHTML = `
+    <div style="display:flex;gap:20px;margin-bottom:14px;font-size:13px;font-weight:700">
+      <span>${ops.length} operaciones</span>
+      <span>Total: <span style="color:var(--gold)">${fmt$(tot)}</span></span>
+    </div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th>
+        <th>Entrada</th><th>Franja</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td><span class="badge ${badgeClass[o.tipo]||'b-normal'}">${badgeLabel[o.tipo]||o.tipo}</span></td>
+        <td>${o.cajero}</td><td>${o.hora_entrada}</td><td>${o.franja}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">
+          ${o.importe?fmt$(o.importe):'$0.00'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function cerrarDrill() {
+  document.getElementById('drill-panel').classList.remove('open');
+  _drillActual = null;
+}
+
+// ══ EXPORT CSV ══
+function exportarCSV() {
+  const ops = DATOS.operaciones;
+  const hoy = new Date().toISOString().slice(0,10);
+  const header = 'Folio,Tipo,Cajero,Entrada,Salida,Minutos,Franja,Importe,Plaza';
+  const rows = ops.map(o =>
+    [o.folio,o.tipo,o.cajero,o.hora_entrada,o.hora_salida||'',o.minutos||'',o.franja,o.importe,'Plaza IWOL'].join(',')
+  );
+  const csv  = '\uFEFF' + [header,...rows].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'IwolPark_admin_'+hoy+'.csv';
+  a.click();
+  showToast('CSV exportado · '+ops.length+' registros');
+}
+
+// ══ UTILS ══
+function fmt$(n) {
+  return '$' + (n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+let _tt;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ══ INIT ══
+document.getElementById('filtro-periodo').value = 'hoy';
+cargarDatos();
+setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+</script>
+</body>
+</html>
