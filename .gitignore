@@ -1,2 +1,3 @@
 *.txt
 .netlify/
+node_modules/
