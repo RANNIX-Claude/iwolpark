@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v9</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v10</span>
   </div>
 </nav>
 
@@ -386,7 +386,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <div class="tabla-wrap">
       <table>
         <thead><tr>
-          <th>Fecha</th><th>Día</th><th>Turno 1</th><th>Turno 2</th>
+          <th>Fecha</th><th>Día</th><th colspan="2">Turnos</th>
           <th>Ops</th><th>Perdidos</th><th>Cortesías</th>
           <th style="text-align:right">Total</th>
         </tr></thead>
@@ -417,41 +417,75 @@ function showTab(id, el) {
   if(id==='cortes')    renderCortes();
 }
 
-// ══ DATOS DEMO ══
-const CAJEROS = ['Juan Pérez','María López','Carlos Ruiz'];
-const TIPOS   = ['normal','normal','normal','preferencial','perdido','cortesia'];
-const DIAS_S  = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+// ══ SUPABASE ══
+const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
+const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+const DIAS_S = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
-function generarOps(n=120) {
-  return Array.from({length:n},(_,i)=>{
-    const t = TIPOS[Math.floor(Math.random()*TIPOS.length)];
-    const imp = t==='normal'?15*(1+Math.floor(Math.random()*4))
-              : t==='preferencial'?6*(1+Math.floor(Math.random()*3))
-              : t==='perdido'?150+15*(1+Math.floor(Math.random()*3)):0;
-    const h = 7+Math.floor(Math.random()*15);
-    const d = new Date(); d.setDate(d.getDate()-Math.floor(Math.random()*30));
-    return {
-      folio:'UFC-'+(829+i), tipo:t,
-      cajero:CAJEROS[Math.floor(Math.random()*CAJEROS.length)],
-      hora:`${String(h).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
-      minutos:15+Math.floor(Math.random()*120),
-      franja:h<12?'Matutino':h<19?'Vespertino':'Nocturno',
-      importe:imp, fecha:d.toISOString().slice(0,10),
-      dia:DIAS_S[d.getDay()===0?6:d.getDay()-1]
-    };
-  });
+function fechasPeriodo(periodo) {
+  const hoy = new Date();
+  const fmt = d => d.toISOString().slice(0,10);
+  if (periodo === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (periodo === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1); return {desde:fmt(ini), hasta:fmt(hoy)}; }
+  if (periodo === 'mes') return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
+  if (periodo === 'año') return { desde: fmt(new Date(hoy.getFullYear(),0,1)), hasta: fmt(hoy) };
+  return { desde: fmt(hoy), hasta: fmt(hoy) };
+}
+function diaSemana(fechaOp) {
+  const d = new Date(fechaOp+'T12:00:00');
+  return DIAS_S[d.getDay()===0?6:d.getDay()-1];
 }
 
-const OPS = generarOps(120);
-const autos_ahora = 14;
+// Tickets ya cerrados (cobrado/perdido/cortesia) de un rango de fechas, mapeados
+// al mismo formato {folio,tipo,cajero,hora,minutos,franja,importe,fecha,dia} que
+// usan todas las vistas de este tablero.
+async function cargarOps(desde, hasta) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc&limit=2000`, { headers: SB_HEADERS });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return rows.filter(t => t.estatus !== 'abierto').map(t => ({
+      folio: t.folio, tipo: t.tipo, cajero: t.cajero || '—',
+      hora: (t.hora_salida || t.hora_entrada || '—'),
+      minutos: t.minutos_estancia || 0, franja: t.franja || '—',
+      importe: Number(t.importe) || 0, fecha: t.fecha_op,
+      dia: diaSemana(t.fecha_op)
+    }));
+  } catch (e) { return []; }
+}
+
+async function contarAbiertos() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=id&limit=1`, {
+      headers: { ...SB_HEADERS, Prefer: 'count=exact' }
+    });
+    const range = r.headers.get('content-range') || '';
+    return parseInt(range.split('/')[1]) || 0;
+  } catch (e) { return 0; }
+}
+
+async function cargarCortesDB(desde, hasta) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/cortes?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=fecha_op.desc,created_at.asc&limit=500`, { headers: SB_HEADERS });
+    return r.ok ? await r.json() : [];
+  } catch (e) { return []; }
+}
+
+// Caches de la última consulta por pestaña (para drill-down/export sin refetch)
+let OPS_EJECUTIVO = [], OPS_OPERATIVO = [], OPS_CAJEROS = [], CORTES_ACTUAL = [];
 
 // ══ UTILS ══
 function fmt$(n){return '$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}
 let _tt; function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500)}
 
 // ══ EJECUTIVO ══
-function renderEjecutivo() {
-  const ops = OPS;
+async function renderEjecutivo() {
+  const periodo = document.getElementById('periodo-ej')?.value || 'mes';
+  const {desde,hasta} = fechasPeriodo(periodo);
+  const [ops, autos_ahora] = await Promise.all([cargarOps(desde,hasta), contarAbiertos()]);
+  OPS_EJECUTIVO = ops;
+
   const cobros = ops.filter(o=>o.importe>0);
   const total  = cobros.reduce((s,o)=>s+o.importe,0);
   const perdidos = ops.filter(o=>o.tipo==='perdido');
@@ -461,10 +495,10 @@ function renderEjecutivo() {
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
-  document.getElementById('ej-ingresos-delta').textContent = '↑ 12% vs mes anterior';
+  document.getElementById('ej-ingresos-delta').style.display = 'none';
   document.getElementById('ej-ops').textContent = ops.length;
   document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
-  document.getElementById('ej-ops-delta').textContent = '↑ 8% vs mes anterior';
+  document.getElementById('ej-ops-delta').style.display = 'none';
   document.getElementById('ej-ocu').textContent = pct+'%';
   document.getElementById('ej-ocu-sub').textContent = autos_ahora+' de 68 lugares';
   document.getElementById('ej-ticket').textContent = fmt$(ticket);
@@ -478,17 +512,26 @@ function renderEjecutivo() {
   document.getElementById('gauge-pct').textContent = pct+'%';
   document.getElementById('gauge-sub').textContent = autos_ahora+' / 68 lugares';
 
-  // Chart meses
-  const meses = ['Feb','Mar','Abr','May','Jun','Jul'];
-  const vals  = [28400,31200,29800,35600,38200,total];
-  const maxM  = Math.max(...vals);
-  document.getElementById('chart-meses').innerHTML = meses.map((m,i)=>`
+  // Chart meses — últimos 6 meses reales
+  const hoyD = new Date();
+  const mesesInfo = [];
+  for (let i=5;i>=0;i--) {
+    const d = new Date(hoyD.getFullYear(), hoyD.getMonth()-i, 1);
+    mesesInfo.push({ anio:d.getFullYear(), mes:d.getMonth()+1, label:d.toLocaleString('es-MX',{month:'short'}) });
+  }
+  const desdeHist = new Date(hoyD.getFullYear(), hoyD.getMonth()-5, 1).toISOString().slice(0,10);
+  const opsHist = await cargarOps(desdeHist, fechasPeriodo('hoy').hasta);
+  const vals = mesesInfo.map(m => opsHist
+    .filter(o => { const d=new Date(o.fecha+'T12:00:00'); return d.getFullYear()===m.anio && (d.getMonth()+1)===m.mes; })
+    .reduce((s,o)=>s+o.importe,0));
+  const maxM  = Math.max(...vals,1);
+  document.getElementById('chart-meses').innerHTML = mesesInfo.map((m,i)=>`
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer"
-         onclick="showToast('${m}: ${fmt$(vals[i])}')">
-      <div style="font-size:10px;font-weight:700;color:var(--muted)">${fmt$(vals[i]).replace('$','$').split('.')[0]}</div>
+         onclick="showToast('${m.label}: ${fmt$(vals[i])}')">
+      <div style="font-size:10px;font-weight:700;color:var(--muted)">${fmt$(vals[i]).split('.')[0]}</div>
       <div style="width:100%;background:${i===5?'var(--purple)':'#D4C5F0'};border-radius:6px 6px 0 0;
            height:${vals[i]/maxM*90}px;min-height:4px;transition:height .5s"></div>
-      <div style="font-size:10px;color:var(--muted)">${m}</div>
+      <div style="font-size:10px;color:var(--muted)">${m.label}</div>
     </div>`).join('');
 
   // Mix ingresos
@@ -498,7 +541,7 @@ function renderEjecutivo() {
     {t:'perdido',l:'Boleto perdido',c:'#D93025'},
     {t:'cortesia',l:'Cortesía',c:'#888'},
   ];
-  const maxT = Math.max(...tiposInfo.map(ti=>ops.filter(o=>o.tipo===ti.t).reduce((s,o)=>s+o.importe,0)));
+  const maxT = Math.max(...tiposInfo.map(ti=>ops.filter(o=>o.tipo===ti.t).reduce((s,o)=>s+o.importe,0)),1);
   document.getElementById('mix-ingresos').innerHTML = tiposInfo.map(ti=>{
     const sub=ops.filter(o=>o.tipo===ti.t);
     const tot=sub.reduce((s,o)=>s+o.importe,0);
@@ -510,15 +553,17 @@ function renderEjecutivo() {
     </div>`;
   }).join('');
 
-  // Mini hoy
+  // Actividad de hoy por hora (a partir de operaciones de hoy)
+  const hoyStr = fechasPeriodo('hoy').hasta;
+  const opsHoy = periodo==='hoy' ? ops : await cargarOps(hoyStr, hoyStr);
   const horas = Array.from({length:16},(_,i)=>i+7);
-  const autosH = horas.map(h=>Math.round(Math.random()*30+5));
-  const maxA = Math.max(...autosH);
+  const autosH = horas.map(h => opsHoy.filter(o => parseInt((o.hora||'0').split(':')[0])===h).length);
+  const maxA = Math.max(...autosH,1);
   document.getElementById('mini-hoy').innerHTML = horas.map((h,i)=>`
     <div style="flex:1;border-radius:3px 3px 0 0;min-height:2px;
          background:${h<12?'#0A66C2':h<19?'#7B5EA7':'#F5A623'};
          height:${autosH[i]/maxA*56}px;cursor:pointer"
-         onclick="showToast('${h}:00 → ${autosH[i]} autos')">
+         onclick="showToast('${h}:00 → ${autosH[i]} operaciones')">
     </div>`).join('');
 
   // Meta vs real
@@ -548,7 +593,7 @@ function drillKPI(tipo) {
   const cont  = document.getElementById('drill-content');
   const title = document.getElementById('drill-title');
   panel.classList.add('open');
-  const ops = OPS;
+  const ops = OPS_EJECUTIVO;
 
   if(tipo==='perdidos') {
     title.textContent = '⚠ Detalle: Boletos Perdidos';
@@ -584,7 +629,12 @@ function drillKPI(tipo) {
 function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
 
 // ══ OPERATIVO ══
-function renderOperativo() { renderTablaOps(); renderFranjasOp(); renderTiposOp(); }
+async function renderOperativo() {
+  const periodo = document.getElementById('periodo-op')?.value || 'semana';
+  const {desde,hasta} = fechasPeriodo(periodo);
+  OPS_OPERATIVO = await cargarOps(desde,hasta);
+  renderTablaOps(); renderFranjasOp(); renderTiposOp();
+}
 
 function renderFranjasOp() {
   const franjas=[
@@ -592,9 +642,9 @@ function renderFranjasOp() {
     {n:'☀ Vespertino',f:'Vespertino',c:'#7B5EA7'},
     {n:'🌙 Nocturno',f:'Nocturno',c:'#F5A623'}
   ];
-  const maxF = Math.max(...franjas.map(f=>OPS.filter(o=>o.franja===f.f).length));
+  const maxF = Math.max(...franjas.map(f=>OPS_OPERATIVO.filter(o=>o.franja===f.f).length),1);
   document.getElementById('op-franjas').innerHTML = franjas.map(f=>{
-    const sub=OPS.filter(o=>o.franja===f.f);
+    const sub=OPS_OPERATIVO.filter(o=>o.franja===f.f);
     const tot=sub.reduce((s,o)=>s+o.importe,0);
     return `<div class="hbar-row">
       <div class="hbar-label" style="color:${f.c}">${f.n}</div>
@@ -614,9 +664,9 @@ function renderTiposOp() {
     {t:'perdido',l:'Boleto perdido',c:'#D93025'},
     {t:'cortesia',l:'Cortesía ≤15min',c:'#888'}
   ];
-  const tot=OPS.length||1;
+  const tot=OPS_OPERATIVO.length||1;
   document.getElementById('op-tipos').innerHTML = tipos.map(ti=>{
-    const sub=OPS.filter(o=>o.tipo===ti.t);
+    const sub=OPS_OPERATIVO.filter(o=>o.tipo===ti.t);
     const pct=Math.round(sub.length/tot*100);
     const ing=sub.reduce((s,o)=>s+o.importe,0);
     return `<div class="hbar-row" onclick="document.getElementById('filtro-tipo-op').value='${ti.t}';renderTablaOps()">
@@ -635,7 +685,7 @@ function renderTablaOps() {
   const filtroFranja= document.getElementById('filtro-franja-op')?.value||'';
   const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
   const bl={normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
-  let ops = OPS;
+  let ops = OPS_OPERATIVO;
   if(filtroTipo)   ops=ops.filter(o=>o.tipo===filtroTipo);
   if(filtroFranja) ops=ops.filter(o=>o.franja===filtroFranja);
   document.getElementById('tabla-ops-corp').innerHTML = ops.map(o=>`
@@ -652,9 +702,15 @@ function renderTablaOps() {
 }
 
 // ══ CAJEROS ══
-function renderCajeros() {
+async function renderCajeros() {
+  const periodo = document.getElementById('periodo-caj')?.value || 'semana';
+  const {desde,hasta} = fechasPeriodo(periodo);
+  const hoyStr = fechasPeriodo('hoy').hasta;
+  const [ops, cortesHoy] = await Promise.all([cargarOps(desde,hasta), cargarCortesDB(hoyStr,hoyStr)]);
+  OPS_CAJEROS = ops;
+
   const cajeros={};
-  OPS.forEach(o=>{
+  ops.forEach(o=>{
     if(!cajeros[o.cajero]) cajeros[o.cajero]={ops:0,total:0,perdidos:0};
     cajeros[o.cajero].ops++;
     cajeros[o.cajero].total+=o.importe;
@@ -662,38 +718,33 @@ function renderCajeros() {
   });
   const sorted=Object.entries(cajeros).sort((a,b)=>b[1].total-a[1].total);
   const max=sorted[0]?.[1]?.total||1;
-  document.getElementById('cajero-ranking-corp').innerHTML=sorted.map(([nom,d],i)=>`
-    <div class="hbar-row" onclick="drillCajero('${nom}',${JSON.stringify(d).replace(/"/g,"'")})">
+  document.getElementById('cajero-ranking-corp').innerHTML=sorted.length ? sorted.map(([nom,d],i)=>`
+    <div class="hbar-row" onclick="drillCajero('${nom}')">
       <div style="min-width:24px;font-size:16px;font-weight:900;color:var(--purple)">${i+1}</div>
       <div class="hbar-label">${nom}<br>
         <span style="font-size:10px;color:var(--muted);font-weight:400">${d.ops} ops · ${d.perdidos} perdidos</span>
       </div>
       <div class="hbar-wrap"><div class="hbar-fill" style="width:${d.total/max*100}%;background:var(--purple)"></div></div>
       <div class="hbar-val">${fmt$(d.total)}</div>
-    </div>`).join('');
+    </div>`).join('') : '<div style="color:var(--muted);font-size:13px;padding:8px">Sin operaciones en el período</div>';
 
-  // Turnos
-  const turnos=[
-    {cajero:'Juan Pérez',inicio:'07:00',fin:'14:00',tipo:'apertura',monto:18400},
-    {cajero:'María López',inicio:'14:00',fin:'22:00',tipo:'relevo',monto:24200},
-    {cajero:'Carlos Ruiz',inicio:'22:00',fin:'Activo',tipo:'relevo',monto:6800},
-  ];
-  const colores={apertura:'#0D9457',relevo:'#0A66C2',cierre:'#D93025'};
-  document.getElementById('turnos-dia').innerHTML=turnos.map(t=>`
+  // Turnos de hoy — tabla real 'cortes'
+  const colores={dia:'#D93025',relevo:'#0A66C2'};
+  document.getElementById('turnos-dia').innerHTML = cortesHoy.length ? cortesHoy.map(c=>`
     <div class="turno-row">
-      <div class="turno-dot" style="background:${colores[t.tipo]}"></div>
+      <div class="turno-dot" style="background:${colores[c.tipo_corte]||'#888'}"></div>
       <div class="turno-info">
-        <div class="turno-cajero">${t.cajero}</div>
-        <div class="turno-time">${t.inicio} → ${t.fin} · ${t.tipo}</div>
+        <div class="turno-cajero">${c.cajero}</div>
+        <div class="turno-time">${(c.inicio_turno||'').slice(11,16)} → ${(c.fin_turno||'').slice(11,16)} · ${c.tipo_corte==='dia'?'cierre del día':'relevo'}</div>
       </div>
-      <div class="turno-monto">${fmt$(t.monto)}</div>
-    </div>`).join('');
+      <div class="turno-monto">${fmt$(c.total_cobrado)}</div>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:13px;padding:8px">Sin turnos cerrados hoy</div>';
 }
 
 function drillCajero(nom) {
   const panel=document.getElementById('drill-cajero');
   document.getElementById('drill-cajero-title').textContent='👤 '+nom;
-  const ops=OPS.filter(o=>o.cajero===nom);
+  const ops=OPS_CAJEROS.filter(o=>o.cajero===nom);
   const tot=ops.reduce((s,o)=>s+o.importe,0);
   const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
   const bl={normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
@@ -722,43 +773,70 @@ function drillCajero(nom) {
 }
 
 // ══ CORTES ══
-function renderCortes() {
-  const fechas=[...new Set(OPS.map(o=>o.fecha))].sort().reverse().slice(0,10);
-  const bc={normal:'b-n',preferencial:'b-p',perdido:'b-x',cortesia:'b-c'};
-  document.getElementById('tabla-cortes').innerHTML=fechas.map(f=>{
-    const sub=OPS.filter(o=>o.fecha===f);
-    const tot=sub.reduce((s,o)=>s+o.importe,0);
-    const perd=sub.filter(o=>o.tipo==='perdido').length;
-    const cort=sub.filter(o=>o.tipo==='cortesia').length;
-    const d=new Date(f+'T12:00:00');
-    const dia=DIAS_S[d.getDay()===0?6:d.getDay()-1];
-    return `<tr onclick="showToast('${f}: ${fmt$(tot)} · ${sub.length} ops')">
-      <td><strong>${f}</strong></td><td>${dia}</td>
-      <td style="color:var(--muted);font-size:11px">T1</td>
-      <td style="color:var(--muted);font-size:11px">T2</td>
-      <td>${sub.length}</td>
+async function renderCortes() {
+  const periodo = document.getElementById('periodo-cor')?.value || 'mes';
+  const {desde,hasta} = fechasPeriodo(periodo);
+  CORTES_ACTUAL = await cargarCortesDB(desde,hasta);
+
+  const porFecha = {};
+  CORTES_ACTUAL.forEach(c => {
+    if (!porFecha[c.fecha_op]) porFecha[c.fecha_op] = [];
+    porFecha[c.fecha_op].push(c);
+  });
+  const fechas = Object.keys(porFecha).sort().reverse();
+
+  document.getElementById('tabla-cortes').innerHTML = fechas.length ? fechas.map(f=>{
+    const cortesDelDia = porFecha[f];
+    const tot  = cortesDelDia.reduce((s,c)=>s+(Number(c.total_cobrado)||0),0);
+    const ops  = cortesDelDia.reduce((s,c)=>s+(Number(c.total_operaciones)||0),0);
+    const perd = cortesDelDia.reduce((s,c)=>s+(Number(c.perdidos)||0),0);
+    const cort = cortesDelDia.reduce((s,c)=>s+(Number(c.cortesias)||0),0);
+    const turnosTxt = cortesDelDia.map(c=>`${c.cajero} (${(c.inicio_turno||'').slice(11,16)}–${(c.fin_turno||'').slice(11,16)})`).join(', ');
+    return `<tr onclick="showToast('${f}: ${fmt$(tot)} · ${ops} ops')">
+      <td><strong>${f}</strong></td><td>${diaSemana(f)}</td>
+      <td colspan="2" style="color:var(--muted);font-size:11px">${turnosTxt}</td>
+      <td>${ops}</td>
       <td style="color:var(--red);font-weight:700">${perd}</td>
       <td style="color:var(--muted)">${cort}</td>
       <td style="text-align:right;font-weight:800;color:var(--gold)">${fmt$(tot)}</td>
     </tr>`;
-  }).join('');
+  }).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Sin cortes registrados en el período</td></tr>`;
 }
 
 // ══ EXPORT ══
 function exportarCSV(tipo) {
   const hoy=new Date().toISOString().slice(0,10);
+  if (tipo === 'cortes') {
+    const header='Fecha,Cajero,TipoCorte,Inicio,Fin,FondoInicial,TotalCobrado,TotalEntregado,Operaciones,Perdidos,Cortesias';
+    const rows=CORTES_ACTUAL.map(c=>[c.fecha_op,c.cajero,c.tipo_corte,c.inicio_turno,c.fin_turno,c.fondo_inicial,c.total_cobrado,c.total_entregado,c.total_operaciones,c.perdidos,c.cortesias].join(','));
+    const csv='﻿'+[header,...rows].join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download=`IwolPark_cortes_${hoy}.csv`;
+    a.click();
+    showToast('CSV exportado · '+CORTES_ACTUAL.length+' cortes');
+    return;
+  }
+  const ops = tipo==='operativo' ? OPS_OPERATIVO : OPS_EJECUTIVO;
   const header='Folio,Tipo,Cajero,Fecha,Hora,Min,Franja,Importe';
-  const rows=OPS.map(o=>[o.folio,o.tipo,o.cajero,o.fecha,o.hora,o.minutos||0,o.franja,o.importe].join(','));
+  const rows=ops.map(o=>[o.folio,o.tipo,o.cajero,o.fecha,o.hora,o.minutos||0,o.franja,o.importe].join(','));
   const csv='\uFEFF'+[header,...rows].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   a.download=`IwolPark_corporativo_${tipo}_${hoy}.csv`;
   a.click();
-  showToast('CSV exportado · '+OPS.length+' registros');
+  showToast('CSV exportado · '+ops.length+' registros');
 }
 
 // ══ INIT ══
 renderEjecutivo();
+setInterval(() => {
+  const activo = document.querySelector('.tab-section.active')?.id;
+  if (activo==='tab-ejecutivo') renderEjecutivo();
+  if (activo==='tab-operativo') renderOperativo();
+  if (activo==='tab-cajeros')   renderCajeros();
+  if (activo==='tab-cortes')    renderCortes();
+}, 60000);
 </script>
 </body>
 </html>
