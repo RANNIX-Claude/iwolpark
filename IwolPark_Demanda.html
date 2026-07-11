@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v13</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v14</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -175,14 +175,33 @@ function fechaADiaIdx(fechaStr) {
   return d.getDay()===0 ? 6 : d.getDay()-1; // Lun=0 .. Dom=6, igual que DIAS
 }
 
+// Supabase/PostgREST limita cada respuesta a 1000 filas sin importar el
+// &limit= que se pida; para rangos con más de 1000 tickets hay que paginar
+// con &offset= hasta agotar el rango o llegar a maxTotal.
+async function fetchPaginado(urlBase, headers, maxTotal) {
+  let todas = [];
+  let offset = 0;
+  const pageSize = 1000;
+  while (true) {
+    const sep = urlBase.includes('?') ? '&' : '?';
+    const r = await fetch(`${urlBase}${sep}limit=${pageSize}&offset=${offset}`, { headers });
+    if (!r.ok) break;
+    const pagina = await r.json();
+    todas = todas.concat(pagina);
+    if (pagina.length < pageSize || todas.length >= maxTotal) break;
+    offset += pageSize;
+  }
+  return todas;
+}
+
 // Trae tickets ya cerrados (o abiertos, para contar la entrada) de las últimas N semanas
 async function cargarTicketsDemanda(semanas) {
   const hasta = new Date();
   const desde = new Date(); desde.setDate(desde.getDate() - semanas*7);
   const fmt = d=>d.toISOString().slice(0,10);
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${fmt(desde)}&fecha_op=lte.${fmt(hasta)}&select=fecha_op,hora_entrada,importe&limit=5000`, { headers: SB_HEADERS });
-    return r.ok ? await r.json() : [];
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${fmt(desde)}&fecha_op=lte.${fmt(hasta)}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
+    return await fetchPaginado(base, SB_HEADERS, 15000);
   } catch (e) { return []; }
 }
 

@@ -169,7 +169,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="nav-right">
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v13</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v14</span>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
 </nav>
@@ -395,6 +395,28 @@ function getFechas() {
   };
 }
 
+// Supabase/PostgREST limita cada respuesta a 1000 filas sin importar el
+// &limit= que se pida; para rangos con más de 1000 tickets hay que paginar
+// con &offset= hasta agotar el rango o llegar a maxTotal.
+async function fetchPaginado(urlBase, headers, maxTotal) {
+  let todas = [];
+  let offset = 0;
+  const pageSize = 1000;
+  while (true) {
+    const sep = urlBase.includes('?') ? '&' : '?';
+    const r = await fetch(`${urlBase}${sep}limit=${pageSize}&offset=${offset}`, { headers });
+    if (!r.ok) {
+      if (offset === 0) throw new Error('Supabase respondió ' + r.status);
+      break;
+    }
+    const pagina = await r.json();
+    todas = todas.concat(pagina);
+    if (pagina.length < pageSize || todas.length >= maxTotal) break;
+    offset += pageSize;
+  }
+  return todas;
+}
+
 // ══ DATOS (Supabase o DEMO) ══
 async function cargarDatos() {
   try {
@@ -402,54 +424,47 @@ async function cargarDatos() {
     const cajeroFiltro = document.getElementById('filtro-cajero')?.value || '';
 
     // Query a Supabase: tabla 'tickets' del período
-    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc&limit=1000`;
+    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc`;
     if(cajeroFiltro) query += `&cajero=eq.${encodeURIComponent(cajeroFiltro)}`;
 
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?${query}`, {
-      headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
-    });
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    const rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000);
 
-    if(r.ok) {
-      const rows = await r.json();
-      // Solo operaciones completadas (cobrado/perdido/cortesia) alimentan KPIs de ingresos
-      const completadas = rows.filter(o => o.estatus !== 'abierto');
-      DATOS.operaciones = completadas.map(o => ({
-        folio:        o.folio,
-        tipo:         o.tipo || 'normal',
-        cajero:       o.cajero || '—',
-        hora_entrada: o.hora_entrada || '—',
-        hora_salida:  o.hora_salida || '—',
-        minutos:      o.minutos_estancia || 0,
-        franja:       o.franja || '—',
-        importe:      parseFloat(o.importe) || 0,
-        fecha:        o.fecha_op || desde
-      }));
-      // Ocupación real = tickets con estatus 'abierto' AHORA MISMO, en una consulta
-      // aparte sin filtro de período (un auto que entró ayer y sigue en la plaza
-      // debe contar aunque el filtro de fecha esté en "Hoy"). Desglosado por tipo
-      // real (antes era un split falso 70/30).
-      try {
-        const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=tipo&limit=1000`, {
-          headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
-        });
-        const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
-        DATOS.autos_en_plaza  = abiertos.length;
-        DATOS.abiertos_normal = abiertos.filter(o => o.tipo !== 'preferencial').length;
-        DATOS.abiertos_pref   = abiertos.filter(o => o.tipo === 'preferencial').length;
-      } catch (e) {
-        DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
-      }
+    // Solo operaciones completadas (cobrado/perdido/cortesia) alimentan KPIs de ingresos
+    const completadas = rows.filter(o => o.estatus !== 'abierto');
+    DATOS.operaciones = completadas.map(o => ({
+      folio:        o.folio,
+      tipo:         o.tipo || 'normal',
+      cajero:       o.cajero || '—',
+      hora_entrada: o.hora_entrada || '—',
+      hora_salida:  o.hora_salida || '—',
+      minutos:      o.minutos_estancia || 0,
+      franja:       o.franja || '—',
+      importe:      parseFloat(o.importe) || 0,
+      fecha:        o.fecha_op || desde
+    }));
+    // Ocupación real = tickets con estatus 'abierto' AHORA MISMO, en una consulta
+    // aparte sin filtro de período (un auto que entró ayer y sigue en la plaza
+    // debe contar aunque el filtro de fecha esté en "Hoy"). Desglosado por tipo
+    // real (antes era un split falso 70/30).
+    try {
+      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=tipo&limit=1000`, {
+        headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
+      });
+      const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
+      DATOS.autos_en_plaza  = abiertos.length;
+      DATOS.abiertos_normal = abiertos.filter(o => o.tipo !== 'preferencial').length;
+      DATOS.abiertos_pref   = abiertos.filter(o => o.tipo === 'preferencial').length;
+    } catch (e) {
+      DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
+    }
 
-      // Poblar select de cajeros
-      const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
-      const sel = document.getElementById('filtro-cajero');
-      if(sel) {
-        sel.innerHTML = '<option value="">Todos los cajeros</option>' +
-          cajeros.map(c=>`<option value="${c}">${c}</option>`).join('');
-      }
-    } else {
-      // Sin datos reales — usar demo
-      DATOS = generarDatosDemo();
+    // Poblar select de cajeros
+    const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
+    const sel = document.getElementById('filtro-cajero');
+    if(sel) {
+      sel.innerHTML = '<option value="">Todos los cajeros</option>' +
+        cajeros.map(c=>`<option value="${c}">${c}</option>`).join('');
     }
 
     renderTodo();

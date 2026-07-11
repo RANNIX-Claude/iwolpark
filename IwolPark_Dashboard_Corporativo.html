@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v13</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v14</span>
   </div>
 </nav>
 
@@ -431,14 +431,32 @@ function diaSemana(fechaOp) {
   return DIAS_S[d.getDay()===0?6:d.getDay()-1];
 }
 
+// Supabase/PostgREST limita cada respuesta a 1000 filas sin importar el
+// &limit= que se pida; para rangos con más de 1000 tickets hay que paginar
+// con &offset= hasta agotar el rango o llegar a maxTotal.
+async function fetchPaginado(urlBase, headers, maxTotal) {
+  let todas = [];
+  let offset = 0;
+  const pageSize = 1000;
+  while (true) {
+    const sep = urlBase.includes('?') ? '&' : '?';
+    const r = await fetch(`${urlBase}${sep}limit=${pageSize}&offset=${offset}`, { headers });
+    if (!r.ok) break;
+    const pagina = await r.json();
+    todas = todas.concat(pagina);
+    if (pagina.length < pageSize || todas.length >= maxTotal) break;
+    offset += pageSize;
+  }
+  return todas;
+}
+
 // Tickets ya cerrados (cobrado/perdido/cortesia) de un rango de fechas, mapeados
 // al mismo formato {folio,tipo,cajero,hora,minutos,franja,importe,fecha,dia} que
 // usan todas las vistas de este tablero.
-async function cargarOps(desde, hasta) {
+async function cargarOps(desde, hasta, maxTotal=6000) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc&limit=2000`, { headers: SB_HEADERS });
-    if (!r.ok) return [];
-    const rows = await r.json();
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc`;
+    const rows = await fetchPaginado(base, SB_HEADERS, maxTotal);
     return rows.filter(t => t.estatus !== 'abierto').map(t => ({
       folio: t.folio, tipo: t.tipo, cajero: t.cajero || '—',
       hora: (t.hora_salida || t.hora_entrada || '—'),
@@ -565,7 +583,7 @@ async function renderEjecutivo() {
     mesesInfo.push({ anio:d.getFullYear(), mes:d.getMonth()+1, label:d.toLocaleString('es-MX',{month:'short'}) });
   }
   const desdeHist = new Date(hoyD.getFullYear(), hoyD.getMonth()-5, 1).toISOString().slice(0,10);
-  const opsHist = await cargarOps(desdeHist, fechasPeriodo('hoy').hasta);
+  const opsHist = await cargarOps(desdeHist, fechasPeriodo('hoy').hasta, 20000);
   OPS_HIST_MESES = opsHist; MESES_INFO = mesesInfo;
   const vals = mesesInfo.map(m => opsHist
     .filter(o => { const d=new Date(o.fecha+'T12:00:00'); return d.getFullYear()===m.anio && (d.getMonth()+1)===m.mes; })
