@@ -115,7 +115,7 @@ tr:hover td{background:#FAFAFE}
   <div class="nav-right">
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v6</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v7</span>
   </div>
 </nav>
 
@@ -401,29 +401,51 @@ tr:hover td{background:#FAFAFE}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── DATOS DEMO ──
-const PENSIONADOS = [
-  {id:'P1',nombre:'Carlos Mendoza',tel:'722-111-2233',wa:'722-111-2233',email:'carlos@mail.com',
-   placas:'MXP-834-B',marca:'Toyota',modelo:'Corolla',anio:2021,color:'Gris',
-   tipo:'24h',monto:900,dia_pago:1,inicio:'2026-01-01',estado:'activo',
-   semaforo:'al_corriente',ultimo_pago:'Jul 2026'},
-  {id:'P2',nombre:'María Soto García',tel:'722-444-5566',wa:'722-444-5566',email:'',
-   placas:'ABT-123-C',marca:'Nissan',modelo:'Versa',anio:2023,color:'Blanco',
-   tipo:'dia',monto:600,dia_pago:5,inicio:'2026-02-01',estado:'activo',
-   semaforo:'por_vencer',ultimo_pago:'Jun 2026'},
-  {id:'P3',nombre:'Roberto Jiménez',tel:'722-777-8899',wa:'722-777-8899',email:'rj@mail.com',
-   placas:'TRP-567-A',marca:'Honda',modelo:'Civic',anio:2020,color:'Azul',
-   tipo:'noche',monto:400,dia_pago:10,inicio:'2025-10-01',estado:'activo',
-   semaforo:'vencido',ultimo_pago:'May 2026'},
-  {id:'P4',nombre:'Ana López Torres',tel:'722-333-4455',wa:'722-333-4455',email:'ana@mail.com',
-   placas:'KLM-901-D',marca:'Volkswagen',modelo:'Jetta',anio:2022,color:'Rojo',
-   tipo:'24h',monto:900,dia_pago:15,inicio:'2026-03-01',estado:'activo',
-   semaforo:'al_corriente',ultimo_pago:'Jul 2026'},
-  {id:'P5',nombre:'Luis Pérez Sánchez',tel:'722-222-3344',wa:'',email:'',
-   placas:'FGH-234-E',marca:'Chevrolet',modelo:'Aveo',anio:2019,color:'Negro',
-   tipo:'dia',monto:600,dia_pago:20,inicio:'2026-04-01',estado:'activo',
-   semaforo:'vencido',ultimo_pago:'May 2026'},
-];
+// ── SUPABASE ──
+const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
+const PLAZA_ID = '8407b28c-497b-47cf-805c-f7918c5129b9'; // Plaza IWOL (dim_plaza)
+const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+
+// Estado real ('activo'|'suspendido'|'cancelado') → semáforo de la UI.
+// No hay todavía seguimiento real de pagos (pagos_pension no está conectado),
+// así que el semáforo refleja solo el estado de la pensión, no el día de pago.
+const ESTADO_A_SEMAFORO = { activo:'al_corriente', suspendido:'por_vencer', cancelado:'vencido' };
+
+let PENSIONADOS = [];
+
+async function cargarPensionados() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?select=pension_id,tipo,monto_mensual,dia_pago,fecha_inicio,estado,codigo_acceso,clientes(cliente_id,nombre,telefono,whatsapp,email),vehiculos(vehiculo_id,placas,marca,modelo,anio,color)&order=created_at.desc`, {
+      headers: SB_HEADERS
+    });
+    if (!r.ok) { showToast('⚠ Sin conexión a Supabase · mostrando vacío'); PENSIONADOS = []; return; }
+    const rows = await r.json();
+    PENSIONADOS = rows.map(p => ({
+      id: p.pension_id,
+      nombre: p.clientes?.nombre || '—',
+      tel: p.clientes?.telefono || '',
+      wa: p.clientes?.whatsapp || '',
+      email: p.clientes?.email || '',
+      placas: p.vehiculos?.placas || '—',
+      marca: p.vehiculos?.marca || '',
+      modelo: p.vehiculos?.modelo || '',
+      anio: p.vehiculos?.anio || '',
+      color: p.vehiculos?.color || '',
+      tipo: p.tipo,
+      monto: Number(p.monto_mensual) || 0,
+      dia_pago: p.dia_pago,
+      inicio: p.fecha_inicio,
+      estado: p.estado,
+      semaforo: ESTADO_A_SEMAFORO[p.estado] || 'inactiva',
+      ultimo_pago: '—',
+      codigo_acceso: p.codigo_acceso
+    }));
+  } catch (e) {
+    showToast('⚠ Sin conexión a Supabase · mostrando vacío');
+    PENSIONADOS = [];
+  }
+}
 
 const PAGOS_POR_VALIDAR = [
   {pension_id:'P2',nombre:'María Soto García',placas:'ABT-123-C',monto:600,
@@ -601,7 +623,7 @@ function actualizarMonto() {
   document.getElementById('p-monto').value = montos[document.getElementById('p-tipo').value]||600;
 }
 
-function guardarPension() {
+async function guardarPension() {
   const nombre = document.getElementById('p-nombre').value.trim();
   const tel    = document.getElementById('p-tel').value.trim();
   const wa     = document.getElementById('p-wa').value.trim();
@@ -627,39 +649,55 @@ function guardarPension() {
   if (!inicio) { showToast('⚠ La fecha de inicio es obligatoria'); return; }
   if (monto <= 0) { showToast('⚠ La mensualidad debe ser mayor a cero'); return; }
 
-  // Agregar al arreglo en memoria
-  const nuevaId = 'P' + (PENSIONADOS.length + 1 + Date.now()).toString().slice(-4);
-  const TIPO_LABEL_INV = {dia:'Día 07–22',noche:'Noche 22–07','24h':'24 horas'};
-  
-  PENSIONADOS.push({
-    id: nuevaId,
-    nombre, tel, wa, email,
-    placas, marca, modelo,
-    anio: anio ? parseInt(anio) : '',
-    color, num_serie: serie,
-    tipo, monto, dia_pago: dia,
-    inicio, estado: 'activo',
-    semaforo: 'por_vencer',
-    ultimo_pago: '—',
-    notas
-  });
+  try {
+    // 1) Cliente
+    const rCliente = await fetch(`${SUPABASE_URL}/rest/v1/clientes`, {
+      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+      body: JSON.stringify({ plaza_id: PLAZA_ID, nombre, telefono: tel, whatsapp: wa, email: email || null })
+    });
+    if (!rCliente.ok) throw new Error(await rCliente.text());
+    const cliente = (await rCliente.json())[0];
 
-  // Limpiar formulario
-  ['p-nombre','p-tel','p-wa','p-email','p-placas','p-color',
-   'p-marca','p-modelo','p-anio','p-serie','p-notas'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('p-monto').value = '600';
-  document.getElementById('p-dia-pago').value = '1';
-  document.getElementById('p-tipo').value = 'dia';
+    // 2) Vehículo
+    const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
+      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+      body: JSON.stringify({ cliente_id: cliente.cliente_id, placas, marca, modelo,
+        anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+    });
+    if (!rVeh.ok) throw new Error(await rVeh.text());
+    const vehiculo = (await rVeh.json())[0];
 
-  cerrarModal('modal-pension');
-  showToast(`✅ Pensión registrada · ${nombre} · ${placas}`);
+    // 3) Pensión — código de acceso simple derivado de las placas
+    const codigo = 'PEN-' + placas.replace(/[^A-Z0-9]/g, '');
+    const rPension = await fetch(`${SUPABASE_URL}/rest/v1/pensiones`, {
+      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+      body: JSON.stringify({
+        plaza_id: PLAZA_ID, cliente_id: cliente.cliente_id, vehiculo_id: vehiculo.vehiculo_id,
+        tipo, monto_mensual: monto, fecha_inicio: inicio, dia_pago: dia,
+        estado: 'activo', codigo_acceso: codigo, notas: notas || null
+      })
+    });
+    if (!rPension.ok) throw new Error(await rPension.text());
 
-  // Refrescar todas las vistas
-  renderSemaforo('todos');
-  renderPensionados();
-  renderCobranza();
+    // Limpiar formulario
+    ['p-nombre','p-tel','p-wa','p-email','p-placas','p-color',
+     'p-marca','p-modelo','p-anio','p-serie','p-notas'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('p-monto').value = '600';
+    document.getElementById('p-dia-pago').value = '1';
+    document.getElementById('p-tipo').value = 'dia';
+
+    cerrarModal('modal-pension');
+    showToast(`✅ Pensión registrada · ${nombre} · ${placas} · código ${codigo}`);
+
+    await cargarPensionados();
+    renderSemaforo('todos');
+    renderPensionados();
+    renderCobranza();
+  } catch (e) {
+    showToast('⚠ Error al guardar en Supabase: ' + e.message);
+  }
 }
 
 function abrirValidar(id,nombre,monto,ref,metodo) {
@@ -735,7 +773,7 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;
 
 // INIT
 const hoy=new Date().toISOString().slice(0,10);
-renderSemaforo('todos');
+(async () => { await cargarPensionados(); renderSemaforo('todos'); })();
 </script>
 </body>
 </html>
