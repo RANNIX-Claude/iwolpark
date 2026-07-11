@@ -169,7 +169,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="nav-right">
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v10</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v11</span>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
 </nav>
@@ -424,8 +424,21 @@ async function cargarDatos() {
         importe:      parseFloat(o.importe) || 0,
         fecha:        o.fecha_op || desde
       }));
-      // Ocupación real = tickets con estatus 'abierto' (vehículos aún en plaza)
-      DATOS.autos_en_plaza = rows.filter(o => o.estatus === 'abierto').length;
+      // Ocupación real = tickets con estatus 'abierto' AHORA MISMO, en una consulta
+      // aparte sin filtro de período (un auto que entró ayer y sigue en la plaza
+      // debe contar aunque el filtro de fecha esté en "Hoy"). Desglosado por tipo
+      // real (antes era un split falso 70/30).
+      try {
+        const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=tipo&limit=1000`, {
+          headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
+        });
+        const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
+        DATOS.autos_en_plaza  = abiertos.length;
+        DATOS.abiertos_normal = abiertos.filter(o => o.tipo !== 'preferencial').length;
+        DATOS.abiertos_pref   = abiertos.filter(o => o.tipo === 'preferencial').length;
+      } catch (e) {
+        DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
+      }
 
       // Poblar select de cajeros
       const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
@@ -476,7 +489,7 @@ function generarDatosDemo() {
       importe: imp
     });
   }
-  return { operaciones: ops, autos_en_plaza: 12, capacidad: 68 };
+  return { operaciones: ops, autos_en_plaza: 12, abiertos_normal: 8, abiertos_pref: 4, capacidad: 68 };
 }
 
 // ══ RENDER TODO ══
@@ -526,8 +539,8 @@ function renderOcupacion() {
   document.getElementById('gauge-pct').textContent  = pct+'%';
   document.getElementById('gauge-sub').textContent  = DATOS.autos_en_plaza+' / '+DATOS.capacidad;
   document.getElementById('gauge-fill').style.width = pct+'%';
-  document.getElementById('ocu-normal').textContent = Math.floor(DATOS.autos_en_plaza*.7);
-  document.getElementById('ocu-pref').textContent   = Math.ceil(DATOS.autos_en_plaza*.3);
+  document.getElementById('ocu-normal').textContent = DATOS.abiertos_normal || 0;
+  document.getElementById('ocu-pref').textContent   = DATOS.abiertos_pref || 0;
 }
 
 function renderMix(ops) {

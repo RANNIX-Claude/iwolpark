@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v10</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v11</span>
   </div>
 </nav>
 
@@ -474,6 +474,57 @@ async function cargarCortesDB(desde, hasta) {
 
 // Caches de la última consulta por pestaña (para drill-down/export sin refetch)
 let OPS_EJECUTIVO = [], OPS_OPERATIVO = [], OPS_CAJEROS = [], CORTES_ACTUAL = [];
+let OPS_HIST_MESES = [], MESES_INFO = [];
+
+// Tickets con estatus='abierto' ahora mismo, mapeados igual que cargarOps
+async function cargarAbiertos() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&order=created_at.desc&limit=500`, { headers: SB_HEADERS });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return rows.map(t => ({
+      folio: t.folio, tipo: t.tipo, cajero: t.cajero || '—',
+      hora: t.hora_entrada || '—', minutos: 0, franja: t.franja || '—',
+      importe: 0, fecha: t.fecha_op, dia: diaSemana(t.fecha_op)
+    }));
+  } catch (e) { return []; }
+}
+
+// Total de tickets + total en importe + tabla desglosada por tipo — el resumen
+// que se muestra al hacer clic en cualquier KPI/gráfica del tablero.
+function resumenTiposHTML(ops) {
+  const tiposInfo = [
+    {t:'normal',l:'Normal',c:'#0A66C2'},
+    {t:'preferencial',l:'Preferencial',c:'#7B5EA7'},
+    {t:'perdido',l:'Boleto perdido',c:'#D93025'},
+    {t:'cortesia',l:'Cortesía',c:'#888'},
+  ];
+  const totalImporte = ops.reduce((s,o)=>s+o.importe,0);
+  const filas = tiposInfo.map(ti=>{
+    const sub = ops.filter(o=>o.tipo===ti.t);
+    const imp = sub.reduce((s,o)=>s+o.importe,0);
+    return `<tr>
+      <td><span class="badge" style="background:${ti.c}22;color:${ti.c}">${ti.l}</span></td>
+      <td style="text-align:right">${sub.length}</td>
+      <td style="text-align:right;font-weight:700;color:var(--gold)">${fmt$(imp)}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="background:var(--bg);border-radius:8px;padding:12px 20px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:var(--purple)">${ops.length}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Total de tickets</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 20px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:var(--gold)">${fmt$(totalImporte)}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Total en importe</div>
+      </div>
+    </div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Tipo</th><th style="text-align:right">Tickets</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>`;
+}
 
 // ══ UTILS ══
 function fmt$(n){return '$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -521,13 +572,14 @@ async function renderEjecutivo() {
   }
   const desdeHist = new Date(hoyD.getFullYear(), hoyD.getMonth()-5, 1).toISOString().slice(0,10);
   const opsHist = await cargarOps(desdeHist, fechasPeriodo('hoy').hasta);
+  OPS_HIST_MESES = opsHist; MESES_INFO = mesesInfo;
   const vals = mesesInfo.map(m => opsHist
     .filter(o => { const d=new Date(o.fecha+'T12:00:00'); return d.getFullYear()===m.anio && (d.getMonth()+1)===m.mes; })
     .reduce((s,o)=>s+o.importe,0));
   const maxM  = Math.max(...vals,1);
   document.getElementById('chart-meses').innerHTML = mesesInfo.map((m,i)=>`
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer"
-         onclick="showToast('${m.label}: ${fmt$(vals[i])}')">
+         onclick="drillMes(${i})">
       <div style="font-size:10px;font-weight:700;color:var(--muted)">${fmt$(vals[i]).split('.')[0]}</div>
       <div style="width:100%;background:${i===5?'var(--purple)':'#D4C5F0'};border-radius:6px 6px 0 0;
            height:${vals[i]/maxM*90}px;min-height:4px;transition:height .5s"></div>
@@ -546,7 +598,7 @@ async function renderEjecutivo() {
     const sub=ops.filter(o=>o.tipo===ti.t);
     const tot=sub.reduce((s,o)=>s+o.importe,0);
     const pct2=maxT?Math.round(tot/maxT*100):0;
-    return `<div class="hbar-row" onclick="showToast('${ti.l}: ${fmt$(tot)} · ${sub.length} ops')">
+    return `<div class="hbar-row" onclick="drillKPI('ingresos')">
       <div class="hbar-label" style="color:${ti.c}">${ti.l}</div>
       <div class="hbar-wrap"><div class="hbar-fill" style="width:${pct2}%;background:${ti.c}"></div></div>
       <div class="hbar-val">${fmt$(tot)}</div>
@@ -588,17 +640,19 @@ async function renderEjecutivo() {
 }
 
 // ══ DRILL KPI ══
-function drillKPI(tipo) {
+async function drillKPI(tipo) {
   const panel = document.getElementById('drill-panel');
   const cont  = document.getElementById('drill-content');
   const title = document.getElementById('drill-title');
   panel.classList.add('open');
+  cont.innerHTML = '<div style="padding:16px;color:var(--muted);text-align:center">Cargando…</div>';
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
   const ops = OPS_EJECUTIVO;
 
   if(tipo==='perdidos') {
     title.textContent = '⚠ Detalle: Boletos Perdidos';
     const perdidos = ops.filter(o=>o.tipo==='perdido');
-    cont.innerHTML = `<div class="tabla-wrap"><table>
+    cont.innerHTML = resumenTiposHTML(perdidos) + `<div class="tabla-wrap" style="margin-top:14px"><table>
       <thead><tr><th>Folio</th><th>Cajero</th><th>Fecha</th><th>Hora</th><th>Franja</th><th style="text-align:right">Importe</th></tr></thead>
       <tbody>${perdidos.map(o=>`<tr>
         <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
@@ -607,25 +661,39 @@ function drillKPI(tipo) {
         <td style="text-align:right;font-weight:700;color:var(--red)">${fmt$(o.importe)}</td>
       </tr>`).join('')}</tbody></table></div>`;
   } else if(tipo==='ingresos') {
-    title.textContent = '💰 Breakdown de ingresos';
-    const tipos = [{t:'normal',l:'Normal',c:'#0A66C2'},{t:'preferencial',l:'Preferencial',c:'#7B5EA7'},{t:'perdido',l:'Perdido',c:'#D93025'}];
-    const tot = ops.reduce((s,o)=>s+o.importe,0);
-    cont.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-      ${tipos.map(ti=>{
-        const sub=ops.filter(o=>o.tipo===ti.t);
-        const t=sub.reduce((s,o)=>s+o.importe,0);
-        return `<div style="background:var(--bg);border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:11px;font-weight:700;color:${ti.c};margin-bottom:4px">${ti.l}</div>
-          <div style="font-size:26px;font-weight:900">${fmt$(t)}</div>
-          <div style="font-size:11px;color:var(--muted)">${sub.length} ops · ${tot?Math.round(t/tot*100):0}%</div>
-        </div>`}).join('')}
-    </div>`;
+    title.textContent = '💰 Detalle: Ingresos totales';
+    cont.innerHTML = resumenTiposHTML(ops.filter(o=>o.importe>0));
+  } else if(tipo==='ticket') {
+    title.textContent = '🎫 Detalle: Ticket promedio';
+    cont.innerHTML = resumenTiposHTML(ops.filter(o=>o.importe>0));
+  } else if(tipo==='operaciones') {
+    title.textContent = '📊 Detalle: Operaciones';
+    cont.innerHTML = resumenTiposHTML(ops);
+  } else if(tipo==='ocupacion') {
+    title.textContent = '🅿️ Detalle: Ocupación actual (en vivo)';
+    const abiertos = await cargarAbiertos();
+    cont.innerHTML = resumenTiposHTML(abiertos) + `<div class="tabla-wrap" style="margin-top:14px"><table>
+      <thead><tr><th>Folio</th><th>Cajero</th><th>Entrada</th><th>Franja</th></tr></thead>
+      <tbody>${abiertos.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.cajero}</td><td>${o.hora}</td><td>${o.franja}</td>
+      </tr>`).join('')}</tbody></table></div>`;
   } else {
     title.textContent = '📊 Detalle: '+tipo;
-    cont.innerHTML = `<div style="padding:16px;color:var(--muted);text-align:center">Ver tabla de operaciones en tab Operativo</div>`;
+    cont.innerHTML = resumenTiposHTML(ops);
   }
+}
+
+function drillMes(i) {
+  const m = MESES_INFO[i];
+  const ops = OPS_HIST_MESES.filter(o => { const d=new Date(o.fecha+'T12:00:00'); return d.getFullYear()===m.anio && (d.getMonth()+1)===m.mes; });
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = '📅 Detalle: '+m.label+' '+m.anio;
+  document.getElementById('drill-content').innerHTML = resumenTiposHTML(ops);
+  panel.classList.add('open');
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
+
 function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
 
 // ══ OPERATIVO ══
