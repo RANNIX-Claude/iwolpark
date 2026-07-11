@@ -97,6 +97,37 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 .drill-back { background:var(--accent); color:#fff; border:none;
               border-radius:6px; padding:6px 14px; font-size:12px;
               font-weight:700; cursor:pointer; }
+
+/* MODAL PARÁMETROS */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+                  z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--white); border-radius:14px; max-width:720px; width:100%;
+             max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.modal-head { display:flex; align-items:center; gap:10px; padding:18px 22px;
+              border-bottom:1px solid var(--border); position:sticky; top:0;
+              background:var(--white); border-radius:14px 14px 0 0; }
+.modal-title { font-size:16px; font-weight:900; }
+.modal-close { margin-left:auto; background:none; border:none; font-size:20px;
+               color:var(--muted); cursor:pointer; line-height:1; }
+.modal-body { padding:20px 22px; display:flex; flex-direction:column; gap:20px; }
+.param-card { border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+.param-card h3 { font-size:12px; font-weight:800; text-transform:uppercase;
+                  letter-spacing:.5px; color:var(--muted); margin-bottom:10px; }
+.param-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.param-row input, .param-row select { border:1.5px solid var(--border); border-radius:8px;
+              padding:8px 12px; font-size:13px; flex:1; min-width:140px; }
+.param-btn { background:var(--accent); color:#fff; border:none; border-radius:8px;
+             padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.param-btn.outline { background:#fff; color:var(--accent); border:1.5px solid var(--accent); }
+.param-card.proximamente { opacity:.6; background:#FAFAFA; }
+.param-tag { display:inline-block; font-size:10px; font-weight:700; background:#F0EEF8;
+             color:var(--accent); border-radius:99px; padding:3px 10px; margin-left:8px; }
+.cajero-list-row { display:flex; align-items:center; gap:10px; padding:8px 0;
+                    border-bottom:1px solid #F0EEF8; font-size:13px; }
+.cajero-list-row .rol-badge { font-size:10px; font-weight:700; padding:2px 8px;
+                                border-radius:99px; background:#EFF6FF; color:var(--accent2); }
+.cajero-list-row .estado-inactivo { color:var(--red); font-size:11px; font-weight:700; }
 .drill-title { font-size:14px; font-weight:800; color:var(--accent); }
 .drill-path  { font-size:11px; color:var(--muted); margin-left:auto; }
 
@@ -169,7 +200,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="nav-right">
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v14</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v15</span>
+    <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
 </nav>
@@ -228,6 +260,70 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <span class="drill-path" id="drill-path"></span>
     </div>
     <div id="drill-content"></div>
+  </div>
+
+  <!-- MODAL PARÁMETROS -->
+  <div class="modal-overlay" id="modal-parametros">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span class="modal-title">⚙ Parámetros del sistema</span>
+        <button class="modal-close" onclick="cerrarParametros()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="param-card">
+          <h3>Capacidad de la plaza</h3>
+          <div class="param-row">
+            <input type="number" id="param-capacidad" min="1" placeholder="Cantidad de cajones">
+            <button class="param-btn" onclick="guardarCapacidad()">Guardar</button>
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>URL de facturación</h3>
+          <div class="param-row">
+            <input type="url" id="param-url-facturacion" placeholder="https://...">
+            <button class="param-btn" onclick="guardarUrlFacturacion()">Guardar</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">
+            Esta liga se convierte en el QR que aparece en el ticket impreso cuando hay un monto a cobrar.
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Pensiones</h3>
+          <div class="param-row">
+            <div style="flex:1;font-size:12.5px;color:var(--muted)">
+              Captura y administra a los clientes con pensión activa.
+            </div>
+            <a class="param-btn outline" href="IwolPark_Pensiones.html" target="_blank">Abrir Pensiones →</a>
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Operadores / Cajeros<span class="param-tag" id="cajeros-count">0</span></h3>
+          <div id="lista-cajeros" style="margin-bottom:12px"></div>
+          <div class="param-row">
+            <input type="text" id="nuevo-cajero-nombre" placeholder="Nombre">
+            <input type="text" id="nuevo-cajero-usuario" placeholder="Usuario">
+            <select id="nuevo-cajero-rol">
+              <option value="cajero">Cajero / Operador</option>
+              <option value="admin_plaza">Administrador de plaza</option>
+              <option value="corporativo">Oficina central</option>
+            </select>
+            <button class="param-btn" onclick="agregarCajero()">+ Agregar</button>
+          </div>
+        </div>
+
+        <div class="param-card proximamente">
+          <h3>Administrador de usuarios<span class="param-tag">Próximamente</span></h3>
+          <div style="font-size:12.5px;color:var(--muted)">
+            Aquí se van a manejar las cuentas y permisos de acceso a los 3 portales (Operador, Administrador, Oficina central).
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 
   <!-- CHARTS ROW 1 -->
@@ -548,7 +644,9 @@ function renderFranjas(ops) {
 }
 
 function renderOcupacion() {
-  const pct = Math.round(DATOS.autos_en_plaza / DATOS.capacidad * 100);
+  // Tope en 100%: tickets "abierto" sin cerrar de días pasados (residuo de
+  // pruebas) pueden inflar autos_en_plaza por encima de la capacidad real.
+  const pct = Math.min(100, Math.round(DATOS.autos_en_plaza / DATOS.capacidad * 100));
   document.getElementById('kpi-ocupacion').textContent     = pct+'%';
   document.getElementById('kpi-ocupacion-sub').textContent = DATOS.autos_en_plaza+' de '+DATOS.capacidad+' lugares';
   document.getElementById('gauge-pct').textContent  = pct+'%';
@@ -767,6 +865,124 @@ function exportarCSV() {
   a.download = 'IwolPark_admin_'+hoy+'.csv';
   a.click();
   showToast('CSV exportado · '+ops.length+' registros');
+}
+
+// ══ PARÁMETROS DEL SISTEMA ══
+let PARAM_PLAZA_ID = null;
+const SB_HEADERS_PARAM = {
+  'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json'
+};
+
+async function abrirParametros() {
+  document.getElementById('modal-parametros').classList.add('open');
+  await Promise.all([cargarParametrosPlaza(), cargarCajeros()]);
+}
+function cerrarParametros() {
+  document.getElementById('modal-parametros').classList.remove('open');
+}
+
+async function cargarParametrosPlaza() {
+  try {
+    // url_facturacion puede no existir aún (requiere el ALTER TABLE manual);
+    // si el select completo falla por columna faltante, se reintenta sin ella
+    // para no tumbar la carga de capacidad_total.
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
+    let tieneUrlFacturacion = true;
+    if (!r.ok) {
+      tieneUrlFacturacion = false;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total&limit=1`, { headers: SB_HEADERS_PARAM });
+    }
+    const rows = r.ok ? await r.json() : [];
+    if (rows.length) {
+      PARAM_PLAZA_ID = rows[0].plaza_id;
+      document.getElementById('param-capacidad').value = rows[0].capacidad_total || '';
+      document.getElementById('param-url-facturacion').value = tieneUrlFacturacion ? (rows[0].url_facturacion || '') : '';
+      document.getElementById('param-url-facturacion').placeholder = tieneUrlFacturacion ? 'https://...' : 'Falta correr el ALTER TABLE (ver instrucciones)';
+      document.getElementById('param-url-facturacion').disabled = !tieneUrlFacturacion;
+    }
+  } catch (e) { showToast('No se pudo cargar la plaza'); }
+}
+
+async function guardarCapacidad() {
+  const val = parseInt(document.getElementById('param-capacidad').value);
+  if (!val || val < 1 || !PARAM_PLAZA_ID) { showToast('Cantidad inválida'); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ capacidad_total: val })
+    });
+    showToast(r.ok ? 'Capacidad actualizada · '+val+' cajones' : 'Error al guardar');
+    if (r.ok) cargarDatos();
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function guardarUrlFacturacion() {
+  const val = document.getElementById('param-url-facturacion').value.trim();
+  if (!PARAM_PLAZA_ID) { showToast('Falta cargar la plaza'); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ url_facturacion: val })
+    });
+    showToast(r.ok ? 'URL de facturación actualizada' : 'Error al guardar (¿ya corriste el ALTER TABLE?)');
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function cargarCajeros() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/cajeros?select=cajero_id,nombre,usuario,rol,activo&order=nombre.asc`, { headers: SB_HEADERS_PARAM });
+    const cajeros = r.ok ? await r.json() : [];
+    renderCajeros(cajeros);
+  } catch (e) { renderCajeros([]); }
+}
+
+const ROL_LABEL = { cajero:'Operador', admin_plaza:'Admin. plaza', corporativo:'Oficina central', super_admin:'Super admin' };
+
+function renderCajeros(cajeros) {
+  document.getElementById('cajeros-count').textContent = cajeros.length;
+  const cont = document.getElementById('lista-cajeros');
+  if (!cajeros.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--muted)">Sin operadores registrados todavía.</div>';
+    return;
+  }
+  cont.innerHTML = cajeros.map(c => `
+    <div class="cajero-list-row">
+      <span style="flex:1;font-weight:700">${c.nombre}</span>
+      <span style="color:var(--muted)">${c.usuario}</span>
+      <span class="rol-badge">${ROL_LABEL[c.rol] || c.rol}</span>
+      ${c.activo ? '' : '<span class="estado-inactivo">Inactivo</span>'}
+      <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
+              onclick="toggleCajero('${c.cajero_id}', ${!c.activo})">${c.activo ? 'Desactivar' : 'Activar'}</button>
+    </div>`).join('');
+}
+
+async function agregarCajero() {
+  const nombre  = document.getElementById('nuevo-cajero-nombre').value.trim();
+  const usuario = document.getElementById('nuevo-cajero-usuario').value.trim();
+  const rol     = document.getElementById('nuevo-cajero-rol').value;
+  if (!nombre || !usuario) { showToast('Falta nombre o usuario'); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/cajeros`, {
+      method: 'POST', headers: { ...SB_HEADERS_PARAM, Prefer: 'return=minimal' },
+      body: JSON.stringify({ plaza_id: PARAM_PLAZA_ID, nombre, usuario, rol, activo: true })
+    });
+    if (r.ok) {
+      document.getElementById('nuevo-cajero-nombre').value = '';
+      document.getElementById('nuevo-cajero-usuario').value = '';
+      showToast('Operador agregado · '+nombre);
+      cargarCajeros();
+    } else {
+      showToast('Error: revisa que el usuario no esté repetido');
+    }
+  } catch (e) { showToast('Error al agregar'); }
+}
+
+async function toggleCajero(cajeroId, nuevoActivo) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/cajeros?cajero_id=eq.${cajeroId}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ activo: nuevoActivo })
+    });
+    if (r.ok) cargarCajeros();
+  } catch (e) { showToast('Error al actualizar'); }
 }
 
 // ══ UTILS ══

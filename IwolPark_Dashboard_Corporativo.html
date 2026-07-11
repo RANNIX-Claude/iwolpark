@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v14</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v15</span>
   </div>
 </nav>
 
@@ -554,7 +554,10 @@ async function renderEjecutivo() {
   const perdidos = ops.filter(o=>o.tipo==='perdido');
   const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
   const ticket = cobros.length?total/cobros.length:0;
-  const pct    = Math.round(autos_ahora/40*100);
+  // Tope en 100%: si hay tickets "abierto" sin cerrar de días pasados (residuo
+  // de pruebas), autos_ahora puede superar la capacidad real de la plaza —
+  // eso es un problema de datos, no una ocupación >100% físicamente posible.
+  const pct    = Math.min(100, Math.round(autos_ahora/40*100));
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';

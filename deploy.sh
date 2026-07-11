@@ -8,7 +8,7 @@ CURRENT=$(cat VERSION 2>/dev/null || echo 0)
 NEXT=$((CURRENT + 1))
 echo "$NEXT" > VERSION
 
-PAGES="IwolPark_TABLET.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html"
+PAGES="IwolPark_Index.html IwolPark_TABLET.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html"
 for f in $PAGES; do
   sed -i -E "s/(id=\"app-version\"[^>]*>)v[0-9]+</\1v${NEXT}</" "$f"
 done
