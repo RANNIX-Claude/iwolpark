@@ -169,7 +169,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="nav-right">
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v11</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v12</span>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
 </nav>
@@ -206,7 +206,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="kpi-card" onclick="drillDown('ocupacion')" title="Ver detalle">
       <div class="kpi-label">Ocupación ahora</div>
       <div class="kpi-value" style="color:var(--accent)" id="kpi-ocupacion">0%</div>
-      <div class="kpi-sub" id="kpi-ocupacion-sub">0 de 68 lugares</div>
+      <div class="kpi-sub" id="kpi-ocupacion-sub">0 de 40 lugares</div>
     </div>
     <div class="kpi-card" onclick="drillDown('boletos_perdidos')" title="Ver detalle">
       <div class="kpi-label">Boletos perdidos</div>
@@ -272,7 +272,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="ocupacion-wrap">
         <div class="gauge-num">
           <div class="gauge-pct" id="gauge-pct">0%</div>
-          <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 68</div>
+          <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 40</div>
         </div>
         <div class="gauge-bar-wrap">
           <div class="gauge-bar-bg">
@@ -281,7 +281,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           <div class="gauge-labels">
             <span>0%</span>
             <span>50%</span>
-            <span>100% (68)</span>
+            <span>100% (40)</span>
           </div>
           <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
@@ -359,7 +359,7 @@ let DATOS = {
   operaciones: [],
   turno_actual: null,
   autos_en_plaza: 0,
-  capacidad: 68
+  capacidad: 40
 };
 let _drillActual = null;
 
@@ -489,7 +489,7 @@ function generarDatosDemo() {
       importe: imp
     });
   }
-  return { operaciones: ops, autos_en_plaza: 12, abiertos_normal: 8, abiertos_pref: 4, capacidad: 68 };
+  return { operaciones: ops, autos_en_plaza: 12, abiertos_normal: 8, abiertos_pref: 4, capacidad: 40 };
 }
 
 // ══ RENDER TODO ══

@@ -78,11 +78,15 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v11</span>
-  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" style="margin-left:12px">
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v12</span>
+  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
 </nav>
+<script>
+  // Si esta página está embebida (iframe dentro de Corporativo), el link "Volver" sobra
+  if (window.self !== window.top) document.getElementById('link-volver').style.display = 'none';
+</script>
 
 <div class="container">
 
@@ -242,7 +246,7 @@ function renderKPIs() {
   const porDia=DIAS.map(d=>({d,t:HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)})).sort((a,b)=>b.t-a.t)[0];
   document.getElementById('kpis-rapidos').innerHTML=[
     {label:'Hora pico',val:`${maxH}:00`,sub:`${maxD} · ${fmtVal(maxVal)}`,color:'var(--red)'},
-    {label:METRICA==='ingresos'?'Ingreso promedio':'Ocupación promedio',val:fmtVal(prom),sub:METRICA==='ingresos'?'por hora':`${Math.round(prom/68*100)}% de capacidad`,color:'var(--purple)'},
+    {label:METRICA==='ingresos'?'Ingreso promedio':'Ocupación promedio',val:fmtVal(prom),sub:METRICA==='ingresos'?'por hora':`${Math.round(prom/40*100)}% de capacidad`,color:'var(--purple)'},
     {label:'Día más activo',val:porDia.d,sub:`Prom. ${fmtVal(porDia.t/24)}/hora`,color:'var(--blue)'},
   ].map(k=>`<div class="card kpi" style="text-align:center;padding:16px">
     <div class="kpi-val" style="color:${k.color}">${k.val}</div>
@@ -315,7 +319,7 @@ function renderFranjas() {
     DIAS.forEach(d=>f.h.forEach(h=>vals.push(DEMANDA[d][h])));
     const prom=vals.reduce((s,v)=>s+v,0)/vals.length;
     const pico=Math.max(...vals);
-    const pct=METRICA==='ingresos' ? null : Math.round(prom/68*100);
+    const pct=METRICA==='ingresos' ? null : Math.round(prom/40*100);
     return `<div class="franja-card" style="background:${f.bg}">
       <div style="font-size:13px;font-weight:800;color:${f.c};margin-bottom:10px">${f.n}</div>
       <div class="franja-pct" style="color:${f.c}">${pct!==null?pct+'%':fmtVal(prom)}</div>

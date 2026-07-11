@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v11</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v12</span>
   </div>
 </nav>
 
@@ -181,7 +181,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <div class="kpi" onclick="drillKPI('ocupacion')">
       <div class="kpi-label">Ocupación prom.</div>
       <div class="kpi-val" style="color:var(--purple)" id="ej-ocu">0%</div>
-      <div class="kpi-sub" id="ej-ocu-sub">de 68 lugares</div>
+      <div class="kpi-sub" id="ej-ocu-sub">de 40 lugares</div>
     </div>
     <div class="kpi" onclick="drillKPI('ticket')">
       <div class="kpi-label">Ticket promedio</div>
@@ -233,7 +233,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
                 stroke-dashoffset="78" style="transition:stroke-dashoffset .6s"/>
         </svg>
         <div style="font-size:32px;font-weight:900;color:var(--purple);margin-top:-16px" id="gauge-pct">0%</div>
-        <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 68 lugares</div>
+        <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 40 lugares</div>
       </div>
     </div>
     <!-- Pico del día -->
@@ -353,19 +353,8 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
 
 <!-- ══ TAB DEMANDA ══ -->
 <div class="tab-section" id="tab-demanda">
-  <div class="card" style="padding:28px;text-align:center">
-    <div style="font-size:32px;margin-bottom:12px">📊</div>
-    <div style="font-size:15px;font-weight:800;margin-bottom:8px">Análisis de Demanda Temporal</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">
-      Heatmap por día/hora, curvas de demanda, patrones semanales e insights automáticos
-    </div>
-    <a href="IwolPark_Demanda.html" target="_blank"
-       style="background:var(--purple);color:#fff;border:none;border-radius:8px;
-              padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;
-              text-decoration:none;display:inline-block">
-      Abrir tablero de demanda →
-    </a>
-  </div>
+  <iframe id="iframe-demanda" title="Análisis de Demanda"
+    style="width:100%;height:1650px;border:none;border-radius:12px;background:#fff"></iframe>
 </div>
 
 <!-- ══ TAB CORTES ══ -->
@@ -415,6 +404,11 @@ function showTab(id, el) {
   if(id==='operativo') renderOperativo();
   if(id==='cajeros')   renderCajeros();
   if(id==='cortes')    renderCortes();
+  if(id==='demanda') {
+    // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
+    const ifr = document.getElementById('iframe-demanda');
+    if (!ifr.src) ifr.src = 'IwolPark_Demanda.html';
+  }
 }
 
 // ══ SUPABASE ══
@@ -542,7 +536,7 @@ async function renderEjecutivo() {
   const perdidos = ops.filter(o=>o.tipo==='perdido');
   const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
   const ticket = cobros.length?total/cobros.length:0;
-  const pct    = Math.round(autos_ahora/68*100);
+  const pct    = Math.round(autos_ahora/40*100);
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
@@ -551,7 +545,7 @@ async function renderEjecutivo() {
   document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
   document.getElementById('ej-ops-delta').style.display = 'none';
   document.getElementById('ej-ocu').textContent = pct+'%';
-  document.getElementById('ej-ocu-sub').textContent = autos_ahora+' de 68 lugares';
+  document.getElementById('ej-ocu-sub').textContent = autos_ahora+' de 40 lugares';
   document.getElementById('ej-ticket').textContent = fmt$(ticket);
   document.getElementById('ej-ticket-sub').textContent = 'por operación cobrada';
   document.getElementById('ej-perdidos').textContent = perdidos.length;
@@ -561,7 +555,7 @@ async function renderEjecutivo() {
   const offset = 157 - (157 * pct/100);
   document.getElementById('gauge-arc').style.strokeDashoffset = offset;
   document.getElementById('gauge-pct').textContent = pct+'%';
-  document.getElementById('gauge-sub').textContent = autos_ahora+' / 68 lugares';
+  document.getElementById('gauge-sub').textContent = autos_ahora+' / 40 lugares';
 
   // Chart meses — últimos 6 meses reales
   const hoyD = new Date();

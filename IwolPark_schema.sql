@@ -14,7 +14,7 @@ CREATE TABLE dim_plaza (
   nombre          TEXT NOT NULL,
   ciudad          TEXT NOT NULL DEFAULT 'Metepec',
   estado          TEXT NOT NULL DEFAULT 'Edo. México',
-  capacidad_total INT  NOT NULL DEFAULT 68,
+  capacidad_total INT  NOT NULL DEFAULT 40,
   empresa_grupo   TEXT NOT NULL DEFAULT 'Inmobiliaria Alcedines del Norte',
   rfc             TEXT NOT NULL DEFAULT 'IAN2009238UA',
   direccion       TEXT,
