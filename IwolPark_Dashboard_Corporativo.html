@@ -136,7 +136,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="nav-right">
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v15</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v16</span>
   </div>
 </nav>
 
@@ -467,13 +467,51 @@ async function cargarOps(desde, hasta, maxTotal=6000) {
   } catch (e) { return []; }
 }
 
-async function contarAbiertos() {
+// Ocupación promedio de un periodo: en vez de "cuántos hay abiertos ahora
+// mismo" (que se infla con tickets 'abierto' que quedaron mal cerrados de
+// días pasados), se toma una "fotografía" cada hora dentro del periodo y se
+// cuenta cuántos tickets ocupaban un cajón en ese instante exacto
+// (entrada_at <= instante < salida_at). El promedio de esas fotografías
+// nunca puede superar la capacidad real, porque cada fotografía es un
+// conteo simultáneo real, no una suma acumulada.
+async function calcularOcupacionPromedio(desde, hasta) {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=id&limit=1`, {
-      headers: { ...SB_HEADERS, Prefer: 'count=exact' }
-    });
-    const range = r.headers.get('content-range') || '';
-    return parseInt(range.split('/')[1]) || 0;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=hora_entrada_at,hora_salida_at,estatus,fecha_op`, { headers: SB_HEADERS });
+    const rows = r.ok ? await r.json() : [];
+    const ahora = new Date();
+    const hoyStr = ahora.toISOString().slice(0,10);
+
+    const intervalos = [];
+    for (const t of rows) {
+      if (!t.hora_entrada_at) continue;
+      const entrada = new Date(t.hora_entrada_at);
+      let salida;
+      if (t.hora_salida_at) salida = new Date(t.hora_salida_at);
+      else if (t.estatus === 'abierto' && t.fecha_op === hoyStr) salida = ahora;
+      else continue; // 'abierto' de un día pasado: dato inconsistente (la
+                      // regla del negocio es que nadie se queda de un día
+                      // para otro) — se excluye para no inflar el promedio
+      if (salida > entrada) intervalos.push([entrada, salida]);
+    }
+    if (!intervalos.length) return 0;
+
+    const inicioMuestreo = new Date(desde+'T00:00:00');
+    const finMuestreo = hasta >= hoyStr ? ahora : new Date(hasta+'T23:00:00');
+    const totalMuestras = Math.floor((finMuestreo.getTime()-inicioMuestreo.getTime())/3600000) + 1;
+
+    // Barrido (sweep-line) con arreglo de diferencias: en vez de comparar cada
+    // muestra contra cada ticket (O(muestras×tickets), lento para "Este año"),
+    // se marca +1 en la muestra donde entra y -1 en la que sale, y se
+    // acumula — mismo resultado, muchísimo más rápido.
+    const delta = new Array(totalMuestras+1).fill(0);
+    for (const [e,s] of intervalos) {
+      const idxStart = Math.max(0, Math.ceil((e.getTime()-inicioMuestreo.getTime())/3600000));
+      const idxEnd   = Math.min(totalMuestras, Math.ceil((s.getTime()-inicioMuestreo.getTime())/3600000));
+      if (idxStart < idxEnd) { delta[idxStart]++; delta[idxEnd]--; }
+    }
+    let ocupados = 0, suma = 0;
+    for (let i=0; i<totalMuestras; i++) { ocupados += delta[i]; suma += ocupados; }
+    return totalMuestras ? suma/totalMuestras : 0;
   } catch (e) { return 0; }
 }
 
@@ -546,7 +584,7 @@ let _tt; function showToast(m){const t=document.getElementById('toast');t.textCo
 async function renderEjecutivo() {
   const periodo = document.getElementById('periodo-ej')?.value || 'mes';
   const {desde,hasta} = fechasPeriodo(periodo);
-  const [ops, autos_ahora] = await Promise.all([cargarOps(desde,hasta), contarAbiertos()]);
+  const [ops, ocupacionProm] = await Promise.all([cargarOps(desde,hasta), calcularOcupacionPromedio(desde,hasta)]);
   OPS_EJECUTIVO = ops;
 
   const cobros = ops.filter(o=>o.importe>0);
@@ -554,10 +592,10 @@ async function renderEjecutivo() {
   const perdidos = ops.filter(o=>o.tipo==='perdido');
   const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
   const ticket = cobros.length?total/cobros.length:0;
-  // Tope en 100%: si hay tickets "abierto" sin cerrar de días pasados (residuo
-  // de pruebas), autos_ahora puede superar la capacidad real de la plaza —
-  // eso es un problema de datos, no una ocupación >100% físicamente posible.
-  const pct    = Math.min(100, Math.round(autos_ahora/40*100));
+  // Promedio de "fotografías" hora por hora del periodo (ver
+  // calcularOcupacionPromedio) — nunca puede superar 40 porque cada
+  // fotografía es un conteo simultáneo real, no la cuenta de abiertos ahora.
+  const pct    = Math.min(100, Math.round(ocupacionProm/40*100));
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
@@ -566,7 +604,7 @@ async function renderEjecutivo() {
   document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
   document.getElementById('ej-ops-delta').style.display = 'none';
   document.getElementById('ej-ocu').textContent = pct+'%';
-  document.getElementById('ej-ocu-sub').textContent = autos_ahora+' de 40 lugares';
+  document.getElementById('ej-ocu-sub').textContent = Math.round(ocupacionProm)+' de 40 lugares (prom.)';
   document.getElementById('ej-ticket').textContent = fmt$(ticket);
   document.getElementById('ej-ticket-sub').textContent = 'por operación cobrada';
   document.getElementById('ej-perdidos').textContent = perdidos.length;
@@ -576,7 +614,7 @@ async function renderEjecutivo() {
   const offset = 157 - (157 * pct/100);
   document.getElementById('gauge-arc').style.strokeDashoffset = offset;
   document.getElementById('gauge-pct').textContent = pct+'%';
-  document.getElementById('gauge-sub').textContent = autos_ahora+' / 40 lugares';
+  document.getElementById('gauge-sub').textContent = Math.round(ocupacionProm)+' / 40 lugares (prom.)';
 
   // Chart meses — últimos 6 meses reales
   const hoyD = new Date();
