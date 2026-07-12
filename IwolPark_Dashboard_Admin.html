@@ -189,20 +189,47 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
          font-size:13px; font-weight:600; z-index:9999;
          transform:translateY(60px); opacity:0; transition:all .3s; }
 .toast.show { transform:translateY(0); opacity:1; }
+
+/* LOGIN */
+#iwol-login-overlay { position:fixed; inset:0; background:#1D1D1F; z-index:999999;
+  display:flex; align-items:center; justify-content:center; }
+#iwol-login-overlay.hidden { display:none; }
+.iwol-login-box { background:#fff; border-radius:16px; padding:32px 28px; width:90%; max-width:340px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; }
+.iwol-login-box h2 { font-size:18px; font-weight:900; margin-bottom:4px; }
+.iwol-login-box p { font-size:12px; color:#6E6E73; margin-bottom:18px; }
+.iwol-login-box input { width:100%; border:1.5px solid #D2D2D7; border-radius:8px; padding:11px 12px;
+  font-size:14px; margin-bottom:10px; box-sizing:border-box; }
+.iwol-login-box button { width:100%; background:#7B5EA7; color:#fff; border:none; border-radius:8px;
+  padding:12px; font-size:14px; font-weight:700; cursor:pointer; }
+.iwol-login-error { color:#D93025; font-size:12px; margin-top:8px; min-height:16px; }
 </style>
 </head>
 <body>
+
+<div id="iwol-login-overlay" class="hidden">
+  <div class="iwol-login-box">
+    <h2>🔒 Iniciar sesión</h2>
+    <p>IwolPark · <span id="iwol-login-app-nombre"></span></p>
+    <input type="text" id="iwol-login-usuario" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="iwol-login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button onclick="iwolIntentarLogin()">Entrar</button>
+    <div class="iwol-login-error" id="iwol-login-error"></div>
+  </div>
+</div>
 
 <nav>
   <span style="font-size:22px;font-weight:900;color:var(--accent)">·iwol·</span>
   <span class="nav-title">IwolPark</span>
   <span class="nav-badge">ADMIN PLAZA</span>
   <div class="nav-right">
+    <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v23</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v24</span>
     <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
+    <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
   </div>
 </nav>
 
@@ -336,6 +363,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           <div class="param-row">
             <input type="text" id="nuevo-cajero-nombre" placeholder="Nombre">
             <input type="text" id="nuevo-cajero-usuario" placeholder="Usuario">
+            <input type="password" id="nuevo-cajero-password" placeholder="Contraseña" autocomplete="new-password">
             <select id="nuevo-cajero-rol">
               <option value="cajero">Cajero / Operador</option>
               <option value="admin_plaza">Administrador de plaza</option>
@@ -343,9 +371,12 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
             </select>
             <button class="param-btn" onclick="agregarCajero()">+ Agregar</button>
           </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">
+            Este usuario/contraseña es lo que se pide al entrar a cualquiera de los 3 portales (Operador, Administrador, Oficina central) según su rol.
+          </div>
         </div>
 
-        <div class="param-card proximamente">
+        <div class="param-card proximamente" style="display:none">
           <h3>Administrador de usuarios<span class="param-tag">Próximamente</span></h3>
           <div style="font-size:12.5px;color:var(--muted)">
             Aquí se van a manejar las cuentas y permisos de acceso a los 3 portales (Operador, Administrador, Oficina central).
@@ -1017,21 +1048,35 @@ function renderCajeros(cajeros) {
     </div>`).join('');
 }
 
+// Hash simple client-side para la contraseña de login — mismo nivel de
+// robustez que el NIP de cierre que ya existía (no es un backend con bcrypt,
+// pero evita guardar la contraseña en texto plano).
+async function sha256Hex(texto) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 async function agregarCajero() {
   const nombre  = document.getElementById('nuevo-cajero-nombre').value.trim();
   const usuario = document.getElementById('nuevo-cajero-usuario').value.trim();
+  const password = document.getElementById('nuevo-cajero-password').value;
   const rol     = document.getElementById('nuevo-cajero-rol').value;
   if (!nombre || !usuario) { showToast('Falta nombre o usuario'); return; }
+  if (!password || password.length < 4) { showToast('La contraseña debe tener al menos 4 caracteres'); return; }
   try {
+    const password_hash = await sha256Hex(password);
     const r = await fetch(`${SUPABASE_URL}/rest/v1/cajeros`, {
       method: 'POST', headers: { ...SB_HEADERS_PARAM, Prefer: 'return=minimal' },
-      body: JSON.stringify({ plaza_id: PARAM_PLAZA_ID, nombre, usuario, rol, activo: true })
+      body: JSON.stringify({ plaza_id: PARAM_PLAZA_ID, nombre, usuario, password_hash, rol, activo: true })
     });
     if (r.ok) {
       document.getElementById('nuevo-cajero-nombre').value = '';
       document.getElementById('nuevo-cajero-usuario').value = '';
+      document.getElementById('nuevo-cajero-password').value = '';
       showToast('Operador agregado · '+nombre);
       cargarCajeros();
+    } else if (r.status === 400 || r.status === 404) {
+      showToast('Error: ¿ya corriste el ALTER TABLE de password_hash?');
     } else {
       showToast('Error: revisa que el usuario no esté repetido');
     }
@@ -1059,10 +1104,72 @@ function showToast(msg) {
   clearTimeout(_tt); _tt = setTimeout(()=>t.classList.remove('show'),2500);
 }
 
+// ══ LOGIN (Fase B) ══ requiere usuario/contraseña contra 'cajeros' antes de
+// usar la app. Sesión válida mientras dure la pestaña (sessionStorage).
+// sha256Hex() ya está definida arriba (se usa también al crear operadores).
+function iwolUsuarioActual() {
+  try { return JSON.parse(sessionStorage.getItem('iwol_usuario') || 'null'); } catch(e) { return null; }
+}
+function cerrarSesion() { sessionStorage.removeItem('iwol_usuario'); location.reload(); }
+
+let _iwolRolesPermitidos = [];
+let _iwolLoginResolve = null;
+function requerirLogin(rolesPermitidos, nombreApp) {
+  _iwolRolesPermitidos = rolesPermitidos;
+  const actual = iwolUsuarioActual();
+  if (actual && rolesPermitidos.includes(actual.rol)) return Promise.resolve(actual);
+  document.getElementById('iwol-login-app-nombre').textContent = nombreApp || '';
+  document.getElementById('iwol-login-overlay').classList.remove('hidden');
+  document.getElementById('iwol-login-usuario').focus();
+  return new Promise(res => { _iwolLoginResolve = res; });
+}
+async function iwolIntentarLogin() {
+  const usuario = document.getElementById('iwol-login-usuario').value.trim();
+  const password = document.getElementById('iwol-login-password').value;
+  const errEl = document.getElementById('iwol-login-error');
+  errEl.textContent = '';
+  if (!usuario || !password) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  try {
+    // login_cajero() es una función en la base (RPC) que compara el hash
+    // internamente y solo regresa los datos públicos si coincide — nunca
+    // expone password_hash al cliente, a diferencia de leer la tabla directo.
+    const hash = await sha256Hex(password);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_usuario: usuario, p_password_hash: hash })
+    });
+    if (!r.ok) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; return; }
+    const rows = await r.json();
+    const cajero = rows[0];
+    if (!cajero) {
+      errEl.textContent = 'Usuario o contraseña incorrectos'; return;
+    }
+    if (!_iwolRolesPermitidos.includes(cajero.rol)) {
+      errEl.textContent = 'Tu usuario no tiene permiso para entrar aquí'; return;
+    }
+    const datosUsuario = { cajero_id: cajero.cajero_id, nombre: cajero.nombre, usuario: cajero.usuario, rol: cajero.rol };
+    sessionStorage.setItem('iwol_usuario', JSON.stringify(datosUsuario));
+    document.getElementById('iwol-login-overlay').classList.add('hidden');
+    document.getElementById('iwol-login-usuario').value = '';
+    document.getElementById('iwol-login-password').value = '';
+    if (_iwolLoginResolve) { _iwolLoginResolve(datosUsuario); _iwolLoginResolve = null; }
+  } catch (e) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; }
+}
+document.addEventListener('keydown', e => {
+  const overlay = document.getElementById('iwol-login-overlay');
+  if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
+});
+
 // ══ INIT ══
-document.getElementById('filtro-periodo').value = 'hoy';
-cargarDatos();
-setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+let USUARIO_ACTUAL = null;
+(async () => {
+  USUARIO_ACTUAL = await requerirLogin(['admin_plaza','super_admin'], 'Administrador de plaza');
+  document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
+  document.getElementById('filtro-periodo').value = 'hoy';
+  cargarDatos();
+  setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+})();
 </script>
 </body>
 </html>

@@ -125,18 +125,45 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
        border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;
        z-index:9999;transform:translateY(60px);opacity:0;transition:all .3s}
 .toast.show{transform:translateY(0);opacity:1}
+
+/* LOGIN */
+#iwol-login-overlay { position:fixed; inset:0; background:#1D1D1F; z-index:999999;
+  display:flex; align-items:center; justify-content:center; }
+#iwol-login-overlay.hidden { display:none; }
+.iwol-login-box { background:#fff; border-radius:16px; padding:32px 28px; width:90%; max-width:340px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; }
+.iwol-login-box h2 { font-size:18px; font-weight:900; margin-bottom:4px; }
+.iwol-login-box p { font-size:12px; color:#6E6E73; margin-bottom:18px; }
+.iwol-login-box input { width:100%; border:1.5px solid #D2D2D7; border-radius:8px; padding:11px 12px;
+  font-size:14px; margin-bottom:10px; box-sizing:border-box; }
+.iwol-login-box button { width:100%; background:#7B5EA7; color:#fff; border:none; border-radius:8px;
+  padding:12px; font-size:14px; font-weight:700; cursor:pointer; }
+.iwol-login-error { color:#D93025; font-size:12px; margin-top:8px; min-height:16px; }
 </style>
 </head>
 <body>
+
+<div id="iwol-login-overlay" class="hidden">
+  <div class="iwol-login-box">
+    <h2>🔒 Iniciar sesión</h2>
+    <p>IwolPark · <span id="iwol-login-app-nombre"></span></p>
+    <input type="text" id="iwol-login-usuario" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="iwol-login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button onclick="iwolIntentarLogin()">Entrar</button>
+    <div class="iwol-login-error" id="iwol-login-error"></div>
+  </div>
+</div>
 
 <nav>
   <span class="nav-logo">·iwol·</span>
   <span class="nav-title">IwolPark</span>
   <span class="nav-badge">CORPORATIVO</span>
   <div class="nav-right">
+    <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v23</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v24</span>
+    <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
 
@@ -949,15 +976,80 @@ function exportarCSV(tipo) {
   showToast('CSV exportado · '+ops.length+' registros');
 }
 
+// ══ LOGIN (Fase B) ══ requiere usuario/contraseña contra 'cajeros' antes de
+// usar la app. Sesión válida mientras dure la pestaña (sessionStorage).
+async function sha256Hex(texto) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function iwolUsuarioActual() {
+  try { return JSON.parse(sessionStorage.getItem('iwol_usuario') || 'null'); } catch(e) { return null; }
+}
+function cerrarSesion() { sessionStorage.removeItem('iwol_usuario'); location.reload(); }
+
+let _iwolRolesPermitidos = [];
+let _iwolLoginResolve = null;
+function requerirLogin(rolesPermitidos, nombreApp) {
+  _iwolRolesPermitidos = rolesPermitidos;
+  const actual = iwolUsuarioActual();
+  if (actual && rolesPermitidos.includes(actual.rol)) return Promise.resolve(actual);
+  document.getElementById('iwol-login-app-nombre').textContent = nombreApp || '';
+  document.getElementById('iwol-login-overlay').classList.remove('hidden');
+  document.getElementById('iwol-login-usuario').focus();
+  return new Promise(res => { _iwolLoginResolve = res; });
+}
+async function iwolIntentarLogin() {
+  const usuario = document.getElementById('iwol-login-usuario').value.trim();
+  const password = document.getElementById('iwol-login-password').value;
+  const errEl = document.getElementById('iwol-login-error');
+  errEl.textContent = '';
+  if (!usuario || !password) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  try {
+    // login_cajero() es una función en la base (RPC) que compara el hash
+    // internamente y solo regresa los datos públicos si coincide — nunca
+    // expone password_hash al cliente, a diferencia de leer la tabla directo.
+    const hash = await sha256Hex(password);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_usuario: usuario, p_password_hash: hash })
+    });
+    if (!r.ok) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; return; }
+    const rows = await r.json();
+    const cajero = rows[0];
+    if (!cajero) {
+      errEl.textContent = 'Usuario o contraseña incorrectos'; return;
+    }
+    if (!_iwolRolesPermitidos.includes(cajero.rol)) {
+      errEl.textContent = 'Tu usuario no tiene permiso para entrar aquí'; return;
+    }
+    const datosUsuario = { cajero_id: cajero.cajero_id, nombre: cajero.nombre, usuario: cajero.usuario, rol: cajero.rol };
+    sessionStorage.setItem('iwol_usuario', JSON.stringify(datosUsuario));
+    document.getElementById('iwol-login-overlay').classList.add('hidden');
+    document.getElementById('iwol-login-usuario').value = '';
+    document.getElementById('iwol-login-password').value = '';
+    if (_iwolLoginResolve) { _iwolLoginResolve(datosUsuario); _iwolLoginResolve = null; }
+  } catch (e) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; }
+}
+document.addEventListener('keydown', e => {
+  const overlay = document.getElementById('iwol-login-overlay');
+  if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
+});
+
 // ══ INIT ══
-renderEjecutivo();
-setInterval(() => {
-  const activo = document.querySelector('.tab-section.active')?.id;
-  if (activo==='tab-ejecutivo') renderEjecutivo();
-  if (activo==='tab-operativo') renderOperativo();
-  if (activo==='tab-cajeros')   renderCajeros();
-  if (activo==='tab-cortes')    renderCortes();
-}, 60000);
+let USUARIO_ACTUAL = null;
+(async () => {
+  USUARIO_ACTUAL = await requerirLogin(['corporativo','super_admin'], 'Oficina central');
+  document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
+  renderEjecutivo();
+  setInterval(() => {
+    const activo = document.querySelector('.tab-section.active')?.id;
+    if (activo==='tab-ejecutivo') renderEjecutivo();
+    if (activo==='tab-operativo') renderOperativo();
+    if (activo==='tab-cajeros')   renderCajeros();
+    if (activo==='tab-cortes')    renderCortes();
+  }, 60000);
+})();
 </script>
 </body>
 </html>
