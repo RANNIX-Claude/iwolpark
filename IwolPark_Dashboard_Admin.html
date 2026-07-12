@@ -200,7 +200,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="nav-right">
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v22</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v23</span>
     <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
   </div>
@@ -272,10 +272,40 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="modal-body">
 
         <div class="param-card">
-          <h3>Capacidad de la plaza</h3>
+          <h3>Edificio</h3>
           <div class="param-row">
+            <input type="text" id="param-edificio-nombre" placeholder="Nombre del edificio">
             <input type="number" id="param-capacidad" min="1" placeholder="Cantidad de cajones">
             <button class="param-btn" onclick="guardarCapacidad()">Guardar</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">
+            Por ahora un edificio = una plaza. Si más adelante esta plaza tiene varios edificios físicos, se separa en su propia tabla.
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Horarios de operación</h3>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Inicio de operaciones</label>
+            <input type="time" id="param-hora-apertura">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Cambio de turno 1</label>
+            <input type="time" id="param-hora-relevo1">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Cambio de turno 2</label>
+            <input type="time" id="param-hora-relevo2">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Cierre del día</label>
+            <input type="time" id="param-hora-cierre">
+          </div>
+          <div class="param-row">
+            <button class="param-btn" onclick="guardarHorarios()">Guardar horarios</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">
+            Los botones de Inicio de turno, Relevo y Cierre del día en el Operador solo se habilitan desde una hora antes de cada horario configurado aquí.
           </div>
         </div>
 
@@ -884,35 +914,67 @@ function cerrarParametros() {
 
 async function cargarParametrosPlaza() {
   try {
-    // url_facturacion puede no existir aún (requiere el ALTER TABLE manual);
-    // si el select completo falla por columna faltante, se reintenta sin ella
-    // para no tumbar la carga de capacidad_total.
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
-    let tieneUrlFacturacion = true;
+    // url_facturacion y los horarios pueden no existir aún (requieren ALTER
+    // TABLE manual); si el select completo falla por columna faltante, se
+    // reintenta con menos columnas para no tumbar la carga de lo que sí existe.
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total,url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, { headers: SB_HEADERS_PARAM });
+    let tieneUrlFacturacion = true, tieneHorarios = true;
+    if (!r.ok) {
+      tieneHorarios = false;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total,url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
+    }
     if (!r.ok) {
       tieneUrlFacturacion = false;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total&limit=1`, { headers: SB_HEADERS_PARAM });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total&limit=1`, { headers: SB_HEADERS_PARAM });
     }
     const rows = r.ok ? await r.json() : [];
     if (rows.length) {
-      PARAM_PLAZA_ID = rows[0].plaza_id;
-      document.getElementById('param-capacidad').value = rows[0].capacidad_total || '';
-      document.getElementById('param-url-facturacion').value = tieneUrlFacturacion ? (rows[0].url_facturacion || '') : '';
+      const p = rows[0];
+      PARAM_PLAZA_ID = p.plaza_id;
+      document.getElementById('param-edificio-nombre').value = p.nombre || '';
+      document.getElementById('param-capacidad').value = p.capacidad_total || '';
+      document.getElementById('param-url-facturacion').value = tieneUrlFacturacion ? (p.url_facturacion || '') : '';
       document.getElementById('param-url-facturacion').placeholder = tieneUrlFacturacion ? 'https://...' : 'Falta correr el ALTER TABLE (ver instrucciones)';
       document.getElementById('param-url-facturacion').disabled = !tieneUrlFacturacion;
+      ['hora-apertura','hora-relevo1','hora-relevo2','hora-cierre'].forEach(id => {
+        document.getElementById('param-'+id).disabled = !tieneHorarios;
+      });
+      if (tieneHorarios) {
+        document.getElementById('param-hora-apertura').value = (p.hora_apertura||'').slice(0,5);
+        document.getElementById('param-hora-relevo1').value  = (p.hora_relevo_1||'').slice(0,5);
+        document.getElementById('param-hora-relevo2').value  = (p.hora_relevo_2||'').slice(0,5);
+        document.getElementById('param-hora-cierre').value   = (p.hora_cierre||'').slice(0,5);
+      }
     }
   } catch (e) { showToast('No se pudo cargar la plaza'); }
 }
 
 async function guardarCapacidad() {
   const val = parseInt(document.getElementById('param-capacidad').value);
+  const nombre = document.getElementById('param-edificio-nombre').value.trim();
   if (!val || val < 1 || !PARAM_PLAZA_ID) { showToast('Cantidad inválida'); return; }
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
-      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ capacidad_total: val })
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ capacidad_total: val, ...(nombre ? {nombre} : {}) })
     });
-    showToast(r.ok ? 'Capacidad actualizada · '+val+' cajones' : 'Error al guardar');
+    showToast(r.ok ? 'Edificio actualizado · '+val+' cajones' : 'Error al guardar');
     if (r.ok) cargarDatos();
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function guardarHorarios() {
+  if (!PARAM_PLAZA_ID) { showToast('Falta cargar la plaza'); return; }
+  const body = {
+    hora_apertura: document.getElementById('param-hora-apertura').value || null,
+    hora_relevo_1: document.getElementById('param-hora-relevo1').value || null,
+    hora_relevo_2: document.getElementById('param-hora-relevo2').value || null,
+    hora_cierre:   document.getElementById('param-hora-cierre').value || null,
+  };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify(body)
+    });
+    showToast(r.ok ? 'Horarios actualizados' : 'Error al guardar (¿ya corriste el ALTER TABLE?)');
   } catch (e) { showToast('Error al guardar'); }
 }
 
