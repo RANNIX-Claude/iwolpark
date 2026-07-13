@@ -168,7 +168,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v32</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v33</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -635,7 +635,7 @@ async function renderEjecutivo() {
   // Promedio de "fotografías" hora por hora del periodo (ver
   // calcularOcupacionPromedio) — nunca puede superar 40 porque cada
   // fotografía es un conteo simultáneo real, no la cuenta de abiertos ahora.
-  const pct    = Math.min(100, Math.round(ocupacionProm/40*100));
+  const pct    = Math.min(100, Math.round(ocupacionProm/CAPACIDAD_TOTAL*100));
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
@@ -644,7 +644,7 @@ async function renderEjecutivo() {
   document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
   document.getElementById('ej-ops-delta').style.display = 'none';
   document.getElementById('ej-ocu').textContent = pct+'%';
-  document.getElementById('ej-ocu-sub').textContent = Math.round(ocupacionProm)+' de 40 lugares (prom.)';
+  document.getElementById('ej-ocu-sub').textContent = Math.round(ocupacionProm)+' de '+CAPACIDAD_TOTAL+' lugares (prom.)';
   document.getElementById('ej-ticket').textContent = fmt$(ticket);
   document.getElementById('ej-ticket-sub').textContent = 'por operación cobrada';
   document.getElementById('ej-perdidos').textContent = perdidos.length;
@@ -654,7 +654,7 @@ async function renderEjecutivo() {
   const offset = 157 - (157 * pct/100);
   document.getElementById('gauge-arc').style.strokeDashoffset = offset;
   document.getElementById('gauge-pct').textContent = pct+'%';
-  document.getElementById('gauge-sub').textContent = Math.round(ocupacionProm)+' / 40 lugares (prom.)';
+  document.getElementById('gauge-sub').textContent = Math.round(ocupacionProm)+' / '+CAPACIDAD_TOTAL+' lugares (prom.)';
 
   // Chart meses — últimos 6 meses reales
   const hoyD = new Date();
@@ -1068,12 +1068,26 @@ function logBitacora(accion, detalle) {
   } catch (e) {}
 }
 
+// Capacidad real de la plaza (dim_plaza.capacidad_total) — antes estaba
+// escrita a mano como "40" en varios lugares de Ejecutivo, sin conexión
+// real a Parámetros (bug detectado en QA: mostraba 40 aunque la plaza
+// esté configurada con 68 cajones).
+let CAPACIDAD_TOTAL = 40;
+async function cargarCapacidadTotal() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=capacidad_total&limit=1`, { headers: SB_HEADERS });
+    const rows = r.ok ? await r.json() : [];
+    if (rows[0]?.capacidad_total) CAPACIDAD_TOTAL = rows[0].capacidad_total;
+  } catch (e) {}
+}
+
 // ══ INIT ══
 let USUARIO_ACTUAL = null;
 (async () => {
   USUARIO_ACTUAL = await requerirLogin(['corporativo','super_admin'], 'Oficina central');
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
   logBitacora('login', { app: 'corporativo' });
+  await cargarCapacidadTotal();
   renderEjecutivo();
   setInterval(() => {
     const activo = document.querySelector('.tab-section.active')?.id;

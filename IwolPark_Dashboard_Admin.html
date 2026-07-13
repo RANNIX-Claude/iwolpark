@@ -245,7 +245,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v32</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v33</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -691,6 +691,15 @@ async function cargarDatos() {
     } catch (e) {
       DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
     }
+
+    // Capacidad real de dim_plaza — antes se quedaba en el default (40) para
+    // siempre, sin importar lo configurado en Parámetros (bug detectado en
+    // QA: mostraba 40 aunque la plaza tenga 68 cajones reales).
+    try {
+      const rCap = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=capacidad_total&limit=1`, { headers });
+      const capRows = rCap.ok ? await rCap.json() : [];
+      if (capRows[0]?.capacidad_total) DATOS.capacidad = capRows[0].capacidad_total;
+    } catch (e) {}
 
     // Poblar select de cajeros
     const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
