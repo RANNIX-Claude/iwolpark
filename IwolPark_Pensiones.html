@@ -115,7 +115,7 @@ tr:hover td{background:#FAFAFE}
   <div class="nav-right">
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v55</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v56</span>
   </div>
 </nav>
 
@@ -259,15 +259,21 @@ tr:hover td{background:#FAFAFE}
           <input class="form-input" id="p-nombre" placeholder="Juan García López">
         </div>
         <div class="form-group">
-          <label class="form-label">Teléfono *</label>
-          <input class="form-input" id="p-tel" placeholder="722 123 4567">
+          <label class="form-label">Número de Local *</label>
+          <input class="form-input" id="p-local" placeholder="Ej. L-12">
         </div>
       </div>
-      <div class="form-grid">
+      <div class="form-grid" style="margin-bottom:8px">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-input" id="p-tel" placeholder="722 123 4567">
+        </div>
         <div class="form-group">
           <label class="form-label">WhatsApp</label>
           <input class="form-input" id="p-wa" placeholder="722 123 4567">
         </div>
+      </div>
+      <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Email</label>
           <input class="form-input" id="p-email" placeholder="juan@email.com">
@@ -279,21 +285,21 @@ tr:hover td{background:#FAFAFE}
       <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">DATOS DEL VEHÍCULO</div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-group">
-          <label class="form-label">Placas *</label>
+          <label class="form-label">Placas</label>
           <input class="form-input" id="p-placas" placeholder="ABC-123-D">
         </div>
         <div class="form-group">
-          <label class="form-label">Color *</label>
+          <label class="form-label">Color</label>
           <input class="form-input" id="p-color" placeholder="Blanco">
         </div>
       </div>
       <div class="form-grid-3">
         <div class="form-group">
-          <label class="form-label">Marca *</label>
+          <label class="form-label">Marca</label>
           <input class="form-input" id="p-marca" placeholder="Nissan">
         </div>
         <div class="form-group">
-          <label class="form-label">Modelo *</label>
+          <label class="form-label">Modelo</label>
           <input class="form-input" id="p-modelo" placeholder="Versa">
         </div>
         <div class="form-group">
@@ -311,7 +317,7 @@ tr:hover td{background:#FAFAFE}
       <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">DATOS DE LA PENSIÓN</div>
       <div class="form-grid" style="margin-bottom:8px">
         <div class="form-group">
-          <label class="form-label">Tipo de pensión *</label>
+          <label class="form-label">Tipo de pensión</label>
           <select class="form-select" id="p-tipo" onchange="actualizarMonto()">
             <option value="dia">Día (07:00–22:00) — $600/mes</option>
             <option value="noche">Noche (22:00–07:00) — $400/mes</option>
@@ -319,13 +325,13 @@ tr:hover td{background:#FAFAFE}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Mensualidad $</label>
+          <label class="form-label">Mensualidad $ *</label>
           <input class="form-input" id="p-monto" type="number" value="600">
         </div>
       </div>
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Fecha inicio *</label>
+          <label class="form-label">Fecha inicio</label>
           <input class="form-input" id="p-inicio" type="date">
         </div>
         <div class="form-group">
@@ -404,7 +410,18 @@ tr:hover td{background:#FAFAFE}
 // ── SUPABASE ──
 const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
-const PLAZA_ID = '8407b28c-497b-47cf-805c-f7918c5129b9'; // Plaza IWOL (dim_plaza)
+// El plaza_id real cambia según el ambiente (QA/Producción tienen bases
+// separadas) — antes estaba fijo en el código y no coincidía con la fila
+// real de dim_plaza en Producción, causando un error de foreign key al
+// registrar clientes/pensiones. Se carga dinámicamente al arrancar.
+let PLAZA_ID = null;
+async function cargarPlazaId() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id&limit=1`, { headers: SB_HEADERS });
+    const rows = r.ok ? await r.json() : [];
+    if (rows[0]) PLAZA_ID = rows[0].plaza_id;
+  } catch (e) {}
+}
 const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
 
 // Fecha local (no UTC) — toISOString() convierte a UTC, así que en la noche
@@ -632,6 +649,7 @@ function actualizarMonto() {
 
 async function guardarPension() {
   const nombre = document.getElementById('p-nombre').value.trim();
+  const local  = document.getElementById('p-local').value.trim();
   const tel    = document.getElementById('p-tel').value.trim();
   const wa     = document.getElementById('p-wa').value.trim();
   const email  = document.getElementById('p-email').value.trim();
@@ -643,43 +661,54 @@ async function guardarPension() {
   const serie  = document.getElementById('p-serie').value.trim();
   const tipo   = document.getElementById('p-tipo').value;
   const monto  = parseFloat(document.getElementById('p-monto').value)||0;
-  const inicio = document.getElementById('p-inicio').value;
+  // fecha_inicio es obligatoria a nivel base de datos (NOT NULL en
+  // pensiones), pero no queremos bloquear al cajero por olvidarla — si se
+  // deja vacía, se usa hoy por default en vez de mostrar un error.
+  const inicio = document.getElementById('p-inicio').value || fmtLocal(new Date());
   const dia    = parseInt(document.getElementById('p-dia-pago').value)||1;
   const notas  = document.getElementById('p-notas').value.trim();
 
-  // Validaciones
+  // Validaciones — solo Nombre, Número de Local y Mensualidad son
+  // obligatorios; los datos del vehículo son opcionales (si se captura
+  // alguno, se piden todos, porque vehiculos.placas/marca/modelo/color son
+  // NOT NULL en la base y no se puede guardar un registro a medias).
   if (!nombre) { showToast('⚠ El nombre es obligatorio'); document.getElementById('p-nombre').focus(); return; }
-  if (!placas) { showToast('⚠ Las placas son obligatorias'); document.getElementById('p-placas').focus(); return; }
-  if (!marca)  { showToast('⚠ La marca es obligatoria'); document.getElementById('p-marca').focus(); return; }
-  if (!modelo) { showToast('⚠ El modelo es obligatorio'); document.getElementById('p-modelo').focus(); return; }
-  if (!color)  { showToast('⚠ El color es obligatorio'); document.getElementById('p-color').focus(); return; }
-  if (!inicio) { showToast('⚠ La fecha de inicio es obligatoria'); return; }
+  if (!local)  { showToast('⚠ El número de local es obligatorio'); document.getElementById('p-local').focus(); return; }
   if (monto <= 0) { showToast('⚠ La mensualidad debe ser mayor a cero'); return; }
+  const hayDatosVehiculo = placas || marca || modelo || color;
+  if (hayDatosVehiculo && !(placas && marca && modelo && color)) {
+    showToast('⚠ Si vas a registrar el vehículo, completa placas, marca, modelo y color');
+    return;
+  }
 
   try {
     // 1) Cliente
     const rCliente = await fetch(`${SUPABASE_URL}/rest/v1/clientes`, {
       method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
-      body: JSON.stringify({ plaza_id: PLAZA_ID, nombre, telefono: tel, whatsapp: wa, email: email || null })
+      body: JSON.stringify({ plaza_id: PLAZA_ID, nombre, numero_local: local, telefono: tel, whatsapp: wa, email: email || null })
     });
     if (!rCliente.ok) throw new Error(await rCliente.text());
     const cliente = (await rCliente.json())[0];
 
-    // 2) Vehículo
-    const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
-      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
-      body: JSON.stringify({ cliente_id: cliente.cliente_id, placas, marca, modelo,
-        anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
-    });
-    if (!rVeh.ok) throw new Error(await rVeh.text());
-    const vehiculo = (await rVeh.json())[0];
+    // 2) Vehículo — opcional, solo si se capturaron sus datos
+    let vehiculoId = null;
+    if (hayDatosVehiculo) {
+      const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
+        method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+        body: JSON.stringify({ cliente_id: cliente.cliente_id, placas, marca, modelo,
+          anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+      });
+      if (!rVeh.ok) throw new Error(await rVeh.text());
+      vehiculoId = (await rVeh.json())[0].vehiculo_id;
+    }
 
-    // 3) Pensión — código de acceso simple derivado de las placas
-    const codigo = 'PEN-' + placas.replace(/[^A-Z0-9]/g, '');
+    // 3) Pensión — código de acceso derivado del número de local (antes
+    // usaba las placas, que ahora pueden no existir)
+    const codigo = 'PEN-' + local.replace(/[^A-Z0-9]/gi, '').toUpperCase();
     const rPension = await fetch(`${SUPABASE_URL}/rest/v1/pensiones`, {
       method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
       body: JSON.stringify({
-        plaza_id: PLAZA_ID, cliente_id: cliente.cliente_id, vehiculo_id: vehiculo.vehiculo_id,
+        plaza_id: PLAZA_ID, cliente_id: cliente.cliente_id, vehiculo_id: vehiculoId,
         tipo, monto_mensual: monto, fecha_inicio: inicio, dia_pago: dia,
         estado: 'activo', codigo_acceso: codigo, notas: notas || null
       })
@@ -687,7 +716,7 @@ async function guardarPension() {
     if (!rPension.ok) throw new Error(await rPension.text());
 
     // Limpiar formulario
-    ['p-nombre','p-tel','p-wa','p-email','p-placas','p-color',
+    ['p-nombre','p-local','p-tel','p-wa','p-email','p-placas','p-color',
      'p-marca','p-modelo','p-anio','p-serie','p-notas'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -780,7 +809,7 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;
 
 // INIT
 const hoy=fmtLocal(new Date());
-(async () => { await cargarPensionados(); renderSemaforo('todos'); })();
+(async () => { await cargarPlazaId(); await cargarPensionados(); renderSemaforo('todos'); })();
 </script>
 </body>
 </html>

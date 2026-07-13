@@ -4,3 +4,5 @@ node_modules/
 .env.prod
 .prod_version
 *_PRODUCCION.html
+.env.prod2
+.prod2_version
