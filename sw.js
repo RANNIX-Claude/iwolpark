@@ -3,7 +3,7 @@
 // inline) para que abra offline tras la primera visita. Los datos operativos
 // (tickets, cortes, cajeros, bitácora) siempre van directo a Supabase — nunca
 // se cachean, porque el sync offline-first ya lo maneja IndexedDB en cada app.
-const CACHE_NAME = 'iwolpark-shell-v2';
+const CACHE_NAME = 'iwolpark-shell-v3';
 const SHELL_FILES = [
   'IwolPark_TABLET.html',
   'IwolPark_Dashboard_Admin.html',
