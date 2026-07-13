@@ -51,8 +51,9 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
              border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer}
 
 /* KPI GRID */
-.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:#fff;border-radius:12px;border:1px solid var(--border);
      padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;
      transition:transform .15s}
@@ -168,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v33</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v34</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -205,16 +206,21 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       <div class="kpi-sub" id="ej-ingresos-sub">cargando...</div>
       <div class="kpi-delta up" id="ej-ingresos-delta">↑ 0%</div>
     </div>
+    <div class="kpi">
+      <div class="kpi-label">Tickets del día</div>
+      <div class="kpi-val" style="color:var(--accent)" id="ej-tickets-dia">0</div>
+      <div class="kpi-sub">total emitidos (abiertos + cerrados)</div>
+    </div>
     <div class="kpi" onclick="drillKPI('operaciones')">
-      <div class="kpi-label">Operaciones</div>
+      <div class="kpi-label">Cobrados</div>
       <div class="kpi-val" style="color:var(--blue)" id="ej-ops">0</div>
       <div class="kpi-sub" id="ej-ops-sub">cargando...</div>
       <div class="kpi-delta up" id="ej-ops-delta">↑ 0%</div>
     </div>
-    <div class="kpi" onclick="drillKPI('ocupacion')">
-      <div class="kpi-label">Ocupación prom.</div>
-      <div class="kpi-val" style="color:var(--purple)" id="ej-ocu">0%</div>
-      <div class="kpi-sub" id="ej-ocu-sub">de 40 lugares</div>
+    <div class="kpi" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF)">
+      <div class="kpi-label">Autos en plaza AHORA</div>
+      <div class="kpi-val" style="color:var(--purple);font-size:38px" id="ej-autos-ahora">0</div>
+      <div class="kpi-sub" id="ej-autos-ahora-sub">de 0 cajones</div>
     </div>
     <div class="kpi" onclick="drillKPI('ticket')">
       <div class="kpi-label">Ticket promedio</div>
@@ -226,6 +232,11 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       <div class="kpi-val" style="color:var(--red)" id="ej-perdidos">0</div>
       <div class="kpi-sub" id="ej-perdidos-sub">$0 penalizaciones</div>
     </div>
+  </div>
+  <div class="kpi" onclick="drillKPI('ocupacion')" style="margin-bottom:20px;cursor:pointer">
+    <div class="kpi-label">Ocupación promedio del periodo</div>
+    <div class="kpi-val" style="color:var(--purple)" id="ej-ocu">0%</div>
+    <div class="kpi-sub" id="ej-ocu-sub">de 0 lugares</div>
   </div>
 
   <!-- Drill panel -->
@@ -490,6 +501,34 @@ async function fetchPaginado(urlBase, headers, maxTotal) {
   return todas;
 }
 
+// Total de tickets del periodo SIN filtrar por estatus (incluye los que
+// siguen abiertos) — "cargarOps" solo regresa los ya cerrados, así que sin
+// esto no se puede saber cuántos tickets hubo en total ese día.
+async function contarTicketsPeriodo(desde, hasta) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio&limit=1`, {
+      headers: { ...SB_HEADERS, Prefer: 'count=exact' }
+    });
+    const rango = r.headers.get('content-range') || '';
+    const total = parseInt(rango.split('/')[1] || '0', 10);
+    return isNaN(total) ? 0 : total;
+  } catch (e) { return 0; }
+}
+
+// Autos en plaza AHORA MISMO (estatus='abierto'), sin importar el periodo
+// seleccionado en el filtro — es una foto del instante actual, no un
+// promedio histórico.
+async function contarAutosAhora() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=folio&limit=1`, {
+      headers: { ...SB_HEADERS, Prefer: 'count=exact' }
+    });
+    const rango = r.headers.get('content-range') || '';
+    const total = parseInt(rango.split('/')[1] || '0', 10);
+    return isNaN(total) ? 0 : total;
+  } catch (e) { return 0; }
+}
+
 // Tickets ya cerrados (cobrado/perdido/cortesia) de un rango de fechas, mapeados
 // al mismo formato {folio,tipo,cajero,hora,minutos,franja,importe,fecha,dia} que
 // usan todas las vistas de este tablero.
@@ -624,7 +663,10 @@ let _tt; function showToast(m){const t=document.getElementById('toast');t.textCo
 async function renderEjecutivo() {
   const periodo = document.getElementById('periodo-ej')?.value || 'mes';
   const {desde,hasta} = fechasPeriodo(periodo);
-  const [ops, ocupacionProm] = await Promise.all([cargarOps(desde,hasta), calcularOcupacionPromedio(desde,hasta)]);
+  const [ops, ocupacionProm, ticketsPeriodo, autosAhora] = await Promise.all([
+    cargarOps(desde,hasta), calcularOcupacionPromedio(desde,hasta),
+    contarTicketsPeriodo(desde,hasta), contarAutosAhora()
+  ]);
   OPS_EJECUTIVO = ops;
 
   const cobros = ops.filter(o=>o.importe>0);
@@ -633,16 +675,20 @@ async function renderEjecutivo() {
   const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
   const ticket = cobros.length?total/cobros.length:0;
   // Promedio de "fotografías" hora por hora del periodo (ver
-  // calcularOcupacionPromedio) — nunca puede superar 40 porque cada
-  // fotografía es un conteo simultáneo real, no la cuenta de abiertos ahora.
+  // calcularOcupacionPromedio) — nunca puede superar la capacidad porque
+  // cada fotografía es un conteo simultáneo real, no la cuenta de abiertos
+  // ahora mismo (eso es "Autos en plaza AHORA", instantáneo, no promedio).
   const pct    = Math.min(100, Math.round(ocupacionProm/CAPACIDAD_TOTAL*100));
 
   document.getElementById('ej-ingresos').textContent = fmt$(total);
   document.getElementById('ej-ingresos-sub').textContent = cobros.length+' cobros';
   document.getElementById('ej-ingresos-delta').style.display = 'none';
-  document.getElementById('ej-ops').textContent = ops.length;
-  document.getElementById('ej-ops-sub').textContent = 'Total operaciones';
+  document.getElementById('ej-tickets-dia').textContent = ticketsPeriodo;
+  document.getElementById('ej-ops').textContent = cobros.length;
+  document.getElementById('ej-ops-sub').textContent = 'con cargo, del periodo';
   document.getElementById('ej-ops-delta').style.display = 'none';
+  document.getElementById('ej-autos-ahora').textContent = autosAhora;
+  document.getElementById('ej-autos-ahora-sub').textContent = 'de '+CAPACIDAD_TOTAL+' cajones';
   document.getElementById('ej-ocu').textContent = pct+'%';
   document.getElementById('ej-ocu-sub').textContent = Math.round(ocupacionProm)+' de '+CAPACIDAD_TOTAL+' lugares (prom.)';
   document.getElementById('ej-ticket').textContent = fmt$(ticket);

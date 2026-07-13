@@ -76,9 +76,10 @@ nav { background:#fff; border-bottom:1px solid var(--border);
               font-weight:700; cursor:pointer; }
 
 /* KPI CARDS */
-.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr);
+.kpi-grid { display:grid; grid-template-columns:repeat(6,1fr);
             gap:14px; margin-bottom:20px; }
-@media (max-width:900px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:1100px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:600px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
 .kpi-card { background:var(--white); border-radius:12px;
             border:1px solid var(--border); padding:18px 20px;
             box-shadow:var(--card-sh); cursor:pointer;
@@ -245,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v33</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v34</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -290,10 +291,15 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="kpi-sub" id="kpi-ingresos-sub">0 operaciones</div>
       <div class="kpi-delta delta-up" id="kpi-ingresos-delta">↑ vs ayer</div>
     </div>
-    <div class="kpi-card" onclick="drillDown('ocupacion')" title="Ver detalle">
-      <div class="kpi-label">Ocupación ahora</div>
-      <div class="kpi-value" style="color:var(--accent)" id="kpi-ocupacion">0%</div>
-      <div class="kpi-sub" id="kpi-ocupacion-sub">0 de 40 lugares</div>
+    <div class="kpi-card">
+      <div class="kpi-label">Tickets del día</div>
+      <div class="kpi-value" style="color:var(--accent)" id="kpi-tickets-dia">0</div>
+      <div class="kpi-sub">total emitidos (abiertos + cerrados)</div>
+    </div>
+    <div class="kpi-card" onclick="drillDown('ocupacion')" title="Ver detalle" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF)">
+      <div class="kpi-label">Autos en plaza AHORA</div>
+      <div class="kpi-value" style="color:var(--accent);font-size:38px" id="kpi-ocupacion-num">0</div>
+      <div class="kpi-sub" id="kpi-ocupacion-sub">de 0 lugares</div>
     </div>
     <div class="kpi-card" onclick="drillDown('boletos_perdidos')" title="Ver detalle">
       <div class="kpi-label">Boletos perdidos</div>
@@ -304,6 +310,11 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="kpi-label">Ticket promedio</div>
       <div class="kpi-value" style="color:var(--green)" id="kpi-ticket">$0</div>
       <div class="kpi-sub" id="kpi-ticket-sub">Tiempo prom: 0 min</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ocupación (%)</div>
+      <div class="kpi-value" style="color:var(--accent)" id="kpi-ocupacion">0%</div>
+      <div class="kpi-sub">del total de cajones</div>
     </div>
   </div>
 
@@ -663,6 +674,10 @@ async function cargarDatos() {
     const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
     const rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000);
 
+    // Total de tickets del período SIN filtrar por estatus — antes solo se
+    // veían los ya cerrados en "N operaciones", así que un día con muchos
+    // tickets todavía abiertos parecía tener casi actividad nula.
+    DATOS.ticketsDia = rows.length;
     // Solo operaciones completadas (cobrado/perdido/cortesia) alimentan KPIs de ingresos
     const completadas = rows.filter(o => o.estatus !== 'abierto');
     DATOS.operaciones = completadas.map(o => ({
@@ -769,7 +784,8 @@ function renderKPIs(ops) {
   const minProm = ops.filter(o=>o.minutos>0).reduce((s,o,_,a)=>s+o.minutos/a.length,0);
 
   document.getElementById('kpi-ingresos').textContent    = fmt$(total);
-  document.getElementById('kpi-ingresos-sub').textContent= ops.length + ' operaciones';
+  document.getElementById('kpi-ingresos-sub').textContent= cobros.length + ' cobrados';
+  document.getElementById('kpi-tickets-dia').textContent = DATOS.ticketsDia || 0;
   document.getElementById('kpi-perdidos').textContent    = perdidos.length;
   document.getElementById('kpi-perdidos-sub').textContent= fmt$(pTotal) + ' en penalizaciones';
   document.getElementById('kpi-ticket').textContent      = fmt$(ticket);
@@ -794,7 +810,8 @@ function renderOcupacion() {
   // pruebas) pueden inflar autos_en_plaza por encima de la capacidad real.
   const pct = Math.min(100, Math.round(DATOS.autos_en_plaza / DATOS.capacidad * 100));
   document.getElementById('kpi-ocupacion').textContent     = pct+'%';
-  document.getElementById('kpi-ocupacion-sub').textContent = DATOS.autos_en_plaza+' de '+DATOS.capacidad+' lugares';
+  document.getElementById('kpi-ocupacion-num').textContent = DATOS.autos_en_plaza;
+  document.getElementById('kpi-ocupacion-sub').textContent = 'de '+DATOS.capacidad+' lugares';
   document.getElementById('gauge-pct').textContent  = pct+'%';
   document.getElementById('gauge-sub').textContent  = DATOS.autos_en_plaza+' / '+DATOS.capacidad;
   document.getElementById('gauge-fill').style.width = pct+'%';
