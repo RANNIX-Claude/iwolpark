@@ -245,7 +245,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v31</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v32</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -603,10 +603,17 @@ function onFiltroCambio() {
   if (p !== 'custom') cargarDatos();
 }
 
+// Fecha local (no UTC) — toISOString() convierte a UTC, así que en la noche
+// (México, UTC-6) "hoy" se recorría al día siguiente y los filtros de
+// periodo (Hoy/Semana/Mes) dejaban de cuadrar entre sí.
+function fmtLocal(d) {
+  const p2 = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+}
 function getFechas() {
   const p = document.getElementById('filtro-periodo').value;
   const hoy = new Date();
-  const fmt = d => d.toISOString().slice(0,10);
+  const fmt = fmtLocal;
   if (p === 'hoy')    return { desde: fmt(hoy), hasta: fmt(hoy) };
   if (p === 'semana') {
     const ini = new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1);
@@ -983,7 +990,7 @@ function cerrarDrill() {
 // ══ EXPORT CSV ══
 function exportarCSV() {
   const ops = DATOS.operaciones;
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fmtLocal(new Date());
   const header = 'Folio,Tipo,Cajero,Entrada,Salida,Minutos,Franja,Importe,Plaza';
   const rows = ops.map(o =>
     [o.folio,o.tipo,o.cajero,o.hora_entrada,o.hora_salida||'',o.minutos||'',o.franja,o.importe,'Plaza IWOL'].join(',')

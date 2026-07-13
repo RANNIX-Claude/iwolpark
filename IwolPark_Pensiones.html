@@ -115,7 +115,7 @@ tr:hover td{background:#FAFAFE}
   <div class="nav-right">
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v31</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v32</span>
   </div>
 </nav>
 
@@ -407,6 +407,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const PLAZA_ID = '8407b28c-497b-47cf-805c-f7918c5129b9'; // Plaza IWOL (dim_plaza)
 const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
 
+// Fecha local (no UTC) — toISOString() convierte a UTC, así que en la noche
+// (México, UTC-6) "hoy" se recorría al día siguiente en estos defaults.
+function fmtLocal(d) {
+  const p2 = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+}
+
 // Estado real ('activo'|'suspendido'|'cancelado') → semáforo de la UI.
 // No hay todavía seguimiento real de pagos (pagos_pension no está conectado),
 // así que el semáforo refleja solo el estado de la pensión, no el día de pago.
@@ -614,7 +621,7 @@ function renderTarifas() {
 let _pagoActual = null;
 
 function abrirModalNuevaPension() {
-  document.getElementById('p-inicio').value = new Date().toISOString().slice(0,10);
+  document.getElementById('p-inicio').value = fmtLocal(new Date());
   document.getElementById('modal-pension').classList.add('open');
 }
 
@@ -741,7 +748,7 @@ function verDetalle(id) {
 }
 
 function abrirModalNuevaTarifa() {
-  document.getElementById('t-desde').value = new Date().toISOString().slice(0,10);
+  document.getElementById('t-desde').value = fmtLocal(new Date());
   document.getElementById('modal-tarifa').classList.add('open');
 }
 
@@ -772,7 +779,7 @@ function showToast(m){const t=document.getElementById('toast');t.textContent=m;
   t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500)}
 
 // INIT
-const hoy=new Date().toISOString().slice(0,10);
+const hoy=fmtLocal(new Date());
 (async () => { await cargarPensionados(); renderSemaforo('todos'); })();
 </script>
 </body>

@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v31</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v32</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -198,7 +198,9 @@ async function fetchPaginado(urlBase, headers, maxTotal) {
 async function cargarTicketsDemanda(semanas) {
   const hasta = new Date();
   const desde = new Date(); desde.setDate(desde.getDate() - semanas*7);
-  const fmt = d=>d.toISOString().slice(0,10);
+  // Fecha local (no UTC) — toISOString() convierte a UTC y en la noche
+  // (México, UTC-6) "hoy" se recorría al día siguiente.
+  const fmt = d => { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); };
   try {
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${fmt(desde)}&fecha_op=lte.${fmt(hasta)}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
     return await fetchPaginado(base, SB_HEADERS, 15000);
