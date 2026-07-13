@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IwolPark · Dashboard Corporativo</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IwolPark Central">
+<meta name="theme-color" content="#7B5EA7">
+<link rel="manifest" href="manifest_corporativo.json">
 <style>
 :root {
   --bg:#F5F5F7; --white:#fff; --border:#D2D2D7;
@@ -162,7 +168,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v26</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v27</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -1036,11 +1042,31 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
 });
 
+// Bitácora de acciones (Fase E) — registro de auditoría best-effort: nunca
+// bloquea ni interrumpe la operación real si falla o no hay conexión.
+function logBitacora(accion, detalle) {
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/bitacora`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json', Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({
+        plaza_id: null,
+        usuario: USUARIO_ACTUAL ? (USUARIO_ACTUAL.usuario || USUARIO_ACTUAL.nombre) : null,
+        accion, detalle: detalle || null
+      })
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 // ══ INIT ══
 let USUARIO_ACTUAL = null;
 (async () => {
   USUARIO_ACTUAL = await requerirLogin(['corporativo','super_admin'], 'Oficina central');
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
+  logBitacora('login', { app: 'corporativo' });
   renderEjecutivo();
   setInterval(() => {
     const activo = document.querySelector('.tab-section.active')?.id;
@@ -1049,6 +1075,9 @@ let USUARIO_ACTUAL = null;
     if (activo==='tab-cajeros')   renderCajeros();
     if (activo==='tab-cortes')    renderCortes();
   }, 60000);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 })();
 </script>
 </body>

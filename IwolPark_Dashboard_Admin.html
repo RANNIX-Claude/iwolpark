@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IwolPark · Dashboard Admin</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IwolPark Admin">
+<meta name="theme-color" content="#7B5EA7">
+<link rel="manifest" href="manifest_admin.json">
 <style>
 :root {
   --bg:      #F5F5F7;
@@ -226,7 +232,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v26</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v27</span>
     <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
@@ -1161,14 +1167,37 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
 });
 
+// Bitácora de acciones (Fase E) — registro de auditoría best-effort: nunca
+// bloquea ni interrumpe la operación real si falla o no hay conexión.
+function logBitacora(accion, detalle) {
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/bitacora`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json', Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({
+        plaza_id: (typeof PARAM_PLAZA_ID !== 'undefined' && PARAM_PLAZA_ID) || null,
+        usuario: USUARIO_ACTUAL ? (USUARIO_ACTUAL.usuario || USUARIO_ACTUAL.nombre) : null,
+        accion, detalle: detalle || null
+      })
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 // ══ INIT ══
 let USUARIO_ACTUAL = null;
 (async () => {
   USUARIO_ACTUAL = await requerirLogin(['admin_plaza','super_admin'], 'Administrador de plaza');
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
+  logBitacora('login', { app: 'admin' });
   document.getElementById('filtro-periodo').value = 'hoy';
   cargarDatos();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 })();
 </script>
 </body>
