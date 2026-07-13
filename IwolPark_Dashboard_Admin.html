@@ -44,6 +44,19 @@ nav { background:#fff; border-bottom:1px solid var(--border);
                border-radius:8px; padding:7px 16px; font-size:12px;
                font-weight:700; cursor:pointer; }
 
+/* MENÚ ADMIN */
+.nav-menu-wrap { position:relative; }
+.nav-menu-list { display:none; position:absolute; top:calc(100% + 6px); right:0;
+  background:#fff; border:1px solid var(--border); border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.15); min-width:220px; padding:6px; z-index:200; }
+.nav-menu-list.open { display:block; }
+.nav-menu-item { display:flex; align-items:center; gap:10px; width:100%;
+  background:none; border:none; text-align:left; padding:10px 12px;
+  border-radius:7px; font-size:13px; font-weight:600; color:var(--text);
+  cursor:pointer; text-decoration:none; }
+.nav-menu-item:hover { background:var(--bg); }
+.nav-menu-sep { height:1px; background:var(--border); margin:6px 4px; }
+
 /* LAYOUT */
 .container { max-width:1400px; margin:0 auto; padding:20px 24px; }
 
@@ -232,8 +245,17 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v28</span>
-    <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v29</span>
+    <div class="nav-menu-wrap">
+      <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
+      <div class="nav-menu-list" id="nav-menu-list">
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirParametros();">⚙ Parámetros del sistema</button>
+        <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
+        <a class="nav-menu-item" href="IwolPark_Demanda.html" target="_blank">📈 Análisis de demanda</a>
+        <div class="nav-menu-sep"></div>
+        <a class="nav-menu-item" href="IwolPark_Index.html">🏠 Portal principal</a>
+      </div>
+    </div>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
   </div>
@@ -989,6 +1011,19 @@ async function abrirParametros() {
 function cerrarParametros() {
   document.getElementById('modal-parametros').classList.remove('open');
 }
+
+// ══ MENÚ ADMIN (Parámetros, Pensiones, Análisis de demanda, Portal) ══
+function toggleNavMenu(ev) {
+  if (ev) ev.stopPropagation();
+  document.getElementById('nav-menu-list').classList.toggle('open');
+}
+function cerrarNavMenu() {
+  document.getElementById('nav-menu-list').classList.remove('open');
+}
+document.addEventListener('click', (ev) => {
+  const wrap = document.querySelector('.nav-menu-wrap');
+  if (wrap && !wrap.contains(ev.target)) cerrarNavMenu();
+});
 
 async function cargarParametrosPlaza() {
   try {
