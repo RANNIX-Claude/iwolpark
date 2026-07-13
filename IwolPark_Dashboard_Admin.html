@@ -232,7 +232,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v27</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v28</span>
     <button class="btn-refresh" style="background:var(--text)" onclick="abrirParametros()">⚙ Parámetros</button>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
@@ -313,6 +313,47 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
           <div style="font-size:11px;color:var(--muted);margin-top:8px">
             Por ahora un edificio = una plaza. Si más adelante esta plaza tiene varios edificios físicos, se separa en su propia tabla.
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Tarifas y tolerancia</h3>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Tarifa normal ($/hr)</label>
+            <input type="number" id="param-tarifa-normal" min="0" step="0.5">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Tarifa preferencial ($/hr)</label>
+            <input type="number" id="param-tarifa-pref" min="0" step="0.5">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Boleto perdido ($ fijo)</label>
+            <input type="number" id="param-tarifa-perdido" min="0" step="1">
+          </div>
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted);min-width:110px">Tolerancia (min)</label>
+            <input type="number" id="param-tolerancia" min="0" step="1">
+          </div>
+          <div class="param-row">
+            <button class="param-btn" onclick="guardarTarifas()">Guardar tarifas</button>
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Empresa y datos fiscales</h3>
+          <div class="param-row">
+            <input type="text" id="param-empresa-grupo" placeholder="Empresa / Grupo">
+            <input type="text" id="param-rfc" placeholder="RFC">
+          </div>
+          <div class="param-row">
+            <input type="text" id="param-ciudad" placeholder="Ciudad">
+            <input type="text" id="param-estado" placeholder="Estado">
+          </div>
+          <div class="param-row">
+            <input type="text" id="param-direccion" placeholder="Dirección">
+          </div>
+          <div class="param-row">
+            <button class="param-btn" onclick="guardarDatosFiscales()">Guardar</button>
           </div>
         </div>
 
@@ -954,15 +995,16 @@ async function cargarParametrosPlaza() {
     // url_facturacion y los horarios pueden no existir aún (requieren ALTER
     // TABLE manual); si el select completo falla por columna faltante, se
     // reintenta con menos columnas para no tumbar la carga de lo que sí existe.
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total,url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, { headers: SB_HEADERS_PARAM });
+    const COLS_BASE = 'plaza_id,nombre,capacidad_total,tarifa_normal,tarifa_pref,tarifa_perdido,tolerancia_min,empresa_grupo,rfc,ciudad,estado,direccion';
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, { headers: SB_HEADERS_PARAM });
     let tieneUrlFacturacion = true, tieneHorarios = true;
     if (!r.ok) {
       tieneHorarios = false;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total,url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
     }
     if (!r.ok) {
       tieneUrlFacturacion = false;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,nombre,capacidad_total&limit=1`, { headers: SB_HEADERS_PARAM });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE}&limit=1`, { headers: SB_HEADERS_PARAM });
     }
     const rows = r.ok ? await r.json() : [];
     if (rows.length) {
@@ -982,6 +1024,15 @@ async function cargarParametrosPlaza() {
         document.getElementById('param-hora-relevo2').value  = (p.hora_relevo_2||'').slice(0,5);
         document.getElementById('param-hora-cierre').value   = (p.hora_cierre||'').slice(0,5);
       }
+      document.getElementById('param-tarifa-normal').value  = p.tarifa_normal  ?? '';
+      document.getElementById('param-tarifa-pref').value    = p.tarifa_pref    ?? '';
+      document.getElementById('param-tarifa-perdido').value = p.tarifa_perdido ?? '';
+      document.getElementById('param-tolerancia').value     = p.tolerancia_min ?? '';
+      document.getElementById('param-empresa-grupo').value  = p.empresa_grupo || '';
+      document.getElementById('param-rfc').value             = p.rfc || '';
+      document.getElementById('param-ciudad').value          = p.ciudad || '';
+      document.getElementById('param-estado').value          = p.estado || '';
+      document.getElementById('param-direccion').value       = p.direccion || '';
     }
   } catch (e) { showToast('No se pudo cargar la plaza'); }
 }
@@ -1023,6 +1074,39 @@ async function guardarUrlFacturacion() {
       method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ url_facturacion: val })
     });
     showToast(r.ok ? 'URL de facturación actualizada' : 'Error al guardar (¿ya corriste el ALTER TABLE?)');
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function guardarTarifas() {
+  if (!PARAM_PLAZA_ID) { showToast('Falta cargar la plaza'); return; }
+  const body = {
+    tarifa_normal:  parseFloat(document.getElementById('param-tarifa-normal').value)  || 0,
+    tarifa_pref:    parseFloat(document.getElementById('param-tarifa-pref').value)    || 0,
+    tarifa_perdido: parseFloat(document.getElementById('param-tarifa-perdido').value) || 0,
+    tolerancia_min: parseInt(document.getElementById('param-tolerancia').value)       || 0,
+  };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify(body)
+    });
+    showToast(r.ok ? 'Tarifas actualizadas' : 'Error al guardar');
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function guardarDatosFiscales() {
+  if (!PARAM_PLAZA_ID) { showToast('Falta cargar la plaza'); return; }
+  const body = {
+    empresa_grupo: document.getElementById('param-empresa-grupo').value.trim() || null,
+    rfc:           document.getElementById('param-rfc').value.trim() || null,
+    ciudad:        document.getElementById('param-ciudad').value.trim() || null,
+    estado:        document.getElementById('param-estado').value.trim() || null,
+    direccion:     document.getElementById('param-direccion').value.trim() || null,
+  };
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify(body)
+    });
+    showToast(r.ok ? 'Datos fiscales actualizados' : 'Error al guardar');
   } catch (e) { showToast('Error al guardar'); }
 }
 
