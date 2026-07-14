@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v46</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v47</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -669,7 +669,10 @@ async function renderEjecutivo() {
   ]);
   OPS_EJECUTIVO = ops;
 
-  const cobros = ops.filter(o=>o.importe>0);
+  // "Cobrados" = todas las salidas cerradas (incluye cortesía, que cierra
+  // en $0 por quedarse menos de 15 min) — solo se excluyen los boletos
+  // perdidos, que ya tienen su propia tarjeta KPI aparte.
+  const cobros = ops.filter(o=>o.tipo!=='perdido');
   const total  = cobros.reduce((s,o)=>s+o.importe,0);
   const perdidos = ops.filter(o=>o.tipo==='perdido');
   const pTotal = perdidos.reduce((s,o)=>s+o.importe,0);
@@ -685,7 +688,7 @@ async function renderEjecutivo() {
   document.getElementById('ej-ingresos-delta').style.display = 'none';
   document.getElementById('ej-tickets-dia').textContent = ticketsPeriodo;
   document.getElementById('ej-ops').textContent = cobros.length;
-  document.getElementById('ej-ops-sub').textContent = 'con cargo, del periodo';
+  document.getElementById('ej-ops-sub').textContent = 'salidas cerradas, del periodo';
   document.getElementById('ej-ops-delta').style.display = 'none';
   document.getElementById('ej-autos-ahora').textContent = autosAhora;
   document.getElementById('ej-autos-ahora-sub').textContent = 'de '+CAPACIDAD_TOTAL+' cajones';
