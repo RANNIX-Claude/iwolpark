@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v40</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v41</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -785,6 +785,10 @@ function renderKPIs(ops) {
 
   document.getElementById('kpi-ingresos').textContent    = fmt$(total);
   document.getElementById('kpi-ingresos-sub').textContent= cobros.length + ' cobrados';
+  // "↑ vs ayer" nunca se calculó contra datos reales — quedó fijo en el HTML
+  // desde el principio, mostrando "subiendo" sin importar el desempeño real
+  // (bug detectado en QA). Corporativo ya lo oculta por la misma razón.
+  document.getElementById('kpi-ingresos-delta').style.display = 'none';
   document.getElementById('kpi-tickets-dia').textContent = DATOS.ticketsDia || 0;
   document.getElementById('kpi-perdidos').textContent    = perdidos.length;
   document.getElementById('kpi-perdidos-sub').textContent= fmt$(pTotal) + ' en penalizaciones';
