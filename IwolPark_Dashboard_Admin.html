@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v68</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v69</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -543,6 +543,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
               <div style="font-size:10px;color:var(--muted);font-weight:700">Preferenciales</div>
               <div style="font-size:20px;font-weight:900;color:#7B5EA7" id="ocu-pref">0</div>
             </div>
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);font-weight:700">Empleados</div>
+              <div style="font-size:20px;font-weight:900;color:#1D3557" id="ocu-empleado">0</div>
+            </div>
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--muted);font-weight:700">Pensión</div>
+              <div style="font-size:20px;font-weight:900;color:#0D9457" id="ocu-pension">0</div>
+            </div>
           </div>
         </div>
       </div>
@@ -722,10 +730,17 @@ async function cargarDatos() {
       });
       const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
       DATOS.autos_en_plaza  = abiertos.length;
-      DATOS.abiertos_normal = abiertos.filter(o => o.tipo !== 'preferencial').length;
-      DATOS.abiertos_pref   = abiertos.filter(o => o.tipo === 'preferencial').length;
+      // Desglose real por los 4 tipos — antes "Normales" era "todo lo que
+      // no es preferencial", lo que mezclaba empleados/pensión ahí adentro.
+      // Ahora que tickets.tipo sí guarda empleado/pension (ver fix de
+      // syncEntrada/COBRO.tipo), se pueden separar de verdad.
+      DATOS.abiertos_normal   = abiertos.filter(o => o.tipo === 'normal').length;
+      DATOS.abiertos_pref     = abiertos.filter(o => o.tipo === 'preferencial').length;
+      DATOS.abiertos_empleado = abiertos.filter(o => o.tipo === 'empleado').length;
+      DATOS.abiertos_pension  = abiertos.filter(o => o.tipo === 'pension').length;
     } catch (e) {
       DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
+      DATOS.abiertos_empleado = 0; DATOS.abiertos_pension = 0;
     }
 
     // Capacidad real de dim_plaza — antes se quedaba en el default (40) para
@@ -840,8 +855,10 @@ function renderOcupacion() {
   document.getElementById('gauge-pct').textContent  = pct+'%';
   document.getElementById('gauge-sub').textContent  = DATOS.autos_en_plaza+' / '+DATOS.capacidad;
   document.getElementById('gauge-fill').style.width = pct+'%';
-  document.getElementById('ocu-normal').textContent = DATOS.abiertos_normal || 0;
-  document.getElementById('ocu-pref').textContent   = DATOS.abiertos_pref || 0;
+  document.getElementById('ocu-normal').textContent   = DATOS.abiertos_normal || 0;
+  document.getElementById('ocu-pref').textContent     = DATOS.abiertos_pref || 0;
+  document.getElementById('ocu-empleado').textContent = DATOS.abiertos_empleado || 0;
+  document.getElementById('ocu-pension').textContent  = DATOS.abiertos_pension || 0;
 }
 
 function renderMix(ops) {
