@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v53</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v54</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -453,6 +453,20 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
           <div style="font-size:11px;color:var(--muted);margin-top:8px">
             Este usuario/contraseña es lo que se pide al entrar a cualquiera de los 3 portales (Operador, Administrador, Oficina central) según su rol.
+          </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Empleados<span class="param-tag" id="empleados-count">0</span></h3>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">
+            Catálogo de empleados con cortesía de estacionamiento. Al dar entrada tipo "Empleado" en la caseta, el cajero elige de esta lista quién es.
+          </div>
+          <div id="lista-empleados" style="margin-bottom:12px"></div>
+          <div class="param-row">
+            <input type="text" id="nuevo-empleado-nombre" placeholder="Nombre completo">
+            <input type="text" id="nuevo-empleado-puesto" placeholder="Puesto">
+            <input type="text" id="nuevo-empleado-area" placeholder="Área">
+            <button class="param-btn" onclick="agregarEmpleado()">+ Agregar</button>
           </div>
         </div>
 
@@ -1043,7 +1057,7 @@ const SB_HEADERS_PARAM = {
 
 async function abrirParametros() {
   document.getElementById('modal-parametros').classList.add('open');
-  await Promise.all([cargarParametrosPlaza(), cargarCajeros()]);
+  await Promise.all([cargarParametrosPlaza(), cargarCajeros(), cargarEmpleados()]);
 }
 function cerrarParametros() {
   document.getElementById('modal-parametros').classList.remove('open');
@@ -1251,6 +1265,64 @@ async function toggleCajero(cajeroId, nuevoActivo) {
       method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ activo: nuevoActivo })
     });
     if (r.ok) cargarCajeros();
+  } catch (e) { showToast('Error al actualizar'); }
+}
+
+// ══ EMPLEADOS (catálogo para la cortesía de estacionamiento) ══
+async function cargarEmpleados() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados?select=id,nombre_completo,puesto,area,activo&order=nombre_completo.asc`, { headers: SB_HEADERS_PARAM });
+    const empleados = r.ok ? await r.json() : [];
+    renderEmpleados(empleados);
+  } catch (e) { renderEmpleados([]); }
+}
+
+function renderEmpleados(empleados) {
+  document.getElementById('empleados-count').textContent = empleados.length;
+  const cont = document.getElementById('lista-empleados');
+  if (!empleados.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--muted)">Sin empleados registrados todavía.</div>';
+    return;
+  }
+  cont.innerHTML = empleados.map(e => `
+    <div class="cajero-list-row">
+      <span style="flex:1;font-weight:700">${e.nombre_completo}</span>
+      <span style="color:var(--muted)">${e.puesto || '—'}</span>
+      <span style="color:var(--muted)">${e.area || '—'}</span>
+      ${e.activo ? '' : '<span class="estado-inactivo">Inactivo</span>'}
+      <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
+              onclick="toggleEmpleado(${e.id}, ${!e.activo})">${e.activo ? 'Desactivar' : 'Activar'}</button>
+    </div>`).join('');
+}
+
+async function agregarEmpleado() {
+  const nombre_completo = document.getElementById('nuevo-empleado-nombre').value.trim();
+  const puesto = document.getElementById('nuevo-empleado-puesto').value.trim();
+  const area = document.getElementById('nuevo-empleado-area').value.trim();
+  if (!nombre_completo) { showToast('Falta el nombre completo'); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados`, {
+      method: 'POST', headers: { ...SB_HEADERS_PARAM, Prefer: 'return=minimal' },
+      body: JSON.stringify({ plaza_id: PARAM_PLAZA_ID, nombre_completo, puesto: puesto || null, area: area || null, activo: true })
+    });
+    if (r.ok) {
+      document.getElementById('nuevo-empleado-nombre').value = '';
+      document.getElementById('nuevo-empleado-puesto').value = '';
+      document.getElementById('nuevo-empleado-area').value = '';
+      showToast('Empleado agregado · '+nombre_completo);
+      cargarEmpleados();
+    } else {
+      showToast('Error: ¿ya corriste el SQL de la tabla empleados?');
+    }
+  } catch (e) { showToast('Error al agregar'); }
+}
+
+async function toggleEmpleado(id, nuevoActivo) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados?id=eq.${id}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ activo: nuevoActivo })
+    });
+    if (r.ok) cargarEmpleados();
   } catch (e) { showToast('Error al actualizar'); }
 }
 
