@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v75</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v76</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -291,7 +291,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="kpi-sub" id="kpi-ingresos-sub">0 operaciones</div>
       <div class="kpi-delta delta-up" id="kpi-ingresos-delta">↑ vs ayer</div>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card" onclick="drillDown('tickets_dia')" title="Ver detalle">
       <div class="kpi-label">Tickets del día</div>
       <div class="kpi-value" style="color:var(--accent)" id="kpi-tickets-dia">0</div>
       <div class="kpi-sub">total emitidos (abiertos + cerrados)</div>
@@ -311,7 +311,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="kpi-value" style="color:var(--green)" id="kpi-ticket">$0</div>
       <div class="kpi-sub" id="kpi-ticket-sub">Tiempo prom: 0 min</div>
     </div>
-    <div class="kpi-card">
+    <div class="kpi-card" onclick="drillDown('ocupacion')" title="Ver detalle">
       <div class="kpi-label">Ocupación (%)</div>
       <div class="kpi-value" style="color:var(--accent)" id="kpi-ocupacion">0%</div>
       <div class="kpi-sub">del total de cajones</div>
@@ -543,19 +543,19 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
             <span>100% (40)</span>
           </div>
           <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('normal')" title="Ver detalle">
               <div style="font-size:10px;color:var(--muted);font-weight:700">Normales</div>
               <div style="font-size:20px;font-weight:900;color:#0A66C2" id="ocu-normal">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('preferencial')" title="Ver detalle">
               <div style="font-size:10px;color:var(--muted);font-weight:700">Preferenciales</div>
               <div style="font-size:20px;font-weight:900;color:#7B5EA7" id="ocu-pref">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('empleado')" title="Ver detalle">
               <div style="font-size:10px;color:var(--muted);font-weight:700">Empleados</div>
               <div style="font-size:20px;font-weight:900;color:#1D3557" id="ocu-empleado">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center">
+            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('pension')" title="Ver detalle">
               <div style="font-size:10px;color:var(--muted);font-weight:700">Pensión</div>
               <div style="font-size:20px;font-weight:900;color:#0D9457" id="ocu-pension">0</div>
             </div>
@@ -712,6 +712,13 @@ async function cargarDatos() {
     // veían los ya cerrados en "N operaciones", así que un día con muchos
     // tickets todavía abiertos parecía tener casi actividad nula.
     DATOS.ticketsDia = rows.length;
+    // Detalle completo (abiertos + cerrados) para el drill-down de "Tickets
+    // del día" (Fase I) — el KPI cuenta todo el período, no solo lo cerrado.
+    DATOS.todosDetalle = rows.map(o => ({
+      folio: o.folio, tipo: o.tipo || 'normal', estatus: o.estatus,
+      cajero: o.cajero || '—', hora_entrada: o.hora_entrada || '—',
+      importe: parseFloat(o.importe) || 0
+    }));
     // Solo operaciones completadas (cobrado/perdido/cortesia) alimentan KPIs de ingresos
     const completadas = rows.filter(o => o.estatus !== 'abierto');
     DATOS.operaciones = completadas.map(o => ({
@@ -740,11 +747,15 @@ async function cargarDatos() {
     // por encima de la realidad.
     try {
       const hoyStr = fmtLocal(new Date());
-      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=tipo&limit=1000`, {
+      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=folio,tipo,cajero,hora_entrada&limit=1000`, {
         headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
       });
       const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
       DATOS.autos_en_plaza  = abiertos.length;
+      // Guardamos el detalle (no solo el conteo) para el drill-down de
+      // Fase I — antes solo se traía "tipo", suficiente para contar pero no
+      // para listar folios al hacer clic en la tarjeta de Ocupación.
+      DATOS.abiertosDetalle = abiertos;
       // Desglose real por los 4 tipos — antes "Normales" era "todo lo que
       // no es preferencial", lo que mezclaba empleados/pensión ahí adentro.
       // Ahora que tickets.tipo sí guarda empleado/pension (ver fix de
@@ -755,7 +766,7 @@ async function cargarDatos() {
       DATOS.abiertos_pension  = abiertos.filter(o => o.tipo === 'pension').length;
     } catch (e) {
       DATOS.autos_en_plaza = 0; DATOS.abiertos_normal = 0; DATOS.abiertos_pref = 0;
-      DATOS.abiertos_empleado = 0; DATOS.abiertos_pension = 0;
+      DATOS.abiertos_empleado = 0; DATOS.abiertos_pension = 0; DATOS.abiertosDetalle = [];
     }
 
     // Capacidad real de dim_plaza — antes se quedaba en el default (40) para
@@ -991,7 +1002,8 @@ function drillDown(tipo) {
     ingresos: '💰 Detalle de ingresos',
     ocupacion: '🅿 Análisis de ocupación',
     boletos_perdidos: '⚠ Boletos perdidos',
-    ticket_promedio: '📊 Análisis de ticket promedio'
+    ticket_promedio: '📊 Análisis de ticket promedio',
+    tickets_dia: '🎫 Tickets del día (abiertos + cerrados)'
   };
   title.textContent = titulos[tipo] || tipo;
   path.textContent  = 'Inicio → ' + (titulos[tipo]||tipo);
@@ -1023,6 +1035,33 @@ function drillDown(tipo) {
           <div style="font-size:11px;color:var(--muted)">${sub.length} ops</div>
         </div>`;
       }).join('')}</div>`;
+  } else if (tipo === 'ocupacion') {
+    cont.innerHTML = tablaAbiertosHTML(DATOS.abiertosDetalle || []);
+  } else if (tipo === 'ticket_promedio') {
+    const cobros = ops.filter(o=>o.importe>0);
+    cont.innerHTML = cobros.length ? `
+      <div class="tabla-wrap"><table>
+        <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Entrada</th><th>Min</th><th style="text-align:right">Importe</th></tr></thead>
+        <tbody>${cobros.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+          <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+          <td>${o.tipo}</td><td>${o.cajero}</td><td>${o.hora_entrada}</td>
+          <td>${o.minutos||'—'}</td>
+          <td style="text-align:right;font-weight:700;color:var(--green)">${fmt$(o.importe)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin cobros en el período</div>';
+  } else if (tipo === 'tickets_dia') {
+    const todos = DATOS.todosDetalle || [];
+    const estatusLabel = {abierto:'Abierto',cobrado:'Cobrado',perdido:'Perdido',cortesia:'Cortesía'};
+    cont.innerHTML = todos.length ? `
+      <div class="tabla-wrap"><table>
+        <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Entrada</th><th>Estatus</th><th style="text-align:right">Importe</th></tr></thead>
+        <tbody>${todos.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+          <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+          <td>${o.tipo}</td><td>${o.cajero}</td><td>${o.hora_entrada}</td>
+          <td>${estatusLabel[o.estatus]||o.estatus}</td>
+          <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${o.importe?fmt$(o.importe):'$0.00'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en el período</div>';
   }
   panel.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -1045,7 +1084,12 @@ function drillCajero(cajero) {
 }
 
 function drillTicket(folio) {
-  const op = DATOS.operaciones.find(o=>o.folio===folio);
+  // Un folio abierto (todavía en la plaza) no está en DATOS.operaciones
+  // (solo guarda cerrados) — se busca también en abiertosDetalle/todosDetalle
+  // para que las filas de esas tablas de drill-down también sean clickeables.
+  const op = DATOS.operaciones.find(o=>o.folio===folio)
+    || (DATOS.abiertosDetalle||[]).find(o=>o.folio===folio)
+    || (DATOS.todosDetalle||[]).find(o=>o.folio===folio);
   if (!op) return;
   const panel = document.getElementById('drill-panel');
   const cont  = document.getElementById('drill-content');
@@ -1053,19 +1097,46 @@ function drillTicket(folio) {
   document.getElementById('drill-path').textContent  = 'Inicio → Operaciones → '+folio;
   _drillActual = 'ticket';
   panel.classList.add('open');
-  const colors={normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025',cortesia:'#888'};
-  const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Boleto Perdido',cortesia:'Cortesía'};
+  const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Boleto Perdido',cortesia:'Cortesía',empleado:'Empleado',pension:'Pensión'};
+  const campos = [['Folio',folio],['Tipo',labels[op.tipo]||op.tipo],['Cajero',op.cajero],
+    ['Entrada',op.hora_entrada]];
+  if (op.franja) campos.push(['Franja',op.franja]);
+  if (op.estatus) campos.push(['Estatus',op.estatus]);
+  if (op.hora_salida !== undefined) campos.push(['Salida',op.hora_salida||'—']);
+  if (op.minutos !== undefined) campos.push(['Minutos',op.minutos||'—']);
+  campos.push(['Importe', op.importe!=null ? fmt$(op.importe) : '—']);
   cont.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-      ${[['Folio',folio],['Tipo',labels[op.tipo]||op.tipo],
-         ['Cajero',op.cajero],['Franja',op.franja],
-         ['Entrada',op.hora_entrada],['Salida',op.hora_salida||'—'],
-         ['Minutos',op.minutos||'—'],['Importe',fmt$(op.importe)]
-        ].map(([k,v])=>`<div style="background:var(--bg);border-radius:8px;padding:12px">
+      ${campos.map(([k,v])=>`<div style="background:var(--bg);border-radius:8px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${k}</div>
           <div style="font-size:16px;font-weight:800;margin-top:4px">${v}</div>
         </div>`).join('')}
     </div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// Tabla de tickets abiertos (en plaza ahora) — usada por el drill de
+// "Ocupación" y de las 4 tarjetas Normales/Preferenciales/Empleados/Pensión.
+function tablaAbiertosHTML(rows) {
+  if (!rows.length) return '<div style="padding:20px;color:var(--muted)">Sin autos en plaza</div>';
+  const labels={normal:'Normal',preferencial:'Preferencial',empleado:'Empleado',pension:'Pensión'};
+  return `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Entrada</th></tr></thead>
+      <tbody>${rows.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${labels[o.tipo]||o.tipo}</td><td>${o.cajero}</td><td>${o.hora_entrada}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+function drillOcupacionTipo(tipo) {
+  const labels={normal:'Normales',preferencial:'Preferenciales',empleado:'Empleados',pension:'Pensión'};
+  const rows = (DATOS.abiertosDetalle||[]).filter(o=>o.tipo===tipo);
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = '🅿 En plaza — '+(labels[tipo]||tipo);
+  document.getElementById('drill-path').textContent  = 'Inicio → Ocupación → '+(labels[tipo]||tipo);
+  _drillActual = 'ocupacion_'+tipo;
+  panel.classList.add('open');
+  document.getElementById('drill-content').innerHTML = tablaAbiertosHTML(rows);
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 

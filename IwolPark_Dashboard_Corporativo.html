@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v75</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v76</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -206,7 +206,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       <div class="kpi-sub" id="ej-ingresos-sub">cargando...</div>
       <div class="kpi-delta up" id="ej-ingresos-delta">↑ 0%</div>
     </div>
-    <div class="kpi">
+    <div class="kpi" onclick="drillKPI('tickets_dia')">
       <div class="kpi-label">Tickets del día</div>
       <div class="kpi-val" style="color:var(--accent)" id="ej-tickets-dia">0</div>
       <div class="kpi-sub">total emitidos (abiertos + cerrados)</div>
@@ -217,7 +217,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       <div class="kpi-sub" id="ej-ops-sub">cargando...</div>
       <div class="kpi-delta up" id="ej-ops-delta">↑ 0%</div>
     </div>
-    <div class="kpi" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF)">
+    <div class="kpi" onclick="drillKPI('ocupacion')" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF);cursor:pointer">
       <div class="kpi-label">Autos en plaza AHORA</div>
       <div class="kpi-val" style="color:var(--purple);font-size:38px" id="ej-autos-ahora">0</div>
       <div class="kpi-sub" id="ej-autos-ahora-sub">de 0 cajones</div>
@@ -837,6 +837,21 @@ async function drillKPI(tipo) {
   } else if(tipo==='operaciones') {
     title.textContent = '📊 Detalle: Operaciones';
     cont.innerHTML = resumenTiposHTML(ops);
+  } else if(tipo==='tickets_dia') {
+    title.textContent = '🎫 Detalle: Tickets del período (abiertos + cerrados)';
+    const periodo = document.getElementById('periodo-ej')?.value || 'mes';
+    const {desde,hasta} = fechasPeriodo(periodo);
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,cajero,fecha_op,hora_entrada,estatus,importe&order=fecha_op.desc`;
+    const todos = await fetchPaginado(base, SB_HEADERS, 5000);
+    const estatusLabel = {abierto:'Abierto',cobrado:'Cobrado',perdido:'Perdido',cortesia:'Cortesía'};
+    cont.innerHTML = todos.length ? `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Fecha</th><th>Entrada</th><th>Estatus</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${todos.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.tipo}</td><td>${o.cajero||'—'}</td><td>${o.fecha_op}</td><td>${o.hora_entrada||'—'}</td>
+        <td>${estatusLabel[o.estatus]||o.estatus}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${Number(o.importe)?fmt$(Number(o.importe)):'$0.00'}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en el período</div>';
   } else if(tipo==='ocupacion') {
     title.textContent = '🅿️ Detalle: Ocupación actual (en vivo)';
     const abiertos = await cargarAbiertos();
@@ -862,6 +877,14 @@ function drillMes(i) {
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+function drillFranjaOp(franja) {
+  const ops = OPS_OPERATIVO.filter(o=>o.franja===franja);
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = '🕐 Franja: '+franja;
+  document.getElementById('drill-content').innerHTML = resumenTiposHTML(ops);
+  panel.classList.add('open');
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
 
 // ══ OPERATIVO ══
@@ -883,7 +906,7 @@ function renderFranjasOp() {
   document.getElementById('op-franjas').innerHTML = franjas.map(f=>{
     const sub=OPS_OPERATIVO.filter(o=>o.franja===f.f);
     const tot=sub.reduce((s,o)=>s+o.importe,0);
-    return `<div class="hbar-row">
+    return `<div class="hbar-row" onclick="drillFranjaOp('${f.f}')">
       <div class="hbar-label" style="color:${f.c}">${f.n}</div>
       <div class="hbar-wrap"><div class="hbar-fill" style="width:${maxF?sub.length/maxF*100:0}%;background:${f.c}"></div></div>
       <div style="min-width:80px;text-align:right;font-size:11px">
