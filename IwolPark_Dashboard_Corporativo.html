@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v76</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v77</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -191,6 +191,8 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="filtros">
     <select id="periodo-ej" onchange="renderEjecutivo()">
       <option value="hoy">Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="antier">Antier</option>
       <option value="semana">Esta semana</option>
       <option value="mes" selected>Este mes</option>
       <option value="año">Este año</option>
@@ -302,6 +304,8 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="filtros">
     <select id="periodo-op" onchange="renderOperativo()">
       <option value="hoy">Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="antier">Antier</option>
       <option value="semana" selected>Esta semana</option>
       <option value="mes">Este mes</option>
     </select>
@@ -365,6 +369,8 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   <div class="filtros">
     <select id="periodo-caj" onchange="renderCajeros()">
       <option value="hoy">Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="antier">Antier</option>
       <option value="semana" selected>Esta semana</option>
       <option value="mes">Este mes</option>
     </select>
@@ -473,6 +479,8 @@ function fechasPeriodo(periodo) {
   const hoy = new Date();
   const fmt = fmtLocal;
   if (periodo === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (periodo === 'ayer')   { const d=new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmt(d), hasta: fmt(d) }; }
+  if (periodo === 'antier') { const d=new Date(hoy); d.setDate(d.getDate()-2); return { desde: fmt(d), hasta: fmt(d) }; }
   if (periodo === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1); return {desde:fmt(ini), hasta:fmt(hoy)}; }
   if (periodo === 'mes') return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
   if (periodo === 'año') return { desde: fmt(new Date(hoy.getFullYear(),0,1)), hasta: fmt(hoy) };
