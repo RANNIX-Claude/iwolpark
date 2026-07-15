@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v67</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v68</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -709,8 +709,15 @@ async function cargarDatos() {
     // aparte sin filtro de período (un auto que entró ayer y sigue en la plaza
     // debe contar aunque el filtro de fecha esté en "Hoy"). Desglosado por tipo
     // real (antes era un split falso 70/30).
+    // Se limita a fecha_op = HOY: la regla del negocio es que nadie se queda
+    // de un día para otro (se hace cierre de día todas las noches), así que
+    // un "abierto" con fecha_op de días anteriores es dato viejo que nunca
+    // se cerró bien (prueba, apagón, etc.), no un auto real todavía adentro
+    // — sin este filtro, esos residuos inflaban "Autos en plaza ahora" muy
+    // por encima de la realidad.
     try {
-      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=tipo&limit=1000`, {
+      const hoyStr = fmtLocal(new Date());
+      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=tipo&limit=1000`, {
         headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
       });
       const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];

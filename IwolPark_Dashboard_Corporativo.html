@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v67</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v68</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -520,7 +520,12 @@ async function contarTicketsPeriodo(desde, hasta) {
 // promedio histórico.
 async function contarAutosAhora() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=folio&limit=1`, {
+    // Igual que en Admin: se limita a fecha_op = HOY. Un "abierto" con
+    // fecha de días anteriores es un residuo que nunca se cerró bien
+    // (la regla del negocio es que nadie se queda de un día para otro),
+    // no un auto real todavía en la plaza.
+    const hoyStr = fmtLocal(new Date());
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=folio&limit=1`, {
       headers: { ...SB_HEADERS, Prefer: 'count=exact' }
     });
     const rango = r.headers.get('content-range') || '';
