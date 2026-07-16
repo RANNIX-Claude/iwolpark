@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v69</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v70</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -694,7 +694,11 @@ async function cargarDatos() {
     if(cajeroFiltro) query += `&cajero=eq.${encodeURIComponent(cajeroFiltro)}`;
 
     const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000);
+    // Los tickets cancelados (error del cajero, corregido con motivo y rastro
+    // en bitácora) se excluyen de raíz de todos los reportes/KPIs — no son
+    // una operación real, no deben contar como boleto emitido ni como ingreso.
+    const rows = (await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000))
+      .filter(o => o.estatus !== 'cancelado');
 
     // Total de tickets del período SIN filtrar por estatus — antes solo se
     // veían los ya cerrados en "N operaciones", así que un día con muchos

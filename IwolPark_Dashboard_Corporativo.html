@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v69</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v70</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -541,7 +541,9 @@ async function cargarOps(desde, hasta, maxTotal=6000) {
   try {
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc`;
     const rows = await fetchPaginado(base, SB_HEADERS, maxTotal);
-    return rows.filter(t => t.estatus !== 'abierto').map(t => ({
+    // Cancelado = boleto erróneo corregido con motivo (bitácora) — no es una
+    // operación real, se excluye de reportes igual que en Admin/TABLET.
+    return rows.filter(t => t.estatus !== 'abierto' && t.estatus !== 'cancelado').map(t => ({
       folio: t.folio, tipo: t.tipo, cajero: t.cajero || '—',
       hora: (t.hora_salida || t.hora_entrada || '—'),
       minutos: t.minutos_estancia || 0, franja: t.franja || '—',
@@ -568,6 +570,7 @@ async function calcularOcupacionPromedio(desde, hasta) {
     const intervalos = [];
     for (const t of rows) {
       if (!t.hora_entrada_at) continue;
+      if (t.estatus === 'cancelado') continue; // boleto erróneo, no ocupó lugar real
       const entrada = new Date(t.hora_entrada_at);
       let salida;
       if (t.hora_salida_at) salida = new Date(t.hora_salida_at);
