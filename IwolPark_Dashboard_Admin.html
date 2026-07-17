@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v88</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v89</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -552,7 +552,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   </div>
 
   <!-- CHARTS ROW 2 -->
-  <div class="charts-grid" style="grid-template-columns:repeat(3,1fr)">
+  <div class="charts-grid">
 
     <!-- Ingresos por franja horaria -->
     <div class="chart-card">
@@ -561,18 +561,15 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div id="franja-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
     </div>
 
-    <!-- Actividad: número de tickets por hora, periodo actual -->
+    <!-- Actividad: barras periodo actual + línea periodo anterior superpuesta -->
     <div class="chart-card">
-      <div class="chart-title">Actividad — Período actual</div>
+      <div class="chart-title">Actividad — Comparativo</div>
       <div class="chart-sub">Número de tickets por hora · clic en barra para ver detalle</div>
-      <div style="display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:4px" id="actividad-horas"></div>
-    </div>
-
-    <!-- Actividad: número de tickets por hora, periodo anterior comparable -->
-    <div class="chart-card">
-      <div class="chart-title">Actividad — Período anterior</div>
-      <div class="chart-sub" id="actividad-anterior-sub">Mismo rango de días, inmediatamente anterior</div>
-      <div style="display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:4px" id="actividad-horas-anterior"></div>
+      <div style="display:flex;gap:12px;font-size:9px;font-weight:700;margin-bottom:2px">
+        <span style="color:var(--accent)">■ Período actual</span>
+        <span style="color:#F5A623">— Período anterior (<span id="actividad-anterior-sub">—</span>)</span>
+      </div>
+      <div id="actividad-comparativa"></div>
     </div>
   </div>
 
@@ -852,8 +849,7 @@ function renderTodo() {
   renderMix(ops);
   renderRankingCajeros(ops);
   renderTabla(ops);
-  renderActividadHoraria();
-  renderActividadHorariaAnterior();
+  renderActividadComparativa();
 }
 
 function renderKPIs(ops) {
@@ -1057,26 +1053,6 @@ function drillPagados(esPagado) {
   panel.classList.add('open');
 }
 
-// Actividad: número de tickets por hora (Fase de layout, mockup "Entrada de
-// autos x hora") — a partir de DATOS.todosDetalle (abiertos + cerrados del
-// período), agrupado por hora de entrada.
-function renderActividadHoraria() {
-  const el = document.getElementById('actividad-horas');
-  if (!el) return;
-  const todos = DATOS.todosDetalle || [];
-  const horas = Array.from({length:24}, (_,i)=>i);
-  const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
-  const max = Math.max(...conteos, 1);
-  el.innerHTML = horas.map((h,i) => `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer"
-         onclick="drillHora(${h})">
-      <div style="font-size:7px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
-      <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;
-           height:${conteos[i]/max*40}px;min-height:2px;transition:height .5s"></div>
-      <div style="font-size:6px;color:var(--muted)">${h}</div>
-    </div>`).join('');
-}
-
 // Rango de fechas del "período anterior": mismo número de días que
 // [desde,hasta], inmediatamente antes — funciona para cualquier tipo de
 // período (Hoy→Ayer, Esta semana→semana pasada, Personalizado→mismo tamaño).
@@ -1089,23 +1065,52 @@ function getFechasAnterior(desde, hasta) {
   return { desde: fmtLocal(iniAnterior), hasta: fmtLocal(finAnterior) };
 }
 
-// Igual que renderActividadHoraria(), pero para el período anterior
-// comparable (DATOS.todosDetalleAnterior) — sin drill-down, es solo
-// referencia visual para comparar el patrón del día/semana/mes anterior.
-function renderActividadHorariaAnterior() {
-  const el = document.getElementById('actividad-horas-anterior');
+// Actividad — Comparativo: número de tickets por hora del período actual
+// (barras, DATOS.todosDetalle) superpuesto con el período anterior
+// comparable (línea, DATOS.todosDetalleAnterior) en una sola gráfica SVG,
+// misma escala para ambas series — reemplaza las dos gráficas separadas de
+// antes, que obligaban a comparar de memoria entre dos tarjetas.
+function renderActividadComparativa() {
+  const el = document.getElementById('actividad-comparativa');
   if (!el) return;
-  const todos = DATOS.todosDetalleAnterior || [];
   const horas = Array.from({length:24}, (_,i)=>i);
-  const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
-  const max = Math.max(...conteos, 1);
-  el.innerHTML = horas.map((h,i) => `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
-      <div style="font-size:7px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
-      <div style="width:100%;background:#B8A9D9;border-radius:3px 3px 0 0;
-           height:${conteos[i]/max*40}px;min-height:2px;transition:height .5s"></div>
-      <div style="font-size:6px;color:var(--muted)">${h}</div>
-    </div>`).join('');
+  const actual   = DATOS.todosDetalle || [];
+  const anterior = DATOS.todosDetalleAnterior || [];
+  const cActual   = horas.map(h => actual.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const cAnterior = horas.map(h => anterior.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const max = Math.max(...cActual, ...cAnterior, 1);
+
+  const slot = 10, plotTop = 12, plotBottom = 82, plotH = plotBottom - plotTop;
+  const barW = slot * 0.6;
+
+  const bars = horas.map((h,i) => {
+    const x = i*slot + (slot-barW)/2;
+    const bh = cActual[i]/max*plotH;
+    const y = plotBottom - bh;
+    const label = cActual[i] ? `<text x="${x+barW/2}" y="${y-1.5}" font-size="4.5" text-anchor="middle" fill="var(--accent)" font-weight="700">${cActual[i]}</text>` : '';
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="1" fill="var(--accent)" style="cursor:pointer" onclick="drillHora(${h})"><title>${h}:00 · ${cActual[i]} tickets (período actual)</title></rect>${label}`;
+  }).join('');
+
+  const puntos = horas.map((h,i) => ({
+    x: i*slot + slot/2,
+    y: plotBottom - (cAnterior[i]/max*plotH),
+    v: cAnterior[i], h
+  }));
+  const linePath = puntos.map((p,i) => (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const dots = puntos.map(p =>
+    `<circle cx="${p.x}" cy="${p.y}" r="1.6" fill="#F5A623"><title>${p.h}:00 · ${p.v} tickets (período anterior)</title></circle>`
+  ).join('');
+
+  const xLabels = horas.map((h,i) =>
+    `<text x="${i*slot+slot/2}" y="92" font-size="4" text-anchor="middle" fill="var(--muted)">${h}</text>`
+  ).join('');
+
+  el.innerHTML = `<svg viewBox="0 0 240 96" style="width:100%;height:auto;display:block">
+      ${bars}
+      <path d="${linePath}" fill="none" stroke="#F5A623" stroke-width="1.2"/>
+      ${dots}
+      ${xLabels}
+    </svg>`;
 }
 function drillHora(h) {
   const todos = DATOS.todosDetalle || [];
