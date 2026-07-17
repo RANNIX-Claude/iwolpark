@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v73</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v74</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -568,10 +568,10 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <!-- CHARTS ROW 2 -->
   <div class="charts-grid">
 
-    <!-- Mix por tipo de boleto -->
+    <!-- Desglose Ticket -->
     <div class="chart-card">
-      <div class="chart-title">Mix por tipo de boleto</div>
-      <div class="chart-sub">Distribución de operaciones del período</div>
+      <div class="chart-title">Desglose Ticket</div>
+      <div class="chart-sub">Pagado · Preferente · Cortesía (≤15 min) · Pensión · Empleado · clic para ver detalle</div>
       <div id="mix-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
     </div>
 
@@ -790,7 +790,7 @@ async function cargarDatos() {
 // ══ DATOS DEMO (reemplazar con Supabase queries) ══
 function generarDatosDemo() {
   const ops = [];
-  const tipos = ['normal','normal','normal','preferencial','perdido','cortesia'];
+  const tipos = ['normal','normal','normal','preferencial','perdido','empleado','pension'];
   const cajeros = ['Juan Pérez','María López','Carlos Ruiz'];
   const hoy = new Date();
   for (let i=0; i<28; i++) {
@@ -895,24 +895,36 @@ function renderOcupacion() {
   document.getElementById('ocu-pension').textContent  = DATOS.abiertos_pension || 0;
 }
 
+// Desglose Ticket (Fase G, tablero ampliado): Pagado/Preferente/Cortesía/
+// Pensión/Empleado. "Cortesía" ya NO se puede leer del campo tipo (desde el
+// fix de esta sesión que dejó de sobrescribirlo a 'cortesia' para preservar
+// empleado/pensión) — se deriva en vivo como normal/preferencial con
+// importe=0 (tolerancia ≤15 min), que es justo lo que el cliente pidió poder
+// contar como dimensión aparte del tipo. "Perdido" no aparece aquí porque ya
+// tiene su propia tarjeta KPI ("Boletos perdidos") arriba.
+const DESGLOSE_BUCKETS = {
+  pagado:       { label:'Pagado',            color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
+  preferencial: { label:'Preferente',        color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && Number(o.importe)>0 },
+  cortesia:     { label:'Cortesía (≤15min)', color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && Number(o.importe)===0 },
+  pension:      { label:'Pensión',           color:'#0D9457', filter:o=>o.tipo==='pension' },
+  empleado:     { label:'Empleado',          color:'#1D3557', filter:o=>o.tipo==='empleado' }
+};
 function renderMix(ops) {
-  const tipos = ['normal','preferencial','perdido','cortesia'];
-  const labels = {normal:'Normal',preferencial:'Preferencial',perdido:'Perdido',cortesia:'Cortesía'};
-  const colors = {normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025',cortesia:'#888'};
-  const total  = ops.length || 1;
+  const total = ops.length || 1;
   const el = document.getElementById('mix-bars');
-  el.innerHTML = tipos.map(t => {
-    const cnt = ops.filter(o=>o.tipo===t).length;
+  el.innerHTML = Object.entries(DESGLOSE_BUCKETS).map(([key,b]) => {
+    const subset = ops.filter(b.filter);
+    const cnt = subset.length;
     const pct = Math.round(cnt/total*100);
-    const ing = ops.filter(o=>o.tipo===t).reduce((s,o)=>s+o.importe,0);
-    return `<div onclick="drillTipo('${t}')" style="cursor:pointer">
+    const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
+    return `<div onclick="drillTipo('${key}')" style="cursor:pointer">
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-        <span style="font-weight:700;color:${colors[t]}">${labels[t]}</span>
+        <span style="font-weight:700;color:${b.color}">${b.label}</span>
         <span style="color:var(--muted)">${cnt} ops · ${fmt$(ing)}</span>
         <span style="font-weight:700">${pct}%</span>
       </div>
       <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;border-radius:99px;background:${colors[t]};transition:width .5s"></div>
+        <div style="width:${pct}%;height:100%;border-radius:99px;background:${b.color};transition:width .5s"></div>
       </div>
     </div>`;
   }).join('');
@@ -1020,10 +1032,11 @@ function drillFranja(key) {
   drillGenerico('Franja: '+(FRANJA_ADMIN_LABEL[key]||key), ops);
 }
 
-function drillTipo(tipo) {
-  const labels = {normal:'Normal',preferencial:'Preferencial',perdido:'Perdido',cortesia:'Cortesía'};
-  const ops = DATOS.operaciones.filter(o=>o.tipo===tipo);
-  drillGenerico('Tipo: '+labels[tipo], ops);
+function drillTipo(key) {
+  const b = DESGLOSE_BUCKETS[key];
+  if (!b) return;
+  const ops = DATOS.operaciones.filter(b.filter);
+  drillGenerico('Desglose: '+b.label, ops);
 }
 
 function drillCajero(cajero) {
