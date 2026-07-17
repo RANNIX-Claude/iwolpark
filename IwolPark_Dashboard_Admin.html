@@ -58,10 +58,10 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 .nav-menu-sep { height:1px; background:var(--border); margin:6px 4px; }
 
 /* LAYOUT */
-.container { max-width:1400px; margin:0 auto; padding:20px 24px; }
+.container { max-width:1400px; margin:0 auto; padding:10px 20px; }
 
 /* FILTROS */
-.filtros { display:flex; gap:10px; align-items:center; margin-bottom:20px;
+.filtros { display:flex; gap:10px; align-items:center; margin-bottom:10px;
            flex-wrap:wrap; }
 .filtros label { font-size:12px; font-weight:700; color:var(--muted);
                  text-transform:uppercase; letter-spacing:.5px; }
@@ -77,35 +77,35 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 
 /* KPI CARDS */
 .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr);
-            gap:14px; margin-bottom:20px; }
+            gap:10px; margin-bottom:10px; }
 @media (max-width:1100px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
 @media (max-width:600px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
-.kpi-card { background:var(--white); border-radius:12px;
-            border:1px solid var(--border); padding:18px 20px;
+.kpi-card { background:var(--white); border-radius:10px;
+            border:1px solid var(--border); padding:10px 12px;
             box-shadow:var(--card-sh); cursor:pointer;
             transition:transform .15s, box-shadow .15s; position:relative; }
 .kpi-card:hover { transform:translateY(-2px);
                   box-shadow:0 6px 20px rgba(0,0,0,.12); }
 .kpi-card.selected { border-color:var(--accent); border-width:2px; }
-.kpi-label { font-size:11px; font-weight:700; color:var(--muted);
-             text-transform:uppercase; letter-spacing:.8px; margin-bottom:8px; }
-.kpi-value { font-size:32px; font-weight:900; line-height:1; margin-bottom:4px; }
-.kpi-sub   { font-size:12px; color:var(--muted); }
-.kpi-delta { position:absolute; top:16px; right:16px; font-size:11px;
-             font-weight:700; padding:3px 7px; border-radius:4px; }
+.kpi-label { font-size:10px; font-weight:700; color:var(--muted);
+             text-transform:uppercase; letter-spacing:.6px; margin-bottom:3px; }
+.kpi-value { font-size:22px; font-weight:900; line-height:1; margin-bottom:2px; }
+.kpi-sub   { font-size:10px; color:var(--muted); }
+.kpi-delta { position:absolute; top:10px; right:10px; font-size:10px;
+             font-weight:700; padding:2px 6px; border-radius:4px; }
 .delta-up   { background:#DCFCE7; color:#16A34A; }
 .delta-down { background:#FEE2E2; color:#DC2626; }
 
 /* CHARTS GRID */
-.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px;
-               margin-bottom:20px; }
+.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px;
+               margin-bottom:10px; }
 @media (max-width:900px) { .charts-grid { grid-template-columns:1fr; } }
-.chart-card { background:var(--white); border-radius:12px;
-              border:1px solid var(--border); padding:20px;
+.chart-card { background:var(--white); border-radius:10px;
+              border:1px solid var(--border); padding:12px;
               box-shadow:var(--card-sh); }
-.chart-title { font-size:13px; font-weight:800; margin-bottom:4px;
+.chart-title { font-size:12px; font-weight:800; margin-bottom:2px;
                color:var(--text); }
-.chart-sub   { font-size:11px; color:var(--muted); margin-bottom:16px; }
+.chart-sub   { font-size:10px; color:var(--muted); margin-bottom:6px; }
 
 /* DRILL-DOWN: ventana pop (overlay fijo, no requiere recorrer la pantalla) */
 .drill-panel { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
@@ -169,39 +169,39 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 .b-cortesia{background:#F5F5F5; color:#6E6E73; }
 
 /* OCUPACIÓN GAUGE */
-.ocupacion-wrap { display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+.ocupacion-wrap { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 .gauge-num { text-align:center; }
-.gauge-pct { font-size:52px; font-weight:900; color:var(--accent); line-height:1; }
-.gauge-bar-wrap { flex:1; min-width:160px; }
-.gauge-bar-bg { background:#F0EEF8; border-radius:99px; height:20px; overflow:hidden; }
+.gauge-pct { font-size:32px; font-weight:900; color:var(--accent); line-height:1; }
+.gauge-bar-wrap { flex:1; min-width:140px; }
+.gauge-bar-bg { background:#F0EEF8; border-radius:99px; height:12px; overflow:hidden; }
 .gauge-bar-fill { height:100%; border-radius:99px;
                   background:linear-gradient(90deg,var(--accent),var(--accent2));
                   transition:width .6s ease; }
 .gauge-labels { display:flex; justify-content:space-between;
-                font-size:11px; color:var(--muted); margin-top:6px; }
+                font-size:10px; color:var(--muted); margin-top:4px; }
 
 /* FRANJA BARRAS */
-.franja-bars { display:flex; gap:12px; align-items:flex-end;
-               height:120px; padding-top:12px; }
+.franja-bars { display:flex; gap:8px; align-items:flex-end;
+               height:70px; padding-top:6px; }
 .franja-col { flex:1; display:flex; flex-direction:column;
-              align-items:center; gap:6px; }
+              align-items:center; gap:3px; }
 .franja-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; }
 .franja-bar { width:100%; border-radius:6px 6px 0 0;
               transition:height .5s ease; cursor:pointer; }
-.franja-label { font-size:10px; color:var(--muted); font-weight:700;
+.franja-label { font-size:9px; color:var(--muted); font-weight:700;
                 text-align:center; }
-.franja-value { font-size:12px; font-weight:800; color:var(--text); }
+.franja-value { font-size:11px; font-weight:800; color:var(--text); }
 
 /* RANKING CAJEROS */
-.cajero-row { display:flex; align-items:center; gap:12px;
-              padding:10px 0; border-bottom:1px solid #F0EEF8; }
-.cajero-num  { font-size:18px; font-weight:900; color:var(--accent);
-               min-width:28px; }
-.cajero-name { flex:1; font-size:13px; font-weight:700; }
+.cajero-row { display:flex; align-items:center; gap:8px;
+              padding:5px 0; border-bottom:1px solid #F0EEF8; }
+.cajero-num  { font-size:14px; font-weight:900; color:var(--accent);
+               min-width:20px; }
+.cajero-name { flex:1; font-size:11px; font-weight:700; }
 .cajero-bar  { flex:2; }
-.cajero-bar-bg { background:#F0EEF8; border-radius:99px; height:8px; }
+.cajero-bar-bg { background:#F0EEF8; border-radius:99px; height:6px; }
 .cajero-bar-fill { height:100%; border-radius:99px; background:var(--accent); }
-.cajero-val  { font-size:13px; font-weight:800; color:var(--gold);
+.cajero-val  { font-size:11px; font-weight:800; color:var(--gold);
                min-width:70px; text-align:right; }
 
 /* TOAST */
@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v86</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v87</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -495,14 +495,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="chart-card">
       <div class="chart-title">Ocupación actual</div>
       <div class="chart-sub">Autos en plaza en este momento</div>
-      <div style="display:flex;gap:16px;font-size:12px;font-weight:700;margin-bottom:6px" title="IN = autos dentro ahora · OUT = tickets del período que ya salieron">
+      <div style="display:flex;gap:12px;font-size:11px;font-weight:700;margin-bottom:4px" title="IN = autos dentro ahora · OUT = tickets del período que ya salieron">
         <span style="color:#0A66C2">🅿 IN: <span id="stat-in">0</span></span>
         <span style="color:#6E6E73">↗ OUT: <span id="stat-out">0</span></span>
       </div>
       <div class="ocupacion-wrap">
         <div class="gauge-num">
           <div class="gauge-pct" id="gauge-pct">0%</div>
-          <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 40</div>
+          <div style="font-size:10px;color:var(--muted)" id="gauge-sub">0 / 40</div>
         </div>
         <div class="gauge-bar-wrap">
           <div class="gauge-bar-bg">
@@ -513,22 +513,22 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
             <span>50%</span>
             <span>100% (40)</span>
           </div>
-          <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('normal')" title="Ver detalle">
-              <div style="font-size:10px;color:var(--muted);font-weight:700">Normales</div>
-              <div style="font-size:20px;font-weight:900;color:#0A66C2" id="ocu-normal">0</div>
+          <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div style="background:#F0EEF8;border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('normal')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Normales</div>
+              <div style="font-size:14px;font-weight:900;color:#0A66C2" id="ocu-normal">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('preferencial')" title="Ver detalle">
-              <div style="font-size:10px;color:var(--muted);font-weight:700">Preferenciales</div>
-              <div style="font-size:20px;font-weight:900;color:#7B5EA7" id="ocu-pref">0</div>
+            <div style="background:#F0EEF8;border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('preferencial')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Preferenciales</div>
+              <div style="font-size:14px;font-weight:900;color:#7B5EA7" id="ocu-pref">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('empleado')" title="Ver detalle">
-              <div style="font-size:10px;color:var(--muted);font-weight:700">Empleados</div>
-              <div style="font-size:20px;font-weight:900;color:#1D3557" id="ocu-empleado">0</div>
+            <div style="background:#F0EEF8;border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('empleado')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Empleados</div>
+              <div style="font-size:14px;font-weight:900;color:#1D3557" id="ocu-empleado">0</div>
             </div>
-            <div style="background:#F0EEF8;border-radius:8px;padding:10px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('pension')" title="Ver detalle">
-              <div style="font-size:10px;color:var(--muted);font-weight:700">Pensión</div>
-              <div style="font-size:20px;font-weight:900;color:#0D9457" id="ocu-pension">0</div>
+            <div style="background:#F0EEF8;border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipo('pension')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Pensión</div>
+              <div style="font-size:14px;font-weight:900;color:#0D9457" id="ocu-pension">0</div>
             </div>
           </div>
         </div>
@@ -539,8 +539,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="chart-card">
       <div class="chart-title">Desglose Ticket</div>
       <div class="chart-sub">Normal · Preferente · Perdido · Cortesía (≤15 min) · Pensión · Empleado · clic para ver detalle</div>
-      <div style="display:flex;gap:10px;margin-bottom:10px" id="desglose-pagos"></div>
-      <div id="mix-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+      <div style="display:flex;gap:6px;margin-bottom:6px" id="desglose-pagos"></div>
+      <div id="mix-bars" style="display:flex;flex-direction:column;gap:4px;margin-top:4px"></div>
     </div>
 
     <!-- Ranking cajeros -->
@@ -565,14 +565,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="chart-card">
       <div class="chart-title">Actividad — Período actual</div>
       <div class="chart-sub">Número de tickets por hora · clic en barra para ver detalle</div>
-      <div style="display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px" id="actividad-horas"></div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:4px" id="actividad-horas"></div>
     </div>
 
     <!-- Actividad: número de tickets por hora, periodo anterior comparable -->
     <div class="chart-card">
       <div class="chart-title">Actividad — Período anterior</div>
       <div class="chart-sub" id="actividad-anterior-sub">Mismo rango de días, inmediatamente anterior</div>
-      <div style="display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px" id="actividad-horas-anterior"></div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:70px;margin-top:4px" id="actividad-horas-anterior"></div>
     </div>
   </div>
 
@@ -933,12 +933,12 @@ function renderFranjas() {
     const pct = Math.round(cnt/total*100);
     const color = FRANJA_ADMIN_COLOR[k];
     return `<div onclick="drillFranja('${k}')" style="cursor:pointer">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
         <span style="font-weight:700;color:${color}">${FRANJA_ADMIN_LABEL[k]}</span>
         <span style="color:var(--muted)">${cnt} ops · ${fmt$(montos[k])}</span>
         <span style="font-weight:700">${pct}%</span>
       </div>
-      <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
+      <div style="background:#F0EEF8;border-radius:99px;height:6px;overflow:hidden">
         <div style="width:${pct}%;height:100%;border-radius:99px;background:${color};transition:width .5s"></div>
       </div>
     </div>`;
@@ -989,12 +989,12 @@ function renderMix(ops) {
     const pct = Math.round(cnt/total*100);
     const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
     return `<div onclick="drillTipo('${key}')" style="cursor:pointer">
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
         <span style="font-weight:700;color:${b.color}">${b.label}</span>
         <span style="color:var(--muted)">${cnt} ops · ${fmt$(ing)}</span>
         <span style="font-weight:700">${pct}%</span>
       </div>
-      <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
+      <div style="background:#F0EEF8;border-radius:99px;height:6px;overflow:hidden">
         <div style="width:${pct}%;height:100%;border-radius:99px;background:${b.color};transition:width .5s"></div>
       </div>
     </div>`;
@@ -1005,13 +1005,13 @@ function renderMix(ops) {
   const noPagados = ops.length - pagados;
   const elPagos = document.getElementById('desglose-pagos');
   if (elPagos) elPagos.innerHTML = `
-    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(true)">
-      <div style="font-size:18px;font-weight:900;color:#0D9457">${pagados}</div>
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
+    <div style="background:#F0EEF8;border-radius:6px;padding:4px 8px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(true)">
+      <div style="font-size:14px;font-weight:900;color:#0D9457">${pagados}</div>
+      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
     </div>
-    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(false)">
-      <div style="font-size:18px;font-weight:900;color:#888">${noPagados}</div>
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
+    <div style="background:#F0EEF8;border-radius:6px;padding:4px 8px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(false)">
+      <div style="font-size:14px;font-weight:900;color:#888">${noPagados}</div>
+      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
     </div>`;
 }
 
@@ -1068,12 +1068,12 @@ function renderActividadHoraria() {
   const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
   const max = Math.max(...conteos, 1);
   el.innerHTML = horas.map((h,i) => `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer"
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer"
          onclick="drillHora(${h})">
-      <div style="font-size:9px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
-      <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;
-           height:${conteos[i]/max*80}px;min-height:2px;transition:height .5s"></div>
-      <div style="font-size:8px;color:var(--muted)">${h}</div>
+      <div style="font-size:7px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
+      <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;
+           height:${conteos[i]/max*40}px;min-height:2px;transition:height .5s"></div>
+      <div style="font-size:6px;color:var(--muted)">${h}</div>
     </div>`).join('');
 }
 
@@ -1100,11 +1100,11 @@ function renderActividadHorariaAnterior() {
   const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
   const max = Math.max(...conteos, 1);
   el.innerHTML = horas.map((h,i) => `
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-      <div style="font-size:9px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
-      <div style="width:100%;background:#B8A9D9;border-radius:4px 4px 0 0;
-           height:${conteos[i]/max*80}px;min-height:2px;transition:height .5s"></div>
-      <div style="font-size:8px;color:var(--muted)">${h}</div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+      <div style="font-size:7px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
+      <div style="width:100%;background:#B8A9D9;border-radius:3px 3px 0 0;
+           height:${conteos[i]/max*40}px;min-height:2px;transition:height .5s"></div>
+      <div style="font-size:6px;color:var(--muted)">${h}</div>
     </div>`).join('');
 }
 function drillHora(h) {
