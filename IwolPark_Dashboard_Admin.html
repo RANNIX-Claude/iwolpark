@@ -246,7 +246,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v72</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v73</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -487,31 +487,39 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <!-- Ingresos por franja horaria -->
     <div class="chart-card">
       <div class="chart-title">Ingresos por franja horaria</div>
-      <div class="chart-sub">Clic en barra para ver detalle · Matutino 07–12 · Vespertino 12–19 · Nocturno 19–07</div>
+      <div class="chart-sub">Clic en barra para ver detalle · 05–09 · 09–14 · 14–22 · 22–05</div>
       <div class="franja-bars" id="franja-bars">
         <div class="franja-col">
-          <div class="franja-value" id="fv-mat">$0</div>
+          <div class="franja-value" id="fv-f1">$0</div>
           <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-mat" style="background:#0A66C2;height:0%"
-                 onclick="drillFranja('Matutino')"></div>
+            <div class="franja-bar" id="fb-f1" style="background:#0A66C2;height:0%"
+                 onclick="drillFranja('f1')"></div>
           </div>
-          <div class="franja-label">Matutino<br>07–12</div>
+          <div class="franja-label">05:00<br>09:00</div>
         </div>
         <div class="franja-col">
-          <div class="franja-value" id="fv-ves">$0</div>
+          <div class="franja-value" id="fv-f2">$0</div>
           <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-ves" style="background:#7B5EA7;height:0%"
-                 onclick="drillFranja('Vespertino')"></div>
+            <div class="franja-bar" id="fb-f2" style="background:#7B5EA7;height:0%"
+                 onclick="drillFranja('f2')"></div>
           </div>
-          <div class="franja-label">Vespertino<br>12–19</div>
+          <div class="franja-label">09:00<br>14:00</div>
         </div>
         <div class="franja-col">
-          <div class="franja-value" id="fv-noc">$0</div>
+          <div class="franja-value" id="fv-f3">$0</div>
           <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-noc" style="background:#F5A623;height:0%"
-                 onclick="drillFranja('Nocturno')"></div>
+            <div class="franja-bar" id="fb-f3" style="background:#F5A623;height:0%"
+                 onclick="drillFranja('f3')"></div>
           </div>
-          <div class="franja-label">Nocturno<br>19–07</div>
+          <div class="franja-label">14:00<br>22:00</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-f4">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-f4" style="background:#4A4A4A;height:0%"
+                 onclick="drillFranja('f4')"></div>
+          </div>
+          <div class="franja-label">22:00<br>05:00</div>
         </div>
       </div>
     </div>
@@ -713,7 +721,10 @@ async function cargarDatos() {
       hora_entrada: o.hora_entrada || '—',
       hora_salida:  o.hora_salida || '—',
       minutos:      o.minutos_estancia || 0,
-      franja:       o.franja || '—',
+      // Recalculada desde hora_entrada, no leída de tickets.franja (columna
+      // histórica con el esquema anterior de 3 franjas) — así el desglose es
+      // correcto también sobre tickets viejos.
+      franja:       franjaLabelDeHora(o.hora_entrada),
       importe:      parseFloat(o.importe) || 0,
       fecha:        o.fecha_op || desde
     }));
@@ -789,15 +800,15 @@ function generarDatosDemo() {
                : t==='perdido' ? 150+15*(1+Math.floor(Math.random()*3))
                : 0;
     const h = 7 + Math.floor(Math.random()*15);
-    const franja = h<12?'Matutino':h<19?'Vespertino':'Nocturno';
+    const hora_entrada = `${String(h).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`;
     ops.push({
       folio: 'UFC-'+(829+i),
       tipo: t,
       cajero: cajeros[Math.floor(Math.random()*cajeros.length)],
-      hora_entrada: `${String(h).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
+      hora_entrada,
       hora_salida:  `${String(h+1+Math.floor(Math.random()*2)).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`,
       minutos: 15 + Math.floor(Math.random()*120),
-      franja,
+      franja: franjaLabelDeHora(hora_entrada),
       importe: imp
     });
   }
@@ -836,17 +847,36 @@ function renderKPIs(ops) {
   document.getElementById('kpi-ticket-sub').textContent  = 'Tiempo prom: ' + Math.round(minProm) + ' min';
 }
 
+// Franja horaria (Fase F, tablero ampliado): 4 bloques de 24h, recalculados
+// EN VIVO desde hora_entrada — no se lee tickets.franja (columna histórica,
+// guardada con el esquema anterior de 3 franjas) para que el widget sea
+// correcto también sobre datos viejos, sin depender de una migración.
+const FRANJAS_ADMIN = [
+  { key:'f1', test:h => h>=5 && h<9 },
+  { key:'f2', test:h => h>=9 && h<14 },
+  { key:'f3', test:h => h>=14 && h<22 },
+  { key:'f4', test:h => h>=22 || h<5 }
+];
+function franjaKeyDeOp(o) {
+  const h = parseInt((o.hora_entrada||'0').split(':')[0]);
+  const f = FRANJAS_ADMIN.find(f => f.test(h));
+  return f ? f.key : null;
+}
+const FRANJA_ADMIN_LABEL = {f1:'05:00–09:00',f2:'09:00–14:00',f3:'14:00–22:00',f4:'22:00–05:00'};
+function franjaLabelDeHora(horaStr) {
+  const h = parseInt((horaStr||'').split(':')[0]);
+  if (isNaN(h)) return '—';
+  const f = FRANJAS_ADMIN.find(f => f.test(h));
+  return f ? FRANJA_ADMIN_LABEL[f.key] : '—';
+}
 function renderFranjas(ops) {
-  const mat = ops.filter(o=>o.franja==='Matutino').reduce((s,o)=>s+o.importe,0);
-  const ves = ops.filter(o=>o.franja==='Vespertino').reduce((s,o)=>s+o.importe,0);
-  const noc = ops.filter(o=>o.franja==='Nocturno').reduce((s,o)=>s+o.importe,0);
-  const max = Math.max(mat,ves,noc,1);
-  document.getElementById('fv-mat').textContent = fmt$(mat);
-  document.getElementById('fv-ves').textContent = fmt$(ves);
-  document.getElementById('fv-noc').textContent = fmt$(noc);
-  document.getElementById('fb-mat').style.height = (mat/max*90)+'%';
-  document.getElementById('fb-ves').style.height = (ves/max*90)+'%';
-  document.getElementById('fb-noc').style.height = (noc/max*90)+'%';
+  const montos = {f1:0,f2:0,f3:0,f4:0};
+  ops.forEach(o => { const k = franjaKeyDeOp(o); if (k) montos[k] += o.importe; });
+  const max = Math.max(montos.f1,montos.f2,montos.f3,montos.f4,1);
+  ['f1','f2','f3','f4'].forEach(k => {
+    document.getElementById('fv-'+k).textContent = fmt$(montos[k]);
+    document.getElementById('fb-'+k).style.height = (montos[k]/max*90)+'%';
+  });
 }
 
 function renderOcupacion() {
@@ -985,9 +1015,9 @@ function drillDown(tipo) {
   panel.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-function drillFranja(franja) {
-  const ops = DATOS.operaciones.filter(o=>o.franja===franja);
-  drillGenerico('Franja: '+franja, ops);
+function drillFranja(key) {
+  const ops = DATOS.operaciones.filter(o => franjaKeyDeOp(o) === key);
+  drillGenerico('Franja: '+(FRANJA_ADMIN_LABEL[key]||key), ops);
 }
 
 function drillTipo(tipo) {
