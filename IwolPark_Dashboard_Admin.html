@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v87</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v88</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -1550,6 +1550,15 @@ async function cargarEmpleados() {
   } catch (e) { renderEmpleados([]); }
 }
 
+// Escapa para insertar de forma segura dentro de un atributo HTML
+// entrecomillado (" ") — antes el nombre se interpolaba directo en un
+// onclick="..." con comillas simples propias; un nombre con comillas dobles,
+// simples o &/< rompía el atributo y el botón quedaba muerto sin avisar.
+function escHtmlAttr(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function renderEmpleados(empleados) {
   document.getElementById('empleados-count').textContent = empleados.length;
   const cont = document.getElementById('lista-empleados');
@@ -1559,15 +1568,24 @@ function renderEmpleados(empleados) {
   }
   cont.innerHTML = empleados.map(e => `
     <div class="cajero-list-row">
-      <span style="flex:1;font-weight:700">${e.nombre_completo}</span>
-      <span style="color:var(--muted)">${e.puesto || '—'}</span>
-      <span style="color:var(--muted)">${e.area || '—'}</span>
+      <span style="flex:1;font-weight:700">${escHtmlAttr(e.nombre_completo)}</span>
+      <span style="color:var(--muted)">${escHtmlAttr(e.puesto) || '—'}</span>
+      <span style="color:var(--muted)">${escHtmlAttr(e.area) || '—'}</span>
       ${e.activo ? '' : '<span class="estado-inactivo">Inactivo</span>'}
       <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
-              onclick="toggleEmpleado(${e.id}, ${!e.activo})">${e.activo ? 'Desactivar' : 'Activar'}</button>
+              data-id="${e.id}" data-activo="${e.activo}" onclick="toggleEmpleadoBtn(this)">${e.activo ? 'Desactivar' : 'Activar'}</button>
       <button class="param-btn outline" style="padding:4px 10px;font-size:11px;color:var(--red);border-color:var(--red)"
-              onclick="eliminarEmpleado(${e.id}, '${(e.nombre_completo||'').replace(/'/g,"\\'")}')">Eliminar</button>
+              data-id="${e.id}" data-nombre="${escHtmlAttr(e.nombre_completo)}" onclick="eliminarEmpleadoBtn(this)">Eliminar</button>
     </div>`).join('');
+}
+// Los botones leen id/nombre de data-* (no de un onclick con la cadena ya
+// interpolada) — así un nombre con comillas/& nunca rompe el atributo ni
+// deja el botón sin funcionar.
+function toggleEmpleadoBtn(btn) {
+  toggleEmpleado(btn.dataset.id, btn.dataset.activo !== 'true');
+}
+function eliminarEmpleadoBtn(btn) {
+  eliminarEmpleado(btn.dataset.id, btn.dataset.nombre);
 }
 
 async function agregarEmpleado() {
