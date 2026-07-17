@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v85</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v86</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -257,7 +257,7 @@ function fmtMoney(n) { return '$'+Math.round(n||0).toLocaleString('es-MX'); }
 // deriva de importe=0 en normal/preferencial (tolerancia ≤15min), no del
 // campo tipo — ver Fase G para el detalle de por qué.
 const DESGLOSE_DEM = {
-  pagado:       { label:'Pagado',            color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
+  pagado:       { label:'Normal',             color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
   preferencial: { label:'Preferente',        color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && Number(o.importe)>0 },
   cortesia:     { label:'Cortesía (≤15min)', color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && Number(o.importe)===0 },
   pension:      { label:'Pensión',           color:'#0D9457', filter:o=>o.tipo==='pension' },

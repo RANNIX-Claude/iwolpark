@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v85</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v86</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -489,7 +489,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   </div>
 
   <!-- CHARTS ROW 1 -->
-  <div class="charts-grid">
+  <div class="charts-grid" style="grid-template-columns:repeat(3,1fr)">
 
     <!-- Ocupación actual -->
     <div class="chart-card">
@@ -535,45 +535,10 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
     </div>
 
-    <!-- Pagados y No pagados -->
-    <div class="chart-card">
-      <div class="chart-title">Pagados y No pagados</div>
-      <div class="chart-sub">Del período seleccionado · clic para ver detalle</div>
-      <div style="display:flex;align-items:center;gap:24px;margin-top:12px">
-        <svg width="120" height="120" viewBox="0 0 36 36" style="flex-shrink:0">
-          <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#F0EEF8" stroke-width="4"></circle>
-          <circle id="pie-pagados" cx="18" cy="18" r="15.9155" fill="none" stroke="#0D9457" stroke-width="4"
-                  stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
-          <circle id="pie-nopagados" cx="18" cy="18" r="15.9155" fill="none" stroke="#888" stroke-width="4"
-                  stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
-        </svg>
-        <div style="display:flex;flex-direction:column;gap:14px">
-          <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="drillPagados(true)">
-            <span style="width:12px;height:12px;border-radius:3px;background:#0D9457;display:inline-block"></span>
-            <div>
-              <div style="font-size:18px;font-weight:900;color:#0D9457" id="pie-pagados-num">0</div>
-              <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Pagados</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="drillPagados(false)">
-            <span style="width:12px;height:12px;border-radius:3px;background:#888;display:inline-block"></span>
-            <div>
-              <div style="font-size:18px;font-weight:900;color:#888" id="pie-nopagados-num">0</div>
-              <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">No pagados</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CHARTS ROW 2 -->
-  <div class="charts-grid">
-
     <!-- Desglose Ticket -->
     <div class="chart-card">
       <div class="chart-title">Desglose Ticket</div>
-      <div class="chart-sub">Pagado · Preferente · Perdido · Cortesía (≤15 min) · Pensión · Empleado · clic para ver detalle</div>
+      <div class="chart-sub">Normal · Preferente · Perdido · Cortesía (≤15 min) · Pensión · Empleado · clic para ver detalle</div>
       <div style="display:flex;gap:10px;margin-bottom:10px" id="desglose-pagos"></div>
       <div id="mix-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
     </div>
@@ -586,8 +551,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     </div>
   </div>
 
-  <!-- CHARTS ROW 3 -->
-  <div class="charts-grid">
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-grid" style="grid-template-columns:repeat(3,1fr)">
 
     <!-- Ingresos por franja horaria -->
     <div class="chart-card">
@@ -596,11 +561,18 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div id="franja-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
     </div>
 
-    <!-- Actividad: número de tickets por hora -->
+    <!-- Actividad: número de tickets por hora, periodo actual -->
     <div class="chart-card">
-      <div class="chart-title">Actividad</div>
+      <div class="chart-title">Actividad — Período actual</div>
       <div class="chart-sub">Número de tickets por hora · clic en barra para ver detalle</div>
       <div style="display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px" id="actividad-horas"></div>
+    </div>
+
+    <!-- Actividad: número de tickets por hora, periodo anterior comparable -->
+    <div class="chart-card">
+      <div class="chart-title">Actividad — Período anterior</div>
+      <div class="chart-sub" id="actividad-anterior-sub">Mismo rango de días, inmediatamente anterior</div>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px" id="actividad-horas-anterior"></div>
     </div>
   </div>
 
@@ -808,6 +780,21 @@ async function cargarDatos() {
       if (capRows[0]?.capacidad_total) DATOS.capacidad = capRows[0].capacidad_total;
     } catch (e) {}
 
+    // "Actividad — Período anterior": mismo número de días, inmediatamente
+    // antes del período seleccionado (Hoy→Ayer, Esta semana→semana pasada,
+    // Personalizado→mismo rango de días justo antes), para comparar el
+    // patrón de tickets por hora contra el período actual.
+    try {
+      const anterior = getFechasAnterior(desde, hasta);
+      const rAnt = await fetchPaginado(
+        `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${anterior.desde}&fecha_op=lte.${anterior.hasta}&select=hora_entrada,estatus`,
+        headers, 15000);
+      DATOS.todosDetalleAnterior = rAnt.filter(o => o.estatus !== 'cancelado');
+      const elSub = document.getElementById('actividad-anterior-sub');
+      if (elSub) elSub.textContent = anterior.desde === anterior.hasta
+        ? anterior.desde : (anterior.desde + ' a ' + anterior.hasta);
+    } catch (e) { DATOS.todosDetalleAnterior = []; }
+
     // Poblar select de cajeros
     const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
     const sel = document.getElementById('filtro-cajero');
@@ -866,6 +853,7 @@ function renderTodo() {
   renderRankingCajeros(ops);
   renderTabla(ops);
   renderActividadHoraria();
+  renderActividadHorariaAnterior();
 }
 
 function renderKPIs(ops) {
@@ -985,7 +973,7 @@ function renderOcupacion() {
 // con importe=0 (tolerancia ≤15 min), que es justo lo que el cliente pidió
 // poder contar como dimensión aparte del tipo.
 const DESGLOSE_BUCKETS = {
-  pagado:       { label:'Pagado',            color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
+  pagado:       { label:'Normal',             color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
   preferencial: { label:'Preferente',        color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && Number(o.importe)>0 },
   perdido:      { label:'Boleto perdido',    color:'#D93025', filter:o=>o.tipo==='perdido' },
   cortesia:     { label:'Cortesía (≤15min)', color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && Number(o.importe)===0 },
@@ -1017,30 +1005,14 @@ function renderMix(ops) {
   const noPagados = ops.length - pagados;
   const elPagos = document.getElementById('desglose-pagos');
   if (elPagos) elPagos.innerHTML = `
-    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1">
+    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(true)">
       <div style="font-size:18px;font-weight:900;color:#0D9457">${pagados}</div>
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
     </div>
-    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1">
+    <div style="background:#F0EEF8;border-radius:8px;padding:8px 14px;text-align:center;flex:1;cursor:pointer" onclick="drillPagados(false)">
       <div style="font-size:18px;font-weight:900;color:#888">${noPagados}</div>
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
     </div>`;
-
-  // Gráfica de pastel Pagados/No pagados — técnica de 2 arcos superpuestos
-  // sobre un círculo de radio 15.9155 (2πr ≈ 100), así el % mapea directo a
-  // stroke-dasharray sin necesitar trigonometría.
-  const totalPie = pagados + noPagados || 1;
-  const pctPagados = (pagados/totalPie)*100;
-  const pctNoPagados = 100 - pctPagados;
-  const circPagados = document.getElementById('pie-pagados');
-  const circNoPagados = document.getElementById('pie-nopagados');
-  if (circPagados && circNoPagados) {
-    circPagados.setAttribute('stroke-dasharray', pctPagados+' '+(100-pctPagados));
-    circNoPagados.setAttribute('stroke-dasharray', pctNoPagados+' '+(100-pctNoPagados));
-    circNoPagados.setAttribute('stroke-dashoffset', String(25-pctPagados));
-  }
-  document.getElementById('pie-pagados-num').textContent = pagados;
-  document.getElementById('pie-nopagados-num').textContent = noPagados;
 }
 
 // Tabla de movimientos unificada para TODOS los drill-down (Fase de detalle
@@ -1100,6 +1072,37 @@ function renderActividadHoraria() {
          onclick="drillHora(${h})">
       <div style="font-size:9px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
       <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;
+           height:${conteos[i]/max*80}px;min-height:2px;transition:height .5s"></div>
+      <div style="font-size:8px;color:var(--muted)">${h}</div>
+    </div>`).join('');
+}
+
+// Rango de fechas del "período anterior": mismo número de días que
+// [desde,hasta], inmediatamente antes — funciona para cualquier tipo de
+// período (Hoy→Ayer, Esta semana→semana pasada, Personalizado→mismo tamaño).
+function getFechasAnterior(desde, hasta) {
+  const d1 = new Date(desde+'T12:00:00');
+  const d2 = new Date(hasta+'T12:00:00');
+  const dias = Math.round((d2-d1)/86400000) + 1;
+  const finAnterior = new Date(d1); finAnterior.setDate(finAnterior.getDate()-1);
+  const iniAnterior = new Date(finAnterior); iniAnterior.setDate(iniAnterior.getDate()-(dias-1));
+  return { desde: fmtLocal(iniAnterior), hasta: fmtLocal(finAnterior) };
+}
+
+// Igual que renderActividadHoraria(), pero para el período anterior
+// comparable (DATOS.todosDetalleAnterior) — sin drill-down, es solo
+// referencia visual para comparar el patrón del día/semana/mes anterior.
+function renderActividadHorariaAnterior() {
+  const el = document.getElementById('actividad-horas-anterior');
+  if (!el) return;
+  const todos = DATOS.todosDetalleAnterior || [];
+  const horas = Array.from({length:24}, (_,i)=>i);
+  const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const max = Math.max(...conteos, 1);
+  el.innerHTML = horas.map((h,i) => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="font-size:9px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
+      <div style="width:100%;background:#B8A9D9;border-radius:4px 4px 0 0;
            height:${conteos[i]/max*80}px;min-height:2px;transition:height .5s"></div>
       <div style="font-size:8px;color:var(--muted)">${h}</div>
     </div>`).join('');
