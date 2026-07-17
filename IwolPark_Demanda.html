@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v74</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v75</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -125,11 +125,32 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
     </div>
   </div>
 
+  <!-- SEMANAL: evolución vs LW + desglose ticket -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">📈 Evolución por día (esta semana vs semana pasada)</div>
+      <div class="card-sub">Azul=esta semana · Dorado=semana pasada (LW)</div>
+      <div style="display:flex;gap:6px;margin-top:8px" id="evolucion-lw"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🎫 Desglose Ticket — esta semana</div>
+      <div class="card-sub">Lunes a hoy</div>
+      <div id="desglose-semana" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- SEMANAL: cajero x día -->
+  <div class="card">
+    <div class="card-title">👤 Ingresos por cajero y día — esta semana</div>
+    <div class="card-sub">Lunes a hoy · importe cobrado por día</div>
+    <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
+  </div>
+
   <!-- CURVAS -->
   <div class="grid2">
     <div class="card">
       <div class="card-title">⏰ Demanda promedio por hora</div>
-      <div class="card-sub">Azul=Matutino · Morado=Vespertino · Dorado=Nocturno</div>
+      <div class="card-sub">Azul=05-09 · Morado=09-14 · Dorado=14-22 · Gris=22-05</div>
       <div class="bar-chart" id="bars-hora"></div>
     </div>
     <div class="card">
@@ -142,8 +163,8 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <!-- FRANJAS -->
   <div class="card">
     <div class="card-title">🌅 Análisis por franja horaria</div>
-    <div class="card-sub">Matutino 07–12 · Vespertino 12–19 · Nocturno 19–07</div>
-    <div class="grid3" id="franjas-detail" style="margin-top:10px"></div>
+    <div class="card-sub">05:00–09:00 · 09:00–14:00 · 14:00–22:00 · 22:00–05:00</div>
+    <div class="grid3" id="franjas-detail" style="margin-top:10px;grid-template-columns:repeat(4,1fr)"></div>
   </div>
 
   <!-- INSIGHTS -->
@@ -169,6 +190,18 @@ let DEMANDA = {};
 
 function fmtVal(v) {
   return METRICA==='ingresos' ? ('$'+Math.round(v).toLocaleString('es-MX')) : (Math.round(v)+' autos');
+}
+
+// Franja horaria (Fase F/H, tablero ampliado): 4 bloques de 24h — reemplaza
+// el esquema anterior de 3 franjas (Matutino/Vespertino/Nocturno).
+const FRANJAS_DEM = [
+  { label:'05:00–09:00', color:'#0A66C2', bg:'#EFF6FF', horas:[5,6,7,8], test:h=>h>=5&&h<9 },
+  { label:'09:00–14:00', color:'#7B5EA7', bg:'#F3F0FF', horas:[9,10,11,12,13], test:h=>h>=9&&h<14 },
+  { label:'14:00–22:00', color:'#F5A623', bg:'#FFFBEB', horas:[14,15,16,17,18,19,20,21], test:h=>h>=14&&h<22 },
+  { label:'22:00–05:00', color:'#4A4A4A', bg:'#F0EEF8', horas:[22,23,0,1,2,3,4], test:h=>h>=22||h<5 }
+];
+function franjaDeHoraDem(h) {
+  return FRANJAS_DEM.find(f => f.test(h)) || FRANJAS_DEM[0];
 }
 function fechaADiaIdx(fechaStr) {
   const d = new Date(fechaStr+'T12:00:00');
@@ -205,6 +238,142 @@ async function cargarTicketsDemanda(semanas) {
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${fmt(desde)}&fecha_op=lte.${fmt(hasta)}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
     return await fetchPaginado(base, SB_HEADERS, 15000);
   } catch (e) { return []; }
+}
+
+// ══ SEMANAL: evolución vs LW, desglose ticket, cajero×día (Fase H) ══
+function fmtFechaLocal(d) {
+  const p2=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+}
+function lunesDeSemana(d) {
+  const dd = new Date(d);
+  dd.setDate(dd.getDate() - ((dd.getDay()+6)%7)); // Lun=inicio de semana
+  dd.setHours(0,0,0,0);
+  return dd;
+}
+function fmtMoney(n) { return '$'+Math.round(n||0).toLocaleString('es-MX'); }
+
+// Desglose Ticket (mismos 5 buckets que el tablero de Admin): "Cortesía" se
+// deriva de importe=0 en normal/preferencial (tolerancia ≤15min), no del
+// campo tipo — ver Fase G para el detalle de por qué.
+const DESGLOSE_DEM = {
+  pagado:       { label:'Pagado',            color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
+  preferencial: { label:'Preferente',        color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && Number(o.importe)>0 },
+  cortesia:     { label:'Cortesía (≤15min)', color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && Number(o.importe)===0 },
+  pension:      { label:'Pensión',           color:'#0D9457', filter:o=>o.tipo==='pension' },
+  empleado:     { label:'Empleado',          color:'#1D3557', filter:o=>o.tipo==='empleado' }
+};
+
+// Trae tickets cerrados de esta semana + la semana pasada (lunes a domingo),
+// con los campos extra (tipo/cajero/estatus) que no necesita el heatmap.
+async function cargarSemanaActualYAnterior() {
+  const hoy = new Date();
+  const lunesActual = lunesDeSemana(hoy);
+  const lunesPasado = new Date(lunesActual); lunesPasado.setDate(lunesPasado.getDate()-7);
+  const desde = fmtFechaLocal(lunesPasado), hasta = fmtFechaLocal(hoy);
+  try {
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,hora_entrada,tipo,cajero,importe,estatus&order=fecha_op.asc`;
+    const rows = await fetchPaginado(base, SB_HEADERS, 8000);
+    const cerrados = rows.filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+    return { cerrados, lunesActualStr: fmtFechaLocal(lunesActual), lunesPasadoStr: fmtFechaLocal(lunesPasado) };
+  } catch (e) { return { cerrados: [], lunesActualStr: fmtFechaLocal(lunesActual), lunesPasadoStr: fmtFechaLocal(lunesPasado) }; }
+}
+
+// Agrupa tickets en 7 cubetas (Lun..Dom) a partir del lunes dado.
+function agruparPorDiaSemana(rows, lunesStr) {
+  const lunes = new Date(lunesStr+'T12:00:00');
+  const out = DIAS.map(()=>({tickets:0,importe:0}));
+  rows.forEach(t => {
+    const fd = new Date(t.fecha_op+'T12:00:00');
+    const idx = Math.round((fd-lunes)/86400000);
+    if (idx>=0 && idx<7) { out[idx].tickets++; out[idx].importe += Number(t.importe)||0; }
+  });
+  return out;
+}
+
+function renderEvolucionLW(cerrados, lunesActualStr, lunesPasadoStr) {
+  const actual = agruparPorDiaSemana(cerrados.filter(t=>t.fecha_op>=lunesActualStr), lunesActualStr);
+  const pasada = agruparPorDiaSemana(cerrados.filter(t=>t.fecha_op>=lunesPasadoStr && t.fecha_op<lunesActualStr), lunesPasadoStr);
+  const val = d => METRICA==='ingresos' ? d.importe : d.tickets;
+  const fmt = v => METRICA==='ingresos' ? fmtMoney(v) : Math.round(v);
+  const max = Math.max(...actual.map(val), ...pasada.map(val), 1);
+  const H = 100;
+  document.getElementById('evolucion-lw').innerHTML = DIAS.map((dia,i) => {
+    const hA = Math.round(val(actual[i])/max*H), hP = Math.round(val(pasada[i])/max*H);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="display:flex;gap:3px;align-items:flex-end;height:${H}px"
+           onmouseenter="tt(event,'${dia} · esta semana: ${fmt(val(actual[i]))} · LW: ${fmt(val(pasada[i]))}')"
+           onmouseleave="ht()">
+        <div style="width:14px;border-radius:4px 4px 0 0;background:#0A66C2;height:${hA}px;min-height:2px"></div>
+        <div style="width:14px;border-radius:4px 4px 0 0;background:#F5A623;height:${hP}px;min-height:2px"></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);font-weight:700">${dia}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDesgloseSemana(ticketsSemana) {
+  const total = ticketsSemana.length || 1;
+  document.getElementById('desglose-semana').innerHTML = Object.values(DESGLOSE_DEM).map(b => {
+    const subset = ticketsSemana.filter(b.filter);
+    const cnt = subset.length, pct = Math.round(cnt/total*100);
+    const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
+    return `<div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span style="font-weight:700;color:${b.color}">${b.label}</span>
+        <span style="color:var(--muted)">${cnt} ops · ${fmtMoney(ing)}</span>
+        <span style="font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;border-radius:99px;background:${b.color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
+  const lunes = new Date(lunesActualStr+'T12:00:00');
+  const porCajero = {};
+  ticketsSemana.forEach(t => {
+    const cj = t.cajero || 'Sin cajero';
+    if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
+    const fd = new Date(t.fecha_op+'T12:00:00');
+    const idx = Math.round((fd-lunes)/86400000);
+    if (idx>=0 && idx<7) porCajero[cj][idx] += Number(t.importe)||0;
+  });
+  const filas = Object.entries(porCajero).sort((a,b) =>
+    b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
+  const el = document.getElementById('tabla-cajero-dia');
+  if (!filas.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
+    return;
+  }
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:7px">Cajero</th>
+        ${DIAS.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+        <th style="padding:7px;text-align:right">Suma días</th>
+      </tr></thead>
+      <tbody>
+      ${filas.map(([cj,vals]) => {
+        const total = vals.reduce((s,v)=>s+v,0);
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:7px;font-weight:700">${cj}</td>
+          ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmtMoney(v):'—'}</td>`).join('')}
+          <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple)">${fmtMoney(total)}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function renderSemanaWidgets() {
+  const { cerrados, lunesActualStr, lunesPasadoStr } = await cargarSemanaActualYAnterior();
+  renderEvolucionLW(cerrados, lunesActualStr, lunesPasadoStr);
+  const ticketsSemana = cerrados.filter(t => t.fecha_op >= lunesActualStr);
+  renderDesgloseSemana(ticketsSemana);
+  renderTablaCajeroDia(ticketsSemana, lunesActualStr);
 }
 
 // Construye {dia:{hora:valor}} — 'autos' = promedio de entradas por hora en ese
@@ -256,6 +425,7 @@ async function render() {
   renderBarsDia(max);
   renderFranjas();
   renderInsights();
+  renderSemanaWidgets();
 }
 
 function renderKPIs() {
@@ -285,7 +455,7 @@ function renderHeatmap(max) {
     HORAS.forEach(h=>{
       const val=DEMANDA[dia][h];
       const {bg,text}=heatColor(val,max);
-      const fr=h>=7&&h<12?'Matutino':h>=12&&h<19?'Vespertino':'Nocturno';
+      const fr=franjaDeHoraDem(h).label;
       html+=`<div class="hm-cell" style="background:${bg};color:${text}"
         onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${fmtVal(val)} · ${fr}'"
         onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal(val)} (${fr})')"
@@ -305,7 +475,7 @@ function renderBarsHora(max) {
     return Math.round(s/DIAS.length);
   });
   const mx=Math.max(...prom);
-  const col=h=>h>=7&&h<12?'#0A66C2':h>=12&&h<19?'#7B5EA7':'#F5A623';
+  const col=h=>franjaDeHoraDem(h).color;
   document.getElementById('bars-hora').innerHTML=prom.map((v,h)=>`
     <div class="bar-col" onmouseenter="tt(event,'${h}:00 → prom. ${fmtVal(v)}')" onmouseleave="ht()">
       <div class="bar-val">${h%4===0?v:''}</div>
@@ -330,11 +500,8 @@ function renderBarsDia(max) {
 }
 
 function renderFranjas() {
-  const franjas=[
-    {n:'🌅 Matutino',h:[7,8,9,10,11],c:'#0A66C2',bg:'#EFF6FF'},
-    {n:'☀ Vespertino',h:[12,13,14,15,16,17,18],c:'#7B5EA7',bg:'#F3F0FF'},
-    {n:'🌙 Nocturno',h:[19,20,21,22,23,0,1,2,3,4,5,6],c:'#F5A623',bg:'#FFFBEB'},
-  ];
+  const iconos=['🌅','🌤','☀','🌙'];
+  const franjas=FRANJAS_DEM.map((f,i)=>({n:iconos[i]+' '+f.label,h:f.horas,c:f.color,bg:f.bg}));
   document.getElementById('franjas-detail').innerHTML=franjas.map(f=>{
     const vals=[];
     DIAS.forEach(d=>f.h.forEach(h=>vals.push(DEMANDA[d][h])));
