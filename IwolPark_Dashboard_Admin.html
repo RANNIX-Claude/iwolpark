@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v82</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v83</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -860,7 +860,7 @@ function generarDatosDemo() {
 function renderTodo() {
   const ops = DATOS.operaciones;
   renderKPIs(ops);
-  renderFranjas(ops);
+  renderFranjas();
   renderOcupacion();
   renderMix(ops);
   renderRankingCajeros(ops);
@@ -929,11 +929,17 @@ function franjaLabelDeHora(horaStr) {
   return f ? FRANJA_ADMIN_LABEL[f.key] : '—';
 }
 const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623',f4:'#4A4A4A'};
-function renderFranjas(ops) {
+// Usa DATOS.todosDetalle (abiertos + cerrados), NO solo DATOS.operaciones
+// (cerrados) — antes esta tarjeta y "Actividad" (número de tickets por
+// hora, que sí cuenta todo) no reconciliaban: la suma de horas de una
+// franja en Actividad nunca coincidía con el conteo de esa franja aquí.
+// El importe sigue siendo el ingreso real (los abiertos aportan $0).
+function renderFranjas() {
+  const todos = DATOS.todosDetalle || [];
   const montos = {f1:0,f2:0,f3:0,f4:0};
   const cuentas = {f1:0,f2:0,f3:0,f4:0};
-  ops.forEach(o => { const k = franjaKeyDeOp(o); if (k) { montos[k] += o.importe; cuentas[k]++; } });
-  const total = ops.length || 1;
+  todos.forEach(o => { const k = franjaKeyDeOp(o); if (k) { montos[k] += (Number(o.importe)||0); cuentas[k]++; } });
+  const total = todos.length || 1;
   const el = document.getElementById('franja-bars');
   el.innerHTML = ['f1','f2','f3','f4'].map(k => {
     const cnt = cuentas[k];
@@ -1213,7 +1219,9 @@ function drillDown(tipo) {
 }
 
 function drillFranja(key) {
-  const ops = DATOS.operaciones.filter(o => franjaKeyDeOp(o) === key);
+  // Mismo origen (todosDetalle) que renderFranjas(), para que el detalle
+  // que se abre coincida exactamente con el conteo mostrado en la tarjeta.
+  const ops = (DATOS.todosDetalle||[]).filter(o => franjaKeyDeOp(o) === key);
   drillGenerico('Franja: '+(FRANJA_ADMIN_LABEL[key]||key), ops);
 }
 
