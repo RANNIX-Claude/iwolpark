@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v79</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v80</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -491,46 +491,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <!-- CHARTS ROW 1 -->
   <div class="charts-grid">
 
-    <!-- Ingresos por franja horaria -->
-    <div class="chart-card">
-      <div class="chart-title">Ingresos por franja horaria</div>
-      <div class="chart-sub">Clic en barra para ver detalle · 05–09 · 09–14 · 14–22 · 22–05</div>
-      <div class="franja-bars" id="franja-bars">
-        <div class="franja-col">
-          <div class="franja-value" id="fv-f1">$0</div>
-          <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-f1" style="background:#0A66C2;height:0%"
-                 onclick="drillFranja('f1')"></div>
-          </div>
-          <div class="franja-label">05:00<br>09:00</div>
-        </div>
-        <div class="franja-col">
-          <div class="franja-value" id="fv-f2">$0</div>
-          <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-f2" style="background:#7B5EA7;height:0%"
-                 onclick="drillFranja('f2')"></div>
-          </div>
-          <div class="franja-label">09:00<br>14:00</div>
-        </div>
-        <div class="franja-col">
-          <div class="franja-value" id="fv-f3">$0</div>
-          <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-f3" style="background:#F5A623;height:0%"
-                 onclick="drillFranja('f3')"></div>
-          </div>
-          <div class="franja-label">14:00<br>22:00</div>
-        </div>
-        <div class="franja-col">
-          <div class="franja-value" id="fv-f4">$0</div>
-          <div class="franja-bar-wrap">
-            <div class="franja-bar" id="fb-f4" style="background:#4A4A4A;height:0%"
-                 onclick="drillFranja('f4')"></div>
-          </div>
-          <div class="franja-label">22:00<br>05:00</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Ocupación actual -->
     <div class="chart-card">
       <div class="chart-title">Ocupación actual</div>
@@ -574,6 +534,37 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         </div>
       </div>
     </div>
+
+    <!-- Pagados y No pagados -->
+    <div class="chart-card">
+      <div class="chart-title">Pagados y No pagados</div>
+      <div class="chart-sub">Del período seleccionado · clic para ver detalle</div>
+      <div style="display:flex;align-items:center;gap:24px;margin-top:12px">
+        <svg width="120" height="120" viewBox="0 0 36 36" style="flex-shrink:0">
+          <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#F0EEF8" stroke-width="4"></circle>
+          <circle id="pie-pagados" cx="18" cy="18" r="15.9155" fill="none" stroke="#0D9457" stroke-width="4"
+                  stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
+          <circle id="pie-nopagados" cx="18" cy="18" r="15.9155" fill="none" stroke="#888" stroke-width="4"
+                  stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="drillPagados(true)">
+            <span style="width:12px;height:12px;border-radius:3px;background:#0D9457;display:inline-block"></span>
+            <div>
+              <div style="font-size:18px;font-weight:900;color:#0D9457" id="pie-pagados-num">0</div>
+              <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">Pagados</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="drillPagados(false)">
+            <span style="width:12px;height:12px;border-radius:3px;background:#888;display:inline-block"></span>
+            <div>
+              <div style="font-size:18px;font-weight:900;color:#888" id="pie-nopagados-num">0</div>
+              <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase">No pagados</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- CHARTS ROW 2 -->
@@ -592,6 +583,57 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="chart-title">Rendimiento por cajero</div>
       <div class="chart-sub">Clic para ver detalle del turno</div>
       <div id="cajero-ranking"></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 3 -->
+  <div class="charts-grid">
+
+    <!-- Ingresos por franja horaria -->
+    <div class="chart-card">
+      <div class="chart-title">Ingresos por franja horaria</div>
+      <div class="chart-sub">Clic en barra para ver detalle · 05–09 · 09–14 · 14–22 · 22–05</div>
+      <div class="franja-bars" id="franja-bars">
+        <div class="franja-col">
+          <div class="franja-value" id="fv-f1">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-f1" style="background:#0A66C2;height:0%"
+                 onclick="drillFranja('f1')"></div>
+          </div>
+          <div class="franja-label">05:00<br>09:00</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-f2">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-f2" style="background:#7B5EA7;height:0%"
+                 onclick="drillFranja('f2')"></div>
+          </div>
+          <div class="franja-label">09:00<br>14:00</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-f3">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-f3" style="background:#F5A623;height:0%"
+                 onclick="drillFranja('f3')"></div>
+          </div>
+          <div class="franja-label">14:00<br>22:00</div>
+        </div>
+        <div class="franja-col">
+          <div class="franja-value" id="fv-f4">$0</div>
+          <div class="franja-bar-wrap">
+            <div class="franja-bar" id="fb-f4" style="background:#4A4A4A;height:0%"
+                 onclick="drillFranja('f4')"></div>
+          </div>
+          <div class="franja-label">22:00<br>05:00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actividad: número de tickets por hora -->
+    <div class="chart-card">
+      <div class="chart-title">Actividad</div>
+      <div class="chart-sub">Número de tickets por hora · clic en barra para ver detalle</div>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px" id="actividad-horas"></div>
     </div>
   </div>
 
@@ -849,6 +891,7 @@ function renderTodo() {
   renderMix(ops);
   renderRankingCajeros(ops);
   renderTabla(ops);
+  renderActividadHoraria();
 }
 
 function renderKPIs(ops) {
@@ -982,6 +1025,78 @@ function renderMix(ops) {
       <div style="font-size:18px;font-weight:900;color:#888">${noPagados}</div>
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
     </div>`;
+
+  // Gráfica de pastel Pagados/No pagados — técnica de 2 arcos superpuestos
+  // sobre un círculo de radio 15.9155 (2πr ≈ 100), así el % mapea directo a
+  // stroke-dasharray sin necesitar trigonometría.
+  const totalPie = pagados + noPagados || 1;
+  const pctPagados = (pagados/totalPie)*100;
+  const pctNoPagados = 100 - pctPagados;
+  const circPagados = document.getElementById('pie-pagados');
+  const circNoPagados = document.getElementById('pie-nopagados');
+  if (circPagados && circNoPagados) {
+    circPagados.setAttribute('stroke-dasharray', pctPagados+' '+(100-pctPagados));
+    circNoPagados.setAttribute('stroke-dasharray', pctNoPagados+' '+(100-pctNoPagados));
+    circNoPagados.setAttribute('stroke-dashoffset', String(25-pctPagados));
+  }
+  document.getElementById('pie-pagados-num').textContent = pagados;
+  document.getElementById('pie-nopagados-num').textContent = noPagados;
+}
+
+function drillPagados(esPagado) {
+  const ops = DATOS.operaciones.filter(o => (Number(o.importe)>0) === esPagado);
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = esPagado ? '💰 Pagados' : '🚫 No pagados';
+  document.getElementById('drill-path').textContent = 'Inicio → ' + (esPagado?'Pagados':'No pagados');
+  document.getElementById('drill-content').innerHTML = ops.length ? `
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Entrada</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.tipo}</td><td>${o.cajero}</td><td>${o.hora_entrada}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${o.importe?fmt$(o.importe):'$0.00'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en esta categoría</div>';
+  panel.classList.add('open');
+}
+
+// Actividad: número de tickets por hora (Fase de layout, mockup "Entrada de
+// autos x hora") — a partir de DATOS.todosDetalle (abiertos + cerrados del
+// período), agrupado por hora de entrada.
+function renderActividadHoraria() {
+  const el = document.getElementById('actividad-horas');
+  if (!el) return;
+  const todos = DATOS.todosDetalle || [];
+  const horas = Array.from({length:24}, (_,i)=>i);
+  const conteos = horas.map(h => todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const max = Math.max(...conteos, 1);
+  el.innerHTML = horas.map((h,i) => `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer"
+         onclick="drillHora(${h})">
+      <div style="font-size:9px;font-weight:800;color:var(--text)">${conteos[i]||''}</div>
+      <div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;
+           height:${conteos[i]/max*80}px;min-height:2px;transition:height .5s"></div>
+      <div style="font-size:8px;color:var(--muted)">${h}</div>
+    </div>`).join('');
+}
+function drillHora(h) {
+  const todos = DATOS.todosDetalle || [];
+  const ops = todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h);
+  const estatusLabel = {abierto:'Abierto',cobrado:'Cobrado',perdido:'Perdido',cortesia:'Cortesía'};
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = '🕐 Tickets a las '+h+':00';
+  document.getElementById('drill-path').textContent = 'Inicio → Actividad → '+h+':00';
+  document.getElementById('drill-content').innerHTML = ops.length ? `
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Entrada</th><th>Estatus</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr onclick="drillTicket('${o.folio}')">
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.tipo}</td><td>${o.cajero}</td><td>${o.hora_entrada}</td>
+        <td>${estatusLabel[o.estatus]||o.estatus}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${o.importe?fmt$(o.importe):'$0.00'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets a esta hora</div>';
+  panel.classList.add('open');
 }
 
 function renderRankingCajeros(ops) {
