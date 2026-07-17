@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v84</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v85</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -324,7 +324,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <!-- Por franja -->
     <div class="card">
       <div class="card-title">Operaciones por franja horaria</div>
-      <div class="card-sub">05–09 · 09–14 · 14–22 · 22–05</div>
+      <div class="card-sub">05–10 · 10–17 · 17–22</div>
       <div id="op-franjas"></div>
     </div>
     <!-- Por tipo -->
@@ -351,10 +351,9 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       </select>
       <select id="filtro-franja-op" onchange="renderTablaOps()" style="border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px">
         <option value="">Todas las franjas</option>
-        <option value="05:00–09:00">05:00–09:00</option>
-        <option value="09:00–14:00">09:00–14:00</option>
-        <option value="14:00–22:00">14:00–22:00</option>
-        <option value="22:00–05:00">22:00–05:00</option>
+        <option value="05:00–10:00">05:00–10:00</option>
+        <option value="10:00–17:00">10:00–17:00</option>
+        <option value="17:00–22:00">17:00–22:00</option>
       </select>
     </div>
     <div class="tabla-wrap">
@@ -502,15 +501,13 @@ function diaSemana(fechaOp) {
   return DIAS_S[d.getDay()===0?6:d.getDay()-1];
 }
 
-// Franja horaria (Fase F, tablero ampliado): 4 bloques de 24h, recalculados
-// EN VIVO desde hora_entrada — no se lee tickets.franja (columna histórica
-// con el esquema anterior de 3 franjas), para que el desglose sea correcto
-// también sobre datos viejos, sin depender de una migración.
+// Franja horaria: 3 bloques (05:00–22:00) — fuera de ese rango no hay
+// franja asignada. Recalculada EN VIVO desde hora_entrada — no se lee
+// tickets.franja (columna histórica con esquemas anteriores).
 const FRANJAS_CORP = [
-  { key:'f1', label:'05:00–09:00', test:h => h>=5 && h<9 },
-  { key:'f2', label:'09:00–14:00', test:h => h>=9 && h<14 },
-  { key:'f3', label:'14:00–22:00', test:h => h>=14 && h<22 },
-  { key:'f4', label:'22:00–05:00', test:h => h>=22 || h<5 }
+  { key:'f1', label:'05:00–10:00', test:h => h>=5 && h<10 },
+  { key:'f2', label:'10:00–17:00', test:h => h>=10 && h<17 },
+  { key:'f3', label:'17:00–22:00', test:h => h>=17 && h<22 }
 ];
 function franjaLabelDeHora(horaStr) {
   const h = parseInt((horaStr||'').split(':')[0]);
@@ -962,10 +959,9 @@ async function renderOperativo() {
 
 function renderFranjasOp() {
   const franjas=[
-    {n:'🌅 05:00–09:00',f:'05:00–09:00',c:'#0A66C2'},
-    {n:'🌤 09:00–14:00',f:'09:00–14:00',c:'#7B5EA7'},
-    {n:'☀ 14:00–22:00',f:'14:00–22:00',c:'#F5A623'},
-    {n:'🌙 22:00–05:00',f:'22:00–05:00',c:'#4A4A4A'}
+    {n:'🌅 05:00–10:00',f:'05:00–10:00',c:'#0A66C2'},
+    {n:'☀ 10:00–17:00',f:'10:00–17:00',c:'#7B5EA7'},
+    {n:'🌇 17:00–22:00',f:'17:00–22:00',c:'#F5A623'}
   ];
   const maxF = Math.max(...franjas.map(f=>OPS_OPERATIVO.filter(o=>o.franja===f.f).length),1);
   document.getElementById('op-franjas').innerHTML = franjas.map(f=>{

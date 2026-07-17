@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v84</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v85</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -592,7 +592,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <!-- Ingresos por franja horaria -->
     <div class="chart-card">
       <div class="chart-title">Ingresos por franja horaria</div>
-      <div class="chart-sub">05–09 · 09–14 · 14–22 · 22–05 · clic para ver detalle</div>
+      <div class="chart-sub">05–10 · 10–17 · 17–22 · clic para ver detalle</div>
       <div id="franja-bars" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
     </div>
 
@@ -906,29 +906,28 @@ function renderMiniStatsFor(rows) {
     `<span style="color:var(--gold)">💰 ${fmt$(monto)}</span>`;
 }
 
-// Franja horaria (Fase F, tablero ampliado): 4 bloques de 24h, recalculados
-// EN VIVO desde hora_entrada — no se lee tickets.franja (columna histórica,
-// guardada con el esquema anterior de 3 franjas) para que el widget sea
-// correcto también sobre datos viejos, sin depender de una migración.
+// Franja horaria: 3 bloques (05:00–22:00) — fuera de ese rango no hay
+// franja asignada. Recalculada EN VIVO desde hora_entrada — no se lee
+// tickets.franja (columna histórica con esquemas anteriores), así el
+// widget es correcto también sobre datos viejos, sin depender de migración.
 const FRANJAS_ADMIN = [
-  { key:'f1', test:h => h>=5 && h<9 },
-  { key:'f2', test:h => h>=9 && h<14 },
-  { key:'f3', test:h => h>=14 && h<22 },
-  { key:'f4', test:h => h>=22 || h<5 }
+  { key:'f1', test:h => h>=5 && h<10 },
+  { key:'f2', test:h => h>=10 && h<17 },
+  { key:'f3', test:h => h>=17 && h<22 }
 ];
 function franjaKeyDeOp(o) {
   const h = parseInt((o.hora_entrada||'0').split(':')[0]);
   const f = FRANJAS_ADMIN.find(f => f.test(h));
   return f ? f.key : null;
 }
-const FRANJA_ADMIN_LABEL = {f1:'05:00–09:00',f2:'09:00–14:00',f3:'14:00–22:00',f4:'22:00–05:00'};
+const FRANJA_ADMIN_LABEL = {f1:'05:00–10:00',f2:'10:00–17:00',f3:'17:00–22:00'};
 function franjaLabelDeHora(horaStr) {
   const h = parseInt((horaStr||'').split(':')[0]);
   if (isNaN(h)) return '—';
   const f = FRANJAS_ADMIN.find(f => f.test(h));
   return f ? FRANJA_ADMIN_LABEL[f.key] : '—';
 }
-const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623',f4:'#4A4A4A'};
+const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623'};
 // Usa DATOS.todosDetalle (abiertos + cerrados), NO solo DATOS.operaciones
 // (cerrados) — antes esta tarjeta y "Actividad" (número de tickets por
 // hora, que sí cuenta todo) no reconciliaban: la suma de horas de una
@@ -936,12 +935,12 @@ const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623',f4:'#4A4A4A'}
 // El importe sigue siendo el ingreso real (los abiertos aportan $0).
 function renderFranjas() {
   const todos = DATOS.todosDetalle || [];
-  const montos = {f1:0,f2:0,f3:0,f4:0};
-  const cuentas = {f1:0,f2:0,f3:0,f4:0};
+  const montos = {f1:0,f2:0,f3:0};
+  const cuentas = {f1:0,f2:0,f3:0};
   todos.forEach(o => { const k = franjaKeyDeOp(o); if (k) { montos[k] += (Number(o.importe)||0); cuentas[k]++; } });
   const total = todos.length || 1;
   const el = document.getElementById('franja-bars');
-  el.innerHTML = ['f1','f2','f3','f4'].map(k => {
+  el.innerHTML = ['f1','f2','f3'].map(k => {
     const cnt = cuentas[k];
     const pct = Math.round(cnt/total*100);
     const color = FRANJA_ADMIN_COLOR[k];

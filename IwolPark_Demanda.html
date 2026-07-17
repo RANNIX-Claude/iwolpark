@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v84</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v85</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -150,7 +150,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <div class="grid2">
     <div class="card">
       <div class="card-title">⏰ Demanda promedio por hora</div>
-      <div class="card-sub">Azul=05-09 · Morado=09-14 · Dorado=14-22 · Gris=22-05</div>
+      <div class="card-sub">Azul=05-10 · Morado=10-17 · Dorado=17-22</div>
       <div class="bar-chart" id="bars-hora"></div>
     </div>
     <div class="card">
@@ -163,8 +163,8 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <!-- FRANJAS -->
   <div class="card">
     <div class="card-title">🌅 Análisis por franja horaria</div>
-    <div class="card-sub">05:00–09:00 · 09:00–14:00 · 14:00–22:00 · 22:00–05:00</div>
-    <div class="grid3" id="franjas-detail" style="margin-top:10px;grid-template-columns:repeat(4,1fr)"></div>
+    <div class="card-sub">05:00–10:00 · 10:00–17:00 · 17:00–22:00</div>
+    <div class="grid3" id="franjas-detail" style="margin-top:10px"></div>
   </div>
 
   <!-- INSIGHTS -->
@@ -192,16 +192,16 @@ function fmtVal(v) {
   return METRICA==='ingresos' ? ('$'+Math.round(v).toLocaleString('es-MX')) : (Math.round(v)+' autos');
 }
 
-// Franja horaria (Fase F/H, tablero ampliado): 4 bloques de 24h — reemplaza
-// el esquema anterior de 3 franjas (Matutino/Vespertino/Nocturno).
+// Franja horaria: 3 bloques (05:00–22:00) — fuera de ese rango no hay
+// franja asignada (la plaza no opera de madrugada).
 const FRANJAS_DEM = [
-  { label:'05:00–09:00', color:'#0A66C2', bg:'#EFF6FF', horas:[5,6,7,8], test:h=>h>=5&&h<9 },
-  { label:'09:00–14:00', color:'#7B5EA7', bg:'#F3F0FF', horas:[9,10,11,12,13], test:h=>h>=9&&h<14 },
-  { label:'14:00–22:00', color:'#F5A623', bg:'#FFFBEB', horas:[14,15,16,17,18,19,20,21], test:h=>h>=14&&h<22 },
-  { label:'22:00–05:00', color:'#4A4A4A', bg:'#F0EEF8', horas:[22,23,0,1,2,3,4], test:h=>h>=22||h<5 }
+  { label:'05:00–10:00', color:'#0A66C2', bg:'#EFF6FF', horas:[5,6,7,8,9], test:h=>h>=5&&h<10 },
+  { label:'10:00–17:00', color:'#7B5EA7', bg:'#F3F0FF', horas:[10,11,12,13,14,15,16], test:h=>h>=10&&h<17 },
+  { label:'17:00–22:00', color:'#F5A623', bg:'#FFFBEB', horas:[17,18,19,20,21], test:h=>h>=17&&h<22 }
 ];
+const FRANJA_DEM_SIN = { label:'Sin franja', color:'#888', bg:'#F5F5F7', horas:[] };
 function franjaDeHoraDem(h) {
-  return FRANJAS_DEM.find(f => f.test(h)) || FRANJAS_DEM[0];
+  return FRANJAS_DEM.find(f => f.test(h)) || FRANJA_DEM_SIN;
 }
 function fechaADiaIdx(fechaStr) {
   const d = new Date(fechaStr+'T12:00:00');
@@ -500,7 +500,7 @@ function renderBarsDia(max) {
 }
 
 function renderFranjas() {
-  const iconos=['🌅','🌤','☀','🌙'];
+  const iconos=['🌅','☀','🌇'];
   const franjas=FRANJAS_DEM.map((f,i)=>({n:iconos[i]+' '+f.label,h:f.horas,c:f.color,bg:f.bg}));
   document.getElementById('franjas-detail').innerHTML=franjas.map(f=>{
     const vals=[];
