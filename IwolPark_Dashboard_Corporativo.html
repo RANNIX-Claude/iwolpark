@@ -169,7 +169,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v77</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v78</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -260,8 +260,9 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     </div>
     <!-- Mix ingresos -->
     <div class="card">
-      <div class="card-title">Mix de ingresos por tipo</div>
-      <div class="card-sub">Distribución del período seleccionado</div>
+      <div class="card-title">Desglose Ticket</div>
+      <div class="card-sub">Pagado · Preferente · Perdido · Cortesía (≤15min) · Pensión · Empleado</div>
+      <div style="display:flex;gap:10px;margin-bottom:10px" id="desglose-ej-pagos"></div>
       <div id="mix-ingresos"></div>
     </div>
   </div>
@@ -655,19 +656,30 @@ async function cargarAbiertos() {
 
 // Total de tickets + total en importe + tabla desglosada por tipo — el resumen
 // que se muestra al hacer clic en cualquier KPI/gráfica del tablero.
+// Buckets de tipo de ticket (Fase G/Corporativo): "Cortesía" se deriva de
+// importe=0 en normal/preferencial (tolerancia ≤15min) — NO se puede leer
+// del campo tipo, que ya no se sobrescribe a 'cortesia' desde el fix de
+// syncEntrada/COBRO.tipo. Antes esta tabla tampoco incluía empleado/pensión.
+const RESUMEN_TIPO_BUCKETS = [
+  { label:'Normal (pagado)',   color:'#0A66C2', filter:o=>o.tipo==='normal' && Number(o.importe)>0 },
+  { label:'Preferencial',      color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && Number(o.importe)>0 },
+  { label:'Boleto perdido',    color:'#D93025', filter:o=>o.tipo==='perdido' },
+  { label:'Cortesía (≤15min)', color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && Number(o.importe)===0 },
+  { label:'Pensión',           color:'#0D9457', filter:o=>o.tipo==='pension' },
+  { label:'Empleado',          color:'#1D3557', filter:o=>o.tipo==='empleado' }
+];
 function resumenTiposHTML(ops) {
-  const tiposInfo = [
-    {t:'normal',l:'Normal',c:'#0A66C2'},
-    {t:'preferencial',l:'Preferencial',c:'#7B5EA7'},
-    {t:'perdido',l:'Boleto perdido',c:'#D93025'},
-    {t:'cortesia',l:'Cortesía',c:'#888'},
-  ];
-  const totalImporte = ops.reduce((s,o)=>s+o.importe,0);
-  const filas = tiposInfo.map(ti=>{
-    const sub = ops.filter(o=>o.tipo===ti.t);
-    const imp = sub.reduce((s,o)=>s+o.importe,0);
+  const totalImporte = ops.reduce((s,o)=>s+(Number(o.importe)||0),0);
+  // Pagado/No pagado (dimensión aparte del tipo): pagado = se recibió dinero,
+  // sin importar si fue normal/preferencial/perdido; no pagado = empleado,
+  // pensión, o tolerancia ≤15min.
+  const pagados = ops.filter(o=>Number(o.importe)>0).length;
+  const noPagados = ops.length - pagados;
+  const filas = RESUMEN_TIPO_BUCKETS.map(b=>{
+    const sub = ops.filter(b.filter);
+    const imp = sub.reduce((s,o)=>s+(Number(o.importe)||0),0);
     return `<tr>
-      <td><span class="badge" style="background:${ti.c}22;color:${ti.c}">${ti.l}</span></td>
+      <td><span class="badge" style="background:${b.color}22;color:${b.color}">${b.label}</span></td>
       <td style="text-align:right">${sub.length}</td>
       <td style="text-align:right;font-weight:700;color:var(--gold)">${fmt$(imp)}</td>
     </tr>`;
@@ -681,6 +693,14 @@ function resumenTiposHTML(ops) {
       <div style="background:var(--bg);border-radius:8px;padding:12px 20px;text-align:center">
         <div style="font-size:24px;font-weight:900;color:var(--gold)">${fmt$(totalImporte)}</div>
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Total en importe</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 20px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:#0D9457">${pagados}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 20px;text-align:center">
+        <div style="font-size:24px;font-weight:900;color:#888">${noPagados}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
       </div>
     </div>
     <div class="tabla-wrap"><table>
@@ -762,24 +782,30 @@ async function renderEjecutivo() {
       <div style="font-size:10px;color:var(--muted)">${m.label}</div>
     </div>`).join('');
 
-  // Mix ingresos
-  const tiposInfo = [
-    {t:'normal',l:'Normal',c:'#0A66C2'},
-    {t:'preferencial',l:'Preferencial',c:'#7B5EA7'},
-    {t:'perdido',l:'Boleto perdido',c:'#D93025'},
-    {t:'cortesia',l:'Cortesía',c:'#888'},
-  ];
-  const maxT = Math.max(...tiposInfo.map(ti=>ops.filter(o=>o.tipo===ti.t).reduce((s,o)=>s+o.importe,0)),1);
-  document.getElementById('mix-ingresos').innerHTML = tiposInfo.map(ti=>{
-    const sub=ops.filter(o=>o.tipo===ti.t);
-    const tot=sub.reduce((s,o)=>s+o.importe,0);
+  // Desglose Ticket — mismos 6 buckets que resumenTiposHTML (Cortesía se
+  // deriva de importe=0 en normal/preferencial, no del campo tipo).
+  const maxT = Math.max(...RESUMEN_TIPO_BUCKETS.map(b=>ops.filter(b.filter).reduce((s,o)=>s+(Number(o.importe)||0),0)),1);
+  document.getElementById('mix-ingresos').innerHTML = RESUMEN_TIPO_BUCKETS.map((b,i)=>{
+    const sub=ops.filter(b.filter);
+    const tot=sub.reduce((s,o)=>s+(Number(o.importe)||0),0);
     const pct2=maxT?Math.round(tot/maxT*100):0;
-    return `<div class="hbar-row" onclick="drillKPI('ingresos')">
-      <div class="hbar-label" style="color:${ti.c}">${ti.l}</div>
-      <div class="hbar-wrap"><div class="hbar-fill" style="width:${pct2}%;background:${ti.c}"></div></div>
-      <div class="hbar-val">${fmt$(tot)}</div>
+    return `<div class="hbar-row" onclick="drillDesgloseEjecutivo(${i})">
+      <div class="hbar-label" style="color:${b.color}">${b.label}</div>
+      <div class="hbar-wrap"><div class="hbar-fill" style="width:${pct2}%;background:${b.color}"></div></div>
+      <div class="hbar-val">${fmt$(tot)} · ${sub.length}</div>
     </div>`;
   }).join('');
+  const pagadosEj = ops.filter(o=>Number(o.importe)>0).length;
+  const noPagadosEj = ops.length - pagadosEj;
+  document.getElementById('desglose-ej-pagos').innerHTML = `
+    <div style="background:var(--bg);border-radius:8px;padding:10px 16px;text-align:center;flex:1">
+      <div style="font-size:20px;font-weight:900;color:#0D9457">${pagadosEj}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:10px 16px;text-align:center;flex:1">
+      <div style="font-size:20px;font-weight:900;color:#888">${noPagadosEj}</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
+    </div>`;
 
   // Actividad de hoy por hora (a partir de operaciones de hoy)
   const hoyStr = fechasPeriodo('hoy').hasta;
@@ -885,6 +911,22 @@ function drillMes(i) {
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+function drillDesgloseEjecutivo(i) {
+  const b = RESUMEN_TIPO_BUCKETS[i];
+  if (!b) return;
+  const ops = OPS_EJECUTIVO.filter(b.filter);
+  const panel = document.getElementById('drill-panel');
+  document.getElementById('drill-title').textContent = '🎫 Desglose: '+b.label;
+  document.getElementById('drill-content').innerHTML = ops.length ? `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Cajero</th><th>Fecha</th><th>Hora</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.cajero}</td><td>${o.fecha}</td><td>${o.hora}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${fmt$(o.importe)}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin operaciones</div>';
+  panel.classList.add('open');
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function drillFranjaOp(franja) {
   const ops = OPS_OPERATIVO.filter(o=>o.franja===franja);
   const panel = document.getElementById('drill-panel');
