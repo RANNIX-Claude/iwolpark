@@ -107,12 +107,13 @@ nav { background:#fff; border-bottom:1px solid var(--border);
                color:var(--text); }
 .chart-sub   { font-size:11px; color:var(--muted); margin-bottom:16px; }
 
-/* DRILL-DOWN PANEL */
-.drill-panel { background:var(--white); border-radius:12px;
-               border:2px solid var(--accent); padding:20px;
-               box-shadow:var(--card-sh); margin-bottom:20px;
-               display:none; }
-.drill-panel.open { display:block; }
+/* DRILL-DOWN: ventana pop (overlay fijo, no requiere recorrer la pantalla) */
+.drill-panel { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+               z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.drill-panel.open { display:flex; }
+.drill-box { background:var(--white); border-radius:12px; border:2px solid var(--accent);
+             padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+             max-width:900px; width:100%; max-height:85vh; overflow-y:auto; }
 .drill-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
 .drill-back { background:var(--accent); color:#fff; border:none;
               border-radius:6px; padding:6px 14px; font-size:12px;
@@ -246,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v78</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v79</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -320,14 +321,18 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     </div>
   </div>
 
-  <!-- DRILL-DOWN PANEL -->
-  <div class="drill-panel" id="drill-panel">
-    <div class="drill-header">
-      <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
-      <span class="drill-title" id="drill-title">Detalle</span>
-      <span class="drill-path" id="drill-path"></span>
+  <!-- DRILL-DOWN: ventana pop -->
+  <div class="drill-panel" id="drill-panel" onclick="if(event.target===this) cerrarDrill()">
+    <div class="drill-box">
+      <div class="drill-header">
+        <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
+        <span class="drill-title" id="drill-title">Detalle</span>
+        <span class="drill-path" id="drill-path"></span>
+        <button onclick="cerrarDrill()" style="background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1;margin-left:8px" title="Cerrar">✕</button>
+      </div>
+      <div id="drill-ministats" style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:700;background:#F8F5FF;border-radius:8px;padding:8px 14px;margin-bottom:14px"></div>
+      <div id="drill-content"></div>
     </div>
-    <div id="drill-content"></div>
   </div>
 
   <!-- MODAL PARÁMETROS -->
@@ -865,6 +870,16 @@ function renderKPIs(ops) {
   document.getElementById('kpi-perdidos-sub').textContent= fmt$(pTotal) + ' en penalizaciones';
   document.getElementById('kpi-ticket').textContent      = fmt$(ticket);
   document.getElementById('kpi-ticket-sub').textContent  = 'Tiempo prom: ' + Math.round(minProm) + ' min';
+
+  // Franja fija arriba de la ventana pop de detalle — para ver "de un
+  // vistazo" el pulso general de la operación sin tener que cerrar el
+  // detalle que se está consultando.
+  const elMini = document.getElementById('drill-ministats');
+  if (elMini) elMini.innerHTML =
+    `<span>🎫 ${DATOS.ticketsDia||0} tickets</span>
+     <span style="color:#0D9457">✅ ${ops.length} cerrados</span>
+     <span style="color:var(--gold)">💰 ${fmt$(total)}</span>
+     <span style="color:var(--accent)">🅿️ ${DATOS.autos_en_plaza||0}/${DATOS.capacidad||0} ocupados</span>`;
 }
 
 // Franja horaria (Fase F, tablero ampliado): 4 bloques de 24h, recalculados
@@ -1091,7 +1106,6 @@ function drillDown(tipo) {
         </tr>`).join('')}</tbody>
       </table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en el período</div>';
   }
-  panel.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function drillFranja(key) {
@@ -1140,7 +1154,6 @@ function drillTicket(folio) {
           <div style="font-size:16px;font-weight:800;margin-top:4px">${v}</div>
         </div>`).join('')}
     </div>`;
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // Tabla de tickets abiertos (en plaza ahora) — usada por el drill de
@@ -1165,7 +1178,6 @@ function drillOcupacionTipo(tipo) {
   _drillActual = 'ocupacion_'+tipo;
   panel.classList.add('open');
   document.getElementById('drill-content').innerHTML = tablaAbiertosHTML(rows);
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function drillGenerico(titulo, ops) {
@@ -1193,7 +1205,6 @@ function drillGenerico(titulo, ops) {
           ${o.importe?fmt$(o.importe):'$0.00'}</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function cerrarDrill() {

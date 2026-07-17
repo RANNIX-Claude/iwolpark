@@ -120,10 +120,13 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
 .tab-section{display:none}
 .tab-section.active{display:block}
 
-/* DRILL PANEL */
-.drill{background:#fff;border:2px solid var(--purple);border-radius:12px;
-       padding:18px;margin-bottom:14px;display:none}
-.drill.open{display:block}
+/* DRILL: ventana pop (overlay fijo, no requiere recorrer la pantalla) */
+.drill{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+       z-index:1000;align-items:center;justify-content:center;padding:20px}
+.drill.open{display:flex}
+.drill-box{background:#fff;border:2px solid var(--purple);border-radius:12px;
+           padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+           max-width:900px;width:100%;max-height:85vh;overflow-y:auto}
 .drill-back{background:var(--purple);color:#fff;border:none;border-radius:6px;
             padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer}
 
@@ -169,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v78</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v79</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -242,12 +245,16 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   </div>
 
   <!-- Drill panel -->
-  <div class="drill" id="drill-panel">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
-      <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-title">Detalle</span>
+  <div class="drill" id="drill-panel" onclick="if(event.target===this) cerrarDrill()">
+    <div class="drill-box">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="drill-back" onclick="cerrarDrill()">← Volver</button>
+        <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-title">Detalle</span>
+        <button onclick="cerrarDrill()" style="background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1;margin-left:auto" title="Cerrar">✕</button>
+      </div>
+      <div id="drill-ministats" style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:700;background:#F8F5FF;border-radius:8px;padding:8px 14px;margin-bottom:14px"></div>
+      <div id="drill-content"></div>
     </div>
-    <div id="drill-content"></div>
   </div>
 
   <div class="grid2">
@@ -393,12 +400,15 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
   </div>
 
   <!-- Detalle cajero seleccionado -->
-  <div class="drill" id="drill-cajero">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <button class="drill-back" onclick="document.getElementById('drill-cajero').classList.remove('open')">← Volver</button>
-      <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-cajero-title">Cajero</span>
+  <div class="drill" id="drill-cajero" onclick="if(event.target===this) this.classList.remove('open')">
+    <div class="drill-box">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="drill-back" onclick="document.getElementById('drill-cajero').classList.remove('open')">← Volver</button>
+        <span style="font-size:14px;font-weight:800;color:var(--purple)" id="drill-cajero-title">Cajero</span>
+        <button onclick="document.getElementById('drill-cajero').classList.remove('open')" style="background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1;margin-left:auto" title="Cerrar">✕</button>
+      </div>
+      <div id="drill-cajero-content"></div>
     </div>
-    <div id="drill-cajero-content"></div>
   </div>
 
 </div>
@@ -753,6 +763,15 @@ async function renderEjecutivo() {
   document.getElementById('ej-perdidos').textContent = perdidos.length;
   document.getElementById('ej-perdidos-sub').textContent = fmt$(pTotal)+' en penalizaciones';
 
+  // Franja fija arriba de la ventana pop de detalle — pulso general de la
+  // operación visible sin tener que cerrar el detalle que se está consultando.
+  const elMini = document.getElementById('drill-ministats');
+  if (elMini) elMini.innerHTML =
+    `<span>🎫 ${ticketsPeriodo} tickets</span>
+     <span style="color:#0D9457">✅ ${cobros.length} cobrados</span>
+     <span style="color:var(--gold)">💰 ${fmt$(total)}</span>
+     <span style="color:var(--purple)">🅿️ ${autosAhora}/${CAPACIDAD_TOTAL} ocupados</span>`;
+
   // Gauge
   const offset = 157 - (157 * pct/100);
   document.getElementById('gauge-arc').style.strokeDashoffset = offset;
@@ -848,7 +867,6 @@ async function drillKPI(tipo) {
   const title = document.getElementById('drill-title');
   panel.classList.add('open');
   cont.innerHTML = '<div style="padding:16px;color:var(--muted);text-align:center">Cargando…</div>';
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
   const ops = OPS_EJECUTIVO;
 
   if(tipo==='perdidos') {
@@ -908,7 +926,6 @@ function drillMes(i) {
   document.getElementById('drill-title').textContent = '📅 Detalle: '+m.label+' '+m.anio;
   document.getElementById('drill-content').innerHTML = resumenTiposHTML(ops);
   panel.classList.add('open');
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function drillDesgloseEjecutivo(i) {
@@ -925,7 +942,6 @@ function drillDesgloseEjecutivo(i) {
         <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${fmt$(o.importe)}</td>
       </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin operaciones</div>';
   panel.classList.add('open');
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function drillFranjaOp(franja) {
   const ops = OPS_OPERATIVO.filter(o=>o.franja===franja);
@@ -933,7 +949,6 @@ function drillFranjaOp(franja) {
   document.getElementById('drill-title').textContent = '🕐 Franja: '+franja;
   document.getElementById('drill-content').innerHTML = resumenTiposHTML(ops);
   panel.classList.add('open');
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
 
@@ -1079,7 +1094,6 @@ function drillCajero(nom) {
       </tr>`).join('')}</tbody>
     </table></div>`;
   panel.classList.add('open');
-  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // ══ CORTES ══
