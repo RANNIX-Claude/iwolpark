@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v83</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v84</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -1563,6 +1563,8 @@ function renderEmpleados(empleados) {
       ${e.activo ? '' : '<span class="estado-inactivo">Inactivo</span>'}
       <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
               onclick="toggleEmpleado(${e.id}, ${!e.activo})">${e.activo ? 'Desactivar' : 'Activar'}</button>
+      <button class="param-btn outline" style="padding:4px 10px;font-size:11px;color:var(--red);border-color:var(--red)"
+              onclick="eliminarEmpleado(${e.id}, '${(e.nombre_completo||'').replace(/'/g,"\\'")}')">Eliminar</button>
     </div>`).join('');
 }
 
@@ -1595,6 +1597,21 @@ async function toggleEmpleado(id, nuevoActivo) {
     });
     if (r.ok) cargarEmpleados();
   } catch (e) { showToast('Error al actualizar'); }
+}
+
+// Eliminación real (DELETE), distinta de "Desactivar" (que solo oculta al
+// empleado del combo de selección en TABLET pero conserva el registro) —
+// para limpiar de una vez registros de prueba duplicados como el catálogo
+// llegó a acumular. Requiere confirmación por ser irreversible.
+async function eliminarEmpleado(id, nombre) {
+  if (!confirm('¿Eliminar definitivamente a "' + nombre + '"? Esta acción no se puede deshacer.')) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados?id=eq.${id}`, {
+      method: 'DELETE', headers: SB_HEADERS_PARAM
+    });
+    if (r.ok) { showToast('Empleado eliminado'); cargarEmpleados(); }
+    else showToast('Error al eliminar');
+  } catch (e) { showToast('Error al eliminar'); }
 }
 
 // ══ UTILS ══

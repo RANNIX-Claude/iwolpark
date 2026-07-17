@@ -115,7 +115,7 @@ tr:hover td{background:#FAFAFE}
   <div class="nav-right">
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v83</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v84</span>
   </div>
 </nav>
 
@@ -668,13 +668,12 @@ async function guardarPension() {
   const dia    = parseInt(document.getElementById('p-dia-pago').value)||1;
   const notas  = document.getElementById('p-notas').value.trim();
 
-  // Validaciones — solo Nombre, Número de Local y Mensualidad son
-  // obligatorios; los datos del vehículo son opcionales (si se captura
-  // alguno, se piden todos, porque vehiculos.placas/marca/modelo/color son
-  // NOT NULL en la base y no se puede guardar un registro a medias).
+  // Validaciones — solo Nombre y Número de Local son obligatorios; el resto
+  // (mensualidad incluida) queda opcional. Los datos del vehículo, si se
+  // captura alguno, se piden todos, porque vehiculos.placas/marca/modelo/
+  // color son NOT NULL en la base y no se puede guardar un registro a medias.
   if (!nombre) { showToast('⚠ El nombre es obligatorio'); document.getElementById('p-nombre').focus(); return; }
   if (!local)  { showToast('⚠ El número de local es obligatorio'); document.getElementById('p-local').focus(); return; }
-  if (monto <= 0) { showToast('⚠ La mensualidad debe ser mayor a cero'); return; }
   const hayDatosVehiculo = placas || marca || modelo || color;
   if (hayDatosVehiculo && !(placas && marca && modelo && color)) {
     showToast('⚠ Si vas a registrar el vehículo, completa placas, marca, modelo y color');
