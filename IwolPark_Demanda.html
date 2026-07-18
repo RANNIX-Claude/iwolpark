@@ -70,6 +70,21 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 .tooltip{position:fixed;background:#1D1D1F;color:#fff;border-radius:8px;
          padding:8px 12px;font-size:12px;pointer-events:none;z-index:9999;
          display:none;line-height:1.5;white-space:nowrap}
+
+/* DRILL-DOWN (popup) */
+.drill-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+             z-index:1000;align-items:center;justify-content:center;padding:20px}
+.drill-panel.open{display:flex}
+.drill-box{background:var(--white);border-radius:12px;border:2px solid var(--purple);
+           max-width:900px;width:100%;max-height:85vh;overflow-y:auto;
+           box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.drill-head{display:flex;align-items:center;gap:10px;padding:16px 20px;
+            border-bottom:1px solid var(--border);position:sticky;top:0;
+            background:var(--white);border-radius:12px 12px 0 0}
+.drill-title{font-size:15px;font-weight:900;color:var(--purple)}
+.drill-close{margin-left:auto;background:none;border:none;font-size:20px;
+             color:var(--muted);cursor:pointer;line-height:1}
+.drill-body{padding:16px 20px}
 </style>
 </head>
 <body>
@@ -78,7 +93,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v92</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v93</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -177,6 +192,16 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 </div>
 
 <div class="tooltip" id="tooltip"></div>
+
+<div class="drill-panel" id="drill-panel" onclick="if(event.target===this) cerrarDrillCajero()">
+  <div class="drill-box">
+    <div class="drill-head">
+      <span class="drill-title" id="drill-title">Detalle</span>
+      <button class="drill-close" onclick="cerrarDrillCajero()">✕</button>
+    </div>
+    <div class="drill-body" id="drill-content"></div>
+  </div>
+</div>
 
 <script>
 const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
@@ -281,7 +306,7 @@ async function cargarSemanaActualYAnterior() {
   const lunesPasado = new Date(lunesActual); lunesPasado.setDate(lunesPasado.getDate()-7);
   const desde = fmtFechaLocal(lunesPasado), hasta = fmtFechaLocal(hoy);
   try {
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,hora_entrada,tipo,cajero,importe,estatus&order=fecha_op.asc`;
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
     const rows = await fetchPaginado(base, SB_HEADERS, 8000);
     const cerrados = rows.filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
     return { cerrados, lunesActualStr: fmtFechaLocal(lunesActual), lunesPasadoStr: fmtFechaLocal(lunesPasado) };
@@ -340,8 +365,15 @@ function renderDesgloseSemana(ticketsSemana) {
   }).join('');
 }
 
+// Filas crudas de la semana (para el drill-down) + el lunes de referencia,
+// cacheados para no volver a pedirlos a Supabase en cada clic.
+let CAJERO_DIA_DEM_ROWS = [];
+let CAJERO_DIA_DEM_LUNES = null;
+
 function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
   const lunes = new Date(lunesActualStr+'T12:00:00');
+  CAJERO_DIA_DEM_ROWS = ticketsSemana;
+  CAJERO_DIA_DEM_LUNES = lunes;
   const porCajero = {};
   ticketsSemana.forEach(t => {
     const cj = normCajero(t.cajero);
@@ -357,11 +389,14 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
     el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
     return;
   }
+  const totalesDia = [0,0,0,0,0,0,0];
+  filas.forEach(([,vals]) => vals.forEach((v,i)=>totalesDia[i]+=v));
+  const granTotal = totalesDia.reduce((s,v)=>s+v,0);
   el.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;font-variant-numeric:tabular-nums">
       <thead><tr style="border-bottom:2px solid var(--border)">
         <th style="text-align:left;padding:7px">Cajero</th>
-        ${DIAS.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+        ${DIAS.map(d=>`<th style="padding:7px;text-align:right">${d}</th>`).join('')}
         <th style="padding:7px;text-align:right">Suma días</th>
       </tr></thead>
       <tbody>
@@ -369,12 +404,56 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
         const total = vals.reduce((s,v)=>s+v,0);
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:7px;font-weight:700">${cj}</td>
-          ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmtMoney(v):'—'}</td>`).join('')}
-          <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple)">${fmtMoney(total)}</td>
+          ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmtMoney(v):'—'}</td>`).join('')}
+          <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',null)">${fmtMoney(total)}</td>
         </tr>`;
       }).join('')}
       </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid var(--border)">
+          <td style="padding:7px;font-weight:800">Total</td>
+          ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem(null,${i})"`:''}>${v?fmtMoney(v):'—'}</td>`).join('')}
+          <td style="padding:7px;text-align:right;font-weight:900;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem(null,null)">${fmtMoney(granTotal)}</td>
+        </tr>
+      </tfoot>
     </table>`;
+}
+
+// Drill-down de "Ingresos por cajero y día": cajero=null -> todos los cajeros
+// de ese día; dia=null -> todos los días de ese cajero; ambos null -> toda
+// la semana.
+function drillCajeroDiaDem(cajero, dia) {
+  if (!CAJERO_DIA_DEM_LUNES) return;
+  const ops = CAJERO_DIA_DEM_ROWS.filter(t => {
+    if (cajero != null && normCajero(t.cajero) !== cajero) return false;
+    if (dia != null) {
+      const fd = new Date(t.fecha_op+'T12:00:00');
+      const idx = Math.round((fd-CAJERO_DIA_DEM_LUNES)/86400000);
+      if (idx !== dia) return false;
+    }
+    return true;
+  });
+  const parteDia = dia!=null ? DIAS[dia] : 'esta semana';
+  const parteCajero = cajero!=null ? cajero : 'Todos los cajeros';
+  document.getElementById('drill-title').textContent = '👤 '+parteCajero+' · '+parteDia;
+  document.getElementById('drill-content').innerHTML = ops.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:7px">Folio</th><th style="text-align:left;padding:7px">Tipo</th>
+        <th style="text-align:left;padding:7px">Cajero</th><th style="text-align:left;padding:7px">Fecha</th>
+        <th style="text-align:left;padding:7px">Entrada</th><th style="text-align:left;padding:7px">Salida</th>
+        <th style="padding:7px;text-align:right">Importe</th>
+      </tr></thead>
+      <tbody>${ops.map(o=>`<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:7px"><span style="font-family:monospace;font-weight:700">${o.folio||'—'}</span></td>
+        <td style="padding:7px">${o.tipo}</td><td style="padding:7px">${normCajero(o.cajero)}</td>
+        <td style="padding:7px">${o.fecha_op}</td><td style="padding:7px">${o.hora_entrada||'—'}</td>
+        <td style="padding:7px">${o.hora_salida||'—'}</td>
+        <td style="padding:7px;text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${fmtMoney(o.importe)}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin operaciones</div>';
+  document.getElementById('drill-panel').classList.add('open');
+}
+function cerrarDrillCajero() {
+  document.getElementById('drill-panel').classList.remove('open');
 }
 
 async function renderSemanaWidgets() {

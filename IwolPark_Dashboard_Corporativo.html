@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v92</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v93</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -677,6 +677,11 @@ function normCajero(n) {
   if (!s) return 'Sin cajero';
   return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
 }
+// Filas crudas de la semana (para el drill-down) + el lunes de referencia,
+// cacheados para no volver a pedirlos a Supabase en cada clic.
+let CAJERO_DIA_EJ_ROWS = [];
+let CAJERO_DIA_EJ_LUNES = null;
+
 async function renderCajeroDiaEj() {
   const el = document.getElementById('tabla-cajero-dia-ej');
   if (!el) return;
@@ -684,8 +689,10 @@ async function renderCajeroDiaEj() {
     const hoy = new Date();
     const lunes = new Date(hoy); lunes.setDate(lunes.getDate()-((lunes.getDay()+6)%7)); lunes.setHours(0,0,0,0);
     const desde = fmtLocal(lunes), hasta = fmtLocal(hoy);
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,cajero,importe,estatus&order=fecha_op.asc`;
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,cajero,hora_entrada,hora_salida,importe,estatus,fecha_op&order=fecha_op.asc`;
     const rows = (await fetchPaginado(base, SB_HEADERS, 8000)).filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+    CAJERO_DIA_EJ_ROWS = rows;
+    CAJERO_DIA_EJ_LUNES = lunes;
 
     const porCajero = {};
     rows.forEach(t => {
@@ -700,11 +707,14 @@ async function renderCajeroDiaEj() {
       el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
       return;
     }
+    const totalesDia = [0,0,0,0,0,0,0];
+    filas.forEach(([,vals]) => vals.forEach((v,i)=>totalesDia[i]+=v));
+    const granTotal = totalesDia.reduce((s,v)=>s+v,0);
     el.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;font-variant-numeric:tabular-nums">
         <thead><tr style="border-bottom:2px solid var(--border)">
           <th style="text-align:left;padding:7px">Cajero</th>
-          ${DIAS_S.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+          ${DIAS_S.map(d=>`<th style="padding:7px;text-align:right">${d}</th>`).join('')}
           <th style="padding:7px;text-align:right">Suma días</th>
         </tr></thead>
         <tbody>
@@ -712,13 +722,48 @@ async function renderCajeroDiaEj() {
           const total = vals.reduce((s,v)=>s+v,0);
           return `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:7px;font-weight:700">${cj}</td>
-            ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmt$(v):'—'}</td>`).join('')}
-            <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple)">${fmt$(total)}</td>
+            ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaEj('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaEj('${cj.replace(/'/g,"\\'")}',null)">${fmt$(total)}</td>
           </tr>`;
         }).join('')}
         </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border)">
+            <td style="padding:7px;font-weight:800">Total</td>
+            ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaEj(null,${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:900;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaEj(null,null)">${fmt$(granTotal)}</td>
+          </tr>
+        </tfoot>
       </table>`;
   } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
+}
+
+// Drill-down de "Ingresos por cajero y día": cajero=null -> todos los cajeros
+// de ese día; dia=null -> todos los días de ese cajero; ambos null -> toda
+// la semana.
+function drillCajeroDiaEj(cajero, dia) {
+  if (!CAJERO_DIA_EJ_LUNES) return;
+  const ops = CAJERO_DIA_EJ_ROWS.filter(t => {
+    if (cajero != null && normCajero(t.cajero) !== cajero) return false;
+    if (dia != null) {
+      const fd = new Date(t.fecha_op+'T12:00:00');
+      const idx = Math.round((fd-CAJERO_DIA_EJ_LUNES)/86400000);
+      if (idx !== dia) return false;
+    }
+    return true;
+  });
+  const parteDia = dia!=null ? DIAS_S[dia] : 'esta semana';
+  const parteCajero = cajero!=null ? cajero : 'Todos los cajeros';
+  document.getElementById('drill-title').textContent = '👤 '+parteCajero+' · '+parteDia;
+  document.getElementById('drill-content').innerHTML = ops.length ? `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th style="text-align:right">Importe</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.tipo}</td><td>${normCajero(o.cajero)}</td><td>${o.fecha_op}</td>
+        <td>${o.hora_entrada||'—'}</td><td>${o.hora_salida||'—'}</td>
+        <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${fmt$(o.importe)}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin operaciones</div>';
+  document.getElementById('drill-panel').classList.add('open');
 }
 
 async function cargarCortesDB(desde, hasta) {

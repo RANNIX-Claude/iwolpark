@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v92</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v93</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -974,6 +974,12 @@ function normCajero(n) {
   if (!s) return 'Sin cajero';
   return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
 }
+// Filas crudas de la semana (con columnas suficientes para el drill-down) y
+// el lunes de referencia, cacheados para que drillCajeroDia() no tenga que
+// volver a pedirlos a Supabase.
+let CAJERO_DIA_ROWS = [];
+let CAJERO_DIA_LUNES = null;
+
 async function renderCajeroDia() {
   const el = document.getElementById('tabla-cajero-dia');
   if (!el) return;
@@ -982,8 +988,10 @@ async function renderCajeroDia() {
     const lunes = lunesDeSemanaCD(hoy);
     const desde = fmtLocalCD(lunes), hasta = fmtLocalCD(hoy);
     const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,cajero,importe,estatus&order=fecha_op.asc`;
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,cajero,cajero_entrada,cajero_salida,hora_entrada,hora_salida,importe,estatus,fecha_op&order=fecha_op.asc`;
     const rows = (await fetchPaginado(base, headers, 8000)).filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+    CAJERO_DIA_ROWS = rows;
+    CAJERO_DIA_LUNES = lunes;
 
     const porCajero = {};
     rows.forEach(t => {
@@ -998,11 +1006,14 @@ async function renderCajeroDia() {
       el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
       return;
     }
+    const totalesDia = [0,0,0,0,0,0,0];
+    filas.forEach(([,vals]) => vals.forEach((v,i)=>totalesDia[i]+=v));
+    const granTotal = totalesDia.reduce((s,v)=>s+v,0);
     el.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;font-variant-numeric:tabular-nums">
         <thead><tr style="border-bottom:2px solid var(--border)">
           <th style="text-align:left;padding:7px">Cajero</th>
-          ${DIAS_CD.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+          ${DIAS_CD.map(d=>`<th style="padding:7px;text-align:right">${d}</th>`).join('')}
           <th style="padding:7px;text-align:right">Suma días</th>
         </tr></thead>
         <tbody>
@@ -1010,13 +1021,45 @@ async function renderCajeroDia() {
           const total = vals.reduce((s,v)=>s+v,0);
           return `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:7px;font-weight:700">${cj}</td>
-            ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmt$(v):'—'}</td>`).join('')}
-            <td style="padding:7px;text-align:right;font-weight:800;color:var(--accent)">${fmt$(total)}</td>
+            ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDia('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:800;color:var(--accent);cursor:pointer" onclick="drillCajeroDia('${cj.replace(/'/g,"\\'")}',null)">${fmt$(total)}</td>
           </tr>`;
         }).join('')}
         </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border)">
+            <td style="padding:7px;font-weight:800">Total</td>
+            ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDia(null,${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:900;color:var(--accent);cursor:pointer" onclick="drillCajeroDia(null,null)">${fmt$(granTotal)}</td>
+          </tr>
+        </tfoot>
       </table>`;
   } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
+}
+
+// Drill-down de "Ingresos por cajero y día": cajero=null -> todos los cajeros
+// de ese día; dia=null -> todos los días de ese cajero; ambos null -> toda
+// la semana. Reutiliza el mismo panel/mini-stats/tabla que el resto de Admin.
+function drillCajeroDia(cajero, dia) {
+  if (!CAJERO_DIA_LUNES) return;
+  const ops = CAJERO_DIA_ROWS.filter(t => {
+    if (cajero != null && normCajero(t.cajero) !== cajero) return false;
+    if (dia != null) {
+      const fd = new Date(t.fecha_op+'T12:00:00');
+      const idx = Math.round((fd-CAJERO_DIA_LUNES)/86400000);
+      if (idx !== dia) return false;
+    }
+    return true;
+  });
+  const panel = document.getElementById('drill-panel');
+  const parteDia = dia!=null ? DIAS_CD[dia] : 'esta semana';
+  const parteCajero = cajero!=null ? cajero : 'Todos los cajeros';
+  document.getElementById('drill-title').textContent = '👤 '+parteCajero+' · '+parteDia;
+  const elPath = document.getElementById('drill-path');
+  if (elPath) elPath.textContent = 'Inicio → Ingresos por cajero y día → '+parteCajero+' · '+parteDia;
+  renderMiniStatsFor(ops);
+  document.getElementById('drill-content').innerHTML = movimientosTablaHTML(ops);
+  panel.classList.add('open');
 }
 // Usa DATOS.todosDetalle (abiertos + cerrados), NO solo DATOS.operaciones
 // (cerrados) — antes esta tarjeta y "Actividad" (número de tickets por
