@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IwolPark · Rendimiento de Cajeros</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#F5F5F7; --white:#fff; --border:#D2D2D7;
+  --purple:#7B5EA7; --blue:#0A66C2; --green:#0D9457;
+  --gold:#F5A623; --red:#D93025; --text:#1D1D1F; --muted:#6E6E73;
+  --pos:#16A34A; --neg:#DC2626;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:center;
+    gap:12px;position:sticky;top:0;z-index:100}
+.nav-logo{font-size:20px;font-weight:900;color:#fff;letter-spacing:-1px}
+.nav-badge{font-size:10px;font-weight:700;background:var(--purple);color:#fff;border-radius:4px;padding:2px 8px}
+.nav-back{background:#333;color:#fff;border:none;border-radius:7px;padding:7px 14px;
+          font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px;margin-left:auto}
+
+.container{max-width:1500px;margin:0 auto;padding:16px 24px}
+
+.demo-banner{background:#FFF7E0;border:1.5px solid var(--gold);color:#8A5B00;
+  border-radius:10px;padding:10px 16px;font-size:12.5px;font-weight:700;
+  margin-bottom:14px;display:none;align-items:center;gap:8px}
+.demo-banner.show{display:flex}
+
+.card{background:var(--white);border-radius:12px;border:1px solid var(--border);
+      padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:14px}
+.card-title{font-size:13px;font-weight:800;margin-bottom:2px}
+.card-sub{font-size:11px;color:var(--muted);margin-bottom:10px}
+
+/* FILTROS */
+.filtros{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.vista-tabs{display:flex;background:var(--white);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.vista-tab{padding:7px 16px;font-size:12.5px;font-weight:700;color:var(--muted);
+  border-radius:7px;cursor:pointer;border:none;background:none;white-space:nowrap}
+.vista-tab.active{background:var(--purple);color:#fff}
+.filtros select{border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;
+  font-size:13px;background:#fff;color:var(--text);cursor:pointer}
+.btn{background:var(--purple);color:#fff;border:none;border-radius:8px;
+     padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover{opacity:.92}
+.btn-outline{background:#fff;color:var(--purple);border:1.5px solid var(--purple);
+     border-radius:8px;padding:7px 14px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.comparando{margin-left:auto;font-size:12px;color:var(--muted);font-weight:700;
+  background:#F0EEF8;border-radius:99px;padding:6px 14px}
+
+.grid3{display:grid;grid-template-columns:1.3fr 1fr 1.3fr;gap:14px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:1050px){.grid3,.grid2{grid-template-columns:1fr}}
+
+/* TABLAS */
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{background:#F8F5FF;color:var(--purple);padding:9px 10px;text-align:left;
+   font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
+   border-bottom:2px solid var(--border);position:sticky;top:0}
+tbody td{padding:8px 10px;border-bottom:1px solid #F0EEF8}
+tbody tr.fila-cajero{cursor:pointer}
+tbody tr.fila-cajero:hover td{background:#FAFAFE}
+tbody tr.fila-total td{font-weight:900;border-top:2px solid var(--border);border-bottom:none;background:#FBFAFF}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.var-pos{color:var(--pos);font-weight:800}
+.var-neg{color:var(--neg);font-weight:800}
+.var-neu{color:var(--muted);font-weight:700}
+.alerta-baja{color:var(--red);font-weight:900;margin-left:3px}
+.alerta-alta{color:var(--pos);font-weight:900;margin-left:3px}
+.sin-actividad{color:var(--muted);font-style:italic;font-size:11px}
+.chip-cajero{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.expand-ico{display:inline-block;transition:transform .2s;margin-right:4px;font-size:10px;color:var(--muted)}
+.expand-ico.open{transform:rotate(90deg)}
+
+/* DRILLDOWN */
+.drilldown-row td{padding:0;border-bottom:1px solid #F0EEF8}
+.drilldown-box{display:none;padding:14px 10px 18px 28px;background:#FBFAFF}
+.drilldown-box.open{display:block}
+.drilldown-title{font-size:12.5px;font-weight:800;color:var(--purple);margin-bottom:10px}
+.drill-tables{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.drill-tables{grid-template-columns:1fr}}
+
+/* SPARKLINE */
+.spark{display:inline-flex;align-items:flex-end;gap:1.5px;height:20px;vertical-align:middle}
+.spark-bar{width:5px;border-radius:1px 1px 0 0}
+
+/* CHARTS */
+.chart-wrap{position:relative;height:260px}
+.chart-wrap.tall{height:320px}
+
+/* CAJERO SELECT PILL */
+.leyenda-cajeros{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;font-weight:700;margin-bottom:8px}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#1D1D1F;color:#fff;
+  border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;z-index:9999;
+  transform:translateY(60px);opacity:0;transition:all .3s}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">·iwol·</span>
+  <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
+  <span class="nav-badge">CAJEROS</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v100</span>
+  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" style="margin-left:12px">← Volver al dashboard</a>
+</nav>
+
+<div class="container">
+
+  <div class="demo-banner" id="demo-banner">⚠️ Datos de demostración — no se pudo conectar a Supabase, esto es información ficticia solo para mostrar el diseño del tablero.</div>
+
+  <!-- SECCIÓN 1: FILTROS -->
+  <div class="filtros">
+    <div class="vista-tabs">
+      <button class="vista-tab" data-vista="semana" onclick="cambiarVista('semana')">Semana</button>
+      <button class="vista-tab active" data-vista="mes" onclick="cambiarVista('mes')">Mes</button>
+      <button class="vista-tab" data-vista="anio" onclick="cambiarVista('anio')">Acumulado año</button>
+    </div>
+    <select id="sel-cajero" onchange="render()">
+      <option value="">Todos los cajeros</option>
+    </select>
+    <button class="btn" onclick="cargarTodo()">↻ Actualizar</button>
+    <span class="comparando" id="comparando-txt">Comparando vs —</span>
+  </div>
+
+  <!-- SECCIÓN 2 + EFECTIVIDAD + SECCIÓN 3 -->
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title" id="tabla-principal-titulo">Alcance cajeros — mes</div>
+      <div class="card-sub">Clic en un cajero para ver el detalle · fila Total al final</div>
+      <div class="tabla-wrap"><table id="tabla-principal">
+        <thead></thead>
+        <tbody></tbody>
+      </table></div>
+      <div style="margin-top:10px;text-align:right">
+        <button class="btn-outline" onclick="exportarTablaCSV('principal')">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Efectividad</div>
+      <div class="card-sub">Ocupación de cajones en el período</div>
+      <div id="efectividad-box"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Acumulado del año</div>
+      <div class="card-sub" id="acumulado-sub">Enero–hoy vs mismo período año anterior</div>
+      <div class="tabla-wrap"><table id="tabla-acumulado">
+        <thead></thead>
+        <tbody></tbody>
+      </table></div>
+      <div style="margin-top:10px;text-align:right">
+        <button class="btn-outline" onclick="exportarTablaCSV('acumulado')">⬇ Export CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 5: TOP DÍAS -->
+  <div class="card">
+    <div class="card-title">Top días de la semana</div>
+    <div class="card-sub">Promedio de tickets por día de semana · período actual vs anterior</div>
+    <div class="tabla-wrap"><table id="tabla-dias">
+      <thead></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <!-- TABLA 12 MESES -->
+  <div class="card">
+    <div class="card-title">Comparativo de meses</div>
+    <div class="card-sub">Últimos 12 meses · ⚠ caída &gt;10% · 🔥 alza &gt;15%</div>
+    <div class="tabla-wrap"><table id="tabla-meses">
+      <thead></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <!-- GRÁFICAS -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Importe cobrado por mes</div>
+      <div class="card-sub">Año anterior vs año actual</div>
+      <div class="chart-wrap"><canvas id="chart1"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Evolución por cajero — tickets e importe</div>
+      <div class="card-sub" id="leyenda-cajeros-23"></div>
+      <div class="chart-wrap"><canvas id="chart2"></canvas></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Mix cajero × tipo de boleto</div>
+      <div class="card-sub">Participación de cada cajero dentro de cada tipo (%) · período actual</div>
+      <div class="chart-wrap tall"><canvas id="chart4"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Promedio diario vs período anterior</div>
+      <div class="card-sub">Tickets promedio por día, por cajero</div>
+      <div class="chart-wrap tall"><canvas id="chart5"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ CONFIG ══
+const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
+const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+
+// ══ UTILS (mismos patrones que el resto de IwolPark) ══
+function fmtLocal(d) { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function fmt$(n) { return '$'+Math.round(n||0).toLocaleString('es-MX'); }
+function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2500); }
+function normCajero(n) {
+  const s = (n||'Sin cajero').trim().replace(/\s+/g,' ');
+  if (!s) return 'Sin cajero';
+  return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+}
+async function fetchPaginado(urlBase, headers, maxTotal) {
+  let todas = [], offset = 0; const pageSize = 1000;
+  while (true) {
+    const sep = urlBase.includes('?') ? '&' : '?';
+    const r = await fetch(`${urlBase}${sep}limit=${pageSize}&offset=${offset}`, { headers });
+    if (!r.ok) { if (offset===0) throw new Error('http '+r.status); break; }
+    const pagina = await r.json();
+    todas = todas.concat(pagina);
+    if (pagina.length < pageSize || todas.length >= maxTotal) break;
+    offset += pageSize;
+  }
+  return todas;
+}
+function csvEscape(v) { const s=String(v==null?'':v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }
+function descargarCSV(nombre, header, filas) {
+  const csv = '﻿' + [header.join(','), ...filas.map(f=>f.map(csvEscape).join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  a.click();
+  showToast('CSV exportado');
+}
+
+// Franja horaria: mismo esquema de 3 bloques ya confirmado y usado en todo
+// IwolPark (05:00–10:00 / 10:00–17:00 / 17:00–22:00) — el doc de referencia
+// traía otros horarios de ejemplo (07-12/12-19/19-07, tomados de una
+// plantilla genérica), pero se usa el esquema real de la plaza para que
+// este tablero cuadre con Admin/Corporativo/Demanda.
+const FRANJAS = [
+  { key:'f1', label:'05:00–10:00', test:h=>h>=5&&h<10 },
+  { key:'f2', label:'10:00–17:00', test:h=>h>=10&&h<17 },
+  { key:'f3', label:'17:00–22:00', test:h=>h>=17&&h<22 }
+];
+const FRANJA_SIN = { key:'sin', label:'Sin franja' };
+function franjaDeHora(horaStr) {
+  const h = parseInt((horaStr||'').split(':')[0]);
+  if (isNaN(h)) return FRANJA_SIN;
+  return FRANJAS.find(f=>f.test(h)) || FRANJA_SIN;
+}
+const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function diaSemanaIdx(fechaStr) { const d = new Date(fechaStr+'T12:00:00'); return d.getDay()===0?6:d.getDay()-1; }
+
+// Tipo de boleto: mismos 6 buckets ya establecidos en todo IwolPark —
+// "Cortesía" se deriva de importe=0 en normal/preferencial (tolerancia
+// ≤15min), no del campo tipo.
+const TIPO_BUCKETS = [
+  { key:'normal',       label:'Normal',       color:'#0A66C2', filter:o=>o.tipo==='normal' && o.importe>0 },
+  { key:'preferencial', label:'Preferencial', color:'#7B5EA7', filter:o=>o.tipo==='preferencial' && o.importe>0 },
+  { key:'perdido',      label:'Perdido',      color:'#D93025', filter:o=>o.tipo==='perdido' },
+  { key:'cortesia',     label:'Cortesía',     color:'#888',    filter:o=>(o.tipo==='normal'||o.tipo==='preferencial') && o.importe===0 },
+  { key:'empleado',     label:'Empleado',     color:'#1D3557', filter:o=>o.tipo==='empleado' },
+  { key:'pension',      label:'Pensión',      color:'#0D9457', filter:o=>o.tipo==='pension' }
+];
+
+// Color por cajero: los dos nombres reales que menciona el documento de
+// referencia quedan fijos; cualquier otro cajero real (Humberto, Demetrio,
+// etc.) toma un color de la paleta rotativa para no chocar entre sí.
+const COLOR_CAJERO_FIJO = { 'Vigilante':'#0A66C2', 'Carmen':'#7B5EA7', 'Juan':'#0D9457' };
+const PALETA_ROTATIVA = ['#F5A623','#D93025','#0A66C2','#1D3557','#0D9457','#7B5EA7'];
+const _colorCache = {};
+function colorCajero(nombre) {
+  if (COLOR_CAJERO_FIJO[nombre]) return COLOR_CAJERO_FIJO[nombre];
+  if (_colorCache[nombre]) return _colorCache[nombre];
+  const usados = Object.keys(_colorCache).length;
+  const c = PALETA_ROTATIVA[usados % PALETA_ROTATIVA.length];
+  _colorCache[nombre] = c;
+  return c;
+}
+
+// ══ PERÍODOS ══
+function lunesDeSemana(d) { const dd=new Date(d); dd.setDate(dd.getDate()-((dd.getDay()+6)%7)); dd.setHours(12,0,0,0); return dd; }
+function rangoDias(desde, hasta) { return { desde: fmtLocal(desde), hasta: fmtLocal(hasta) }; }
+
+function periodosVista(vista) {
+  const hoy = new Date();
+  if (vista === 'semana') {
+    const lunesAct = lunesDeSemana(hoy);
+    const domAct = new Date(lunesAct); domAct.setDate(domAct.getDate()+6);
+    const lunesAnt = new Date(lunesAct); lunesAnt.setDate(lunesAnt.getDate()-7);
+    const domAnt = new Date(lunesAnt); domAnt.setDate(domAnt.getDate()+6);
+    return {
+      actual: rangoDias(lunesAct, hoy < domAct ? hoy : domAct),
+      anterior: rangoDias(lunesAnt, domAnt),
+      etiquetaActual: 'Semana actual ('+fmtLocal(lunesAct)+' a '+fmtLocal(hoy)+')',
+      etiquetaAnterior: 'semana anterior ('+fmtLocal(lunesAnt)+' a '+fmtLocal(domAnt)+')'
+    };
+  }
+  if (vista === 'anio') {
+    const eneAct = new Date(hoy.getFullYear(), 0, 1);
+    const eneAnt = new Date(hoy.getFullYear()-1, 0, 1);
+    const mismaFechaAnt = new Date(hoy.getFullYear()-1, hoy.getMonth(), hoy.getDate());
+    return {
+      actual: rangoDias(eneAct, hoy),
+      anterior: rangoDias(eneAnt, mismaFechaAnt),
+      etiquetaActual: 'Ene–hoy '+hoy.getFullYear(),
+      etiquetaAnterior: 'mismo período '+(hoy.getFullYear()-1)
+    };
+  }
+  // mes (default)
+  const inicioMesAct = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const inicioMesAnt = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+  const finMesAnt = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+  return {
+    actual: rangoDias(inicioMesAct, hoy),
+    anterior: rangoDias(inicioMesAnt, finMesAnt),
+    etiquetaActual: MESES[hoy.getMonth()]+' '+hoy.getFullYear(),
+    etiquetaAnterior: MESES[inicioMesAnt.getMonth()]+' '+inicioMesAnt.getFullYear()
+  };
+}
+
+// ══ DATOS ══
+let TODOS = [];   // tickets normalizados de todo el rango cargado
+let ES_DEMO = false;
+let VISTA = 'mes';
+let CAJERO_EXPANDIDO = null;
+
+async function cargarTodo() {
+  try {
+    const hoy = new Date();
+    const desde = fmtLocal(new Date(hoy.getFullYear()-1, 0, 1));
+    const hasta = fmtLocal(hoy);
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=cajero,tipo,importe,fecha_op,hora_entrada,estatus&order=fecha_op.asc`;
+    const rows = await fetchPaginado(base, SB_HEADERS, 30000);
+    const utiles = rows.filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+    if (!utiles.length) throw new Error('sin datos reales todavía');
+    TODOS = utiles.map(t => ({
+      cajero: normCajero(t.cajero), tipo: t.tipo || 'normal',
+      importe: Number(t.importe) || 0, fecha: t.fecha_op,
+      franja: franjaDeHora(t.hora_entrada).key, dia: diaSemanaIdx(t.fecha_op),
+      mes: t.fecha_op.slice(0,7) // 'YYYY-MM'
+    }));
+    ES_DEMO = false;
+  } catch (e) {
+    TODOS = generarDemo();
+    ES_DEMO = true;
+  }
+  document.getElementById('demo-banner').classList.toggle('show', ES_DEMO);
+  poblarSelectCajeros();
+  render();
+}
+
+function generarDemo() {
+  // Datos ficticios realistas — misma forma que los reales, para que toda
+  // la UI (tablas, drilldown, gráficas) se vea completa aunque Supabase no
+  // responda.
+  const cajerosDemo = ['Vigilante','Carmen','Juan'];
+  const tiposDemo = ['normal','normal','normal','preferencial','preferencial','perdido','cortesia','empleado','pension'];
+  const out = [];
+  const hoy = new Date();
+  for (let mOffset=12; mOffset>=0; mOffset--) {
+    const base = new Date(hoy.getFullYear(), hoy.getMonth()-mOffset, 1);
+    const diasEnMes = mOffset===0 ? hoy.getDate() : new Date(base.getFullYear(), base.getMonth()+1, 0).getDate();
+    for (let d=1; d<=diasEnMes; d++) {
+      const fecha = new Date(base.getFullYear(), base.getMonth(), d);
+      const fechaStr = fmtLocal(fecha);
+      const factorFinde = [0,6].includes(fecha.getDay()) ? 1.3 : 1;
+      cajerosDemo.forEach(cj => {
+        const nTickets = Math.round((8 + Math.random()*10) * factorFinde);
+        for (let i=0;i<nTickets;i++) {
+          const tipo = tiposDemo[Math.floor(Math.random()*tiposDemo.length)];
+          const h = 5 + Math.floor(Math.random()*17);
+          const importe = tipo==='normal' ? 15*(1+Math.floor(Math.random()*3))
+            : tipo==='preferencial' ? 6*(1+Math.floor(Math.random()*3))
+            : tipo==='perdido' ? 150+15*Math.floor(Math.random()*3)
+            : 0;
+          out.push({ cajero: cj, tipo, importe, fecha: fechaStr,
+            franja: franjaDeHora(h+':00').key, dia: diaSemanaIdx(fechaStr), mes: fechaStr.slice(0,7) });
+        }
+      });
+    }
+  }
+  return out;
+}
+
+function poblarSelectCajeros() {
+  const sel = document.getElementById('sel-cajero');
+  const actual = sel.value;
+  const cajeros = [...new Set(TODOS.map(t=>t.cajero))].sort();
+  sel.innerHTML = '<option value="">Todos los cajeros</option>' + cajeros.map(c=>`<option value="${c}">${c}</option>`).join('');
+  if (cajeros.includes(actual)) sel.value = actual;
+}
+
+function filtrarCajero(rows) {
+  const cj = document.getElementById('sel-cajero').value;
+  return cj ? rows.filter(t=>t.cajero===cj) : rows;
+}
+function enRango(rows, desde, hasta) { return rows.filter(t => t.fecha>=desde && t.fecha<=hasta); }
+
+// ══ AGREGACIONES ══
+function porCajero(rows) {
+  const out = {};
+  rows.forEach(t => { const o = out[t.cajero] || (out[t.cajero]={tickets:0,importe:0}); o.tickets++; o.importe += t.importe; });
+  return out;
+}
+function porCajeroTipo(rows, cajero) {
+  const subset = rows.filter(t=>t.cajero===cajero);
+  return TIPO_BUCKETS.map(b => {
+    const s = subset.filter(b.filter);
+    return { label:b.label, tickets:s.length, importe:s.reduce((a,o)=>a+o.importe,0) };
+  });
+}
+function porCajeroFranja(rows, cajero) {
+  const subset = rows.filter(t=>t.cajero===cajero);
+  return FRANJAS.map(f => {
+    const s = subset.filter(t=>t.franja===f.key);
+    return { label:f.label, tickets:s.length, importe:s.reduce((a,o)=>a+o.importe,0) };
+  });
+}
+function porDiaSemana(rows) {
+  // Promedio de tickets por día de semana: cuenta días distintos con
+  // actividad para dividir, igual que el resto de IwolPark (Demanda.html).
+  const acc = DIAS.map(()=>({tickets:0,fechas:new Set()}));
+  rows.forEach(t => { acc[t.dia].tickets++; acc[t.dia].fechas.add(t.fecha); });
+  return acc.map(a => a.fechas.size ? a.tickets/a.fechas.size : 0);
+}
+function porMes(rows) {
+  const out = {};
+  rows.forEach(t => { const o = out[t.mes] || (out[t.mes]={tickets:0,importe:0}); o.tickets++; o.importe += t.importe; });
+  return out;
+}
+function variacion(ant, act) {
+  if (ant===0 && act===0) return { txt:'—', clase:'var-neu', pct:null };
+  if (ant===0) return { txt:'🆕 Nuevo', clase:'var-pos', pct:null };
+  const pct = (act-ant)/ant*100;
+  const txt = (pct>=0?'+':'')+pct.toFixed(1)+'%';
+  return { txt, clase: pct>0?'var-pos':pct<0?'var-neg':'var-neu', pct };
+}
+function flechaVar(v) {
+  if (v.pct==null) return v.txt;
+  const flecha = v.pct>0 ? '↑' : v.pct<0 ? '↓' : '';
+  let alerta = '';
+  if (v.pct <= -10) alerta = '<span class="alerta-baja" title="Caída fuerte">⚠</span>';
+  else if (v.pct >= 15) alerta = '<span class="alerta-alta" title="Alza fuerte">🔥</span>';
+  return flecha+' '+v.txt+alerta;
+}
+
+// ══ RENDER PRINCIPAL ══
+function cambiarVista(v) {
+  VISTA = v;
+  document.querySelectorAll('.vista-tab').forEach(t=>t.classList.toggle('active', t.dataset.vista===v));
+  render();
+}
+
+let ULTIMO_ACTUAL = [], ULTIMO_ANTERIOR = [];
+
+function render() {
+  if (!TODOS.length) return;
+  const periodos = periodosVista(VISTA);
+  document.getElementById('comparando-txt').textContent = 'Comparando '+periodos.etiquetaActual+' vs '+periodos.etiquetaAnterior;
+
+  const rowsCajero = filtrarCajero(TODOS);
+  const actual = enRango(rowsCajero, periodos.actual.desde, periodos.actual.hasta);
+  const anterior = enRango(rowsCajero, periodos.anterior.desde, periodos.anterior.hasta);
+  ULTIMO_ACTUAL = actual; ULTIMO_ANTERIOR = anterior;
+
+  const titulos = { semana:'Alcance cajeros — semana', mes:'Alcance cajeros — mes', anio:'Alcance cajeros — acumulado año' };
+  document.getElementById('tabla-principal-titulo').textContent = titulos[VISTA];
+
+  renderTablaPrincipal(actual, anterior);
+  renderEfectividad(actual, periodos);
+  renderAcumuladoAnio();
+  renderTablaDias(actual, anterior);
+  renderTablaMeses();
+  renderCharts(actual, anterior);
+  if (CAJERO_EXPANDIDO) renderDrilldown(CAJERO_EXPANDIDO, actual, anterior);
+}
+
+function renderTablaPrincipal(actual, anterior) {
+  const t = document.getElementById('tabla-principal');
+  const porCajAct = porCajero(actual), porCajAnt = porCajero(anterior);
+  const cajeros = [...new Set([...Object.keys(porCajAct), ...Object.keys(porCajAnt)])];
+  const totAct = actual.reduce((s,o)=>s+o.importe,0), totActTickets = actual.length;
+  const totAnt = anterior.reduce((s,o)=>s+o.importe,0), totAntTickets = anterior.length;
+
+  t.querySelector('thead').innerHTML = `<tr>
+    <th>Cajero</th><th class="num">Tickets ant.</th><th class="num">Tickets act.</th><th class="num">Var%</th>
+    <th class="num">Importe ant.</th><th class="num">Importe act.</th><th class="num">Var%</th>
+    <th class="num">% Part.</th><th>Tendencia</th>
+  </tr>`;
+
+  const filas = cajeros.map(cj => {
+    const a = porCajAnt[cj] || {tickets:0,importe:0};
+    const b = porCajAct[cj] || {tickets:0,importe:0};
+    const vT = variacion(a.tickets, b.tickets), vI = variacion(a.importe, b.importe);
+    const part = totActTickets ? (b.tickets/totActTickets*100) : 0;
+    const spark = sparklineCajero(cj);
+    const sinActividad = b.tickets===0 && a.tickets===0;
+    return { cj, a, b, vT, vI, part, spark, sinActividad };
+  }).sort((x,y) => y.b.importe - x.b.importe);
+
+  t.querySelector('tbody').innerHTML = filas.map(f => `
+    <tr class="fila-cajero" onclick="toggleDrilldown('${f.cj.replace(/'/g,"\\'")}')">
+      <td><span class="expand-ico ${CAJERO_EXPANDIDO===f.cj?'open':''}">▶</span>
+          <span class="chip-cajero" style="background:${colorCajero(f.cj)}"></span>${f.cj}</td>
+      <td class="num">${f.a.tickets}</td>
+      <td class="num">${f.b.tickets}</td>
+      <td class="num ${f.vT.clase}">${flecha(f.vT)}</td>
+      <td class="num">${fmt$(f.a.importe)}</td>
+      <td class="num">${fmt$(f.b.importe)}</td>
+      <td class="num ${f.vI.clase}">${flecha(f.vI)}</td>
+      <td class="num">${f.sinActividad ? '<span class="sin-actividad">Sin actividad</span>' : f.part.toFixed(1)+'%'}</td>
+      <td>${f.spark}</td>
+    </tr>
+    <tr class="drilldown-row" id="drill-row-${cssId(f.cj)}"><td colspan="9"><div class="drilldown-box" id="drill-box-${cssId(f.cj)}"></div></td></tr>
+  `).join('') + `
+    <tr class="fila-total">
+      <td>Total</td>
+      <td class="num">${totAntTickets}</td>
+      <td class="num">${totActTickets}</td>
+      <td class="num ${variacion(totAntTickets,totActTickets).clase}">${flecha(variacion(totAntTickets,totActTickets))}</td>
+      <td class="num">${fmt$(totAnt)}</td>
+      <td class="num">${fmt$(totAct)}</td>
+      <td class="num ${variacion(totAnt,totAct).clase}">${flecha(variacion(totAnt,totAct))}</td>
+      <td class="num">100%</td>
+      <td></td>
+    </tr>`;
+}
+function flecha(v){ return flechaVar(v); }
+function cssId(s){ return s.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+function sparklineCajero(cajero) {
+  // Últimos 4 meses de tickets del cajero, como mini-barras.
+  const hoy = new Date();
+  const valores = [];
+  for (let i=3;i>=0;i--) {
+    const m = new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+    const mesStr = fmtLocal(m).slice(0,7);
+    valores.push(TODOS.filter(t=>t.cajero===cajero && t.mes===mesStr).length);
+  }
+  const max = Math.max(...valores, 1);
+  const color = colorCajero(cajero);
+  return `<span class="spark">${valores.map(v=>`<span class="spark-bar" style="height:${Math.max(2,v/max*20)}px;background:${color}"></span>`).join('')}</span>`;
+}
+
+function toggleDrilldown(cajero) {
+  const abrir = CAJERO_EXPANDIDO !== cajero;
+  CAJERO_EXPANDIDO = abrir ? cajero : null;
+  render();
+  if (abrir) {
+    const box = document.getElementById('drill-row-'+cssId(cajero));
+    if (box) box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+}
+function renderDrilldown(cajero, actual, anterior) {
+  const box = document.getElementById('drill-box-'+cssId(cajero));
+  const ico = document.querySelector(`#drill-row-${cssId(cajero)}`)?.previousElementSibling?.querySelector('.expand-ico');
+  if (!box) return;
+  box.classList.add('open');
+
+  const porTipoAct = porCajeroTipo(actual, cajero), porTipoAnt = porCajeroTipo(anterior, cajero);
+  const totTipoAct = porTipoAct.reduce((s,o)=>s+o.tickets,0) || 1;
+  const filasTipo = porTipoAct.map((t,i) => {
+    const ant = porTipoAnt[i];
+    const v = variacion(ant.tickets, t.tickets);
+    const part = (t.tickets/totTipoAct*100).toFixed(0);
+    return `<tr><td>${t.label}</td><td class="num">${ant.tickets}</td><td class="num">${t.tickets}</td>
+      <td class="num ${v.clase}">${flecha(v)}</td><td class="num">${fmt$(ant.importe)}</td>
+      <td class="num">${fmt$(t.importe)}</td><td class="num">${part}%</td></tr>`;
+  }).join('');
+
+  const porFranjaAct = porCajeroFranja(actual, cajero), porFranjaAnt = porCajeroFranja(anterior, cajero);
+  const filasFranja = porFranjaAct.map((f,i) => {
+    const ant = porFranjaAnt[i];
+    const v = variacion(ant.tickets, f.tickets);
+    return `<tr><td>${f.label}</td><td class="num">${ant.tickets}</td><td class="num">${f.tickets}</td>
+      <td class="num ${v.clase}">${flecha(v)}</td><td class="num">${fmt$(ant.importe)}</td>
+      <td class="num">${fmt$(f.importe)}</td></tr>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div class="drilldown-title">Detalle: ${cajero}</div>
+    <div class="drill-tables">
+      <div>
+        <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Por tipo de boleto</div>
+        <table><thead><tr><th>Tipo</th><th class="num">Tick. ant</th><th class="num">Tick. act</th><th class="num">Var%</th><th class="num">Imp. ant</th><th class="num">Imp. act</th><th class="num">% Part</th></tr></thead>
+        <tbody>${filasTipo}</tbody></table>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:800;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Por franja horaria</div>
+        <table><thead><tr><th>Franja</th><th class="num">Tick. ant</th><th class="num">Tick. act</th><th class="num">Var%</th><th class="num">Imp. ant</th><th class="num">Imp. act</th></tr></thead>
+        <tbody>${filasFranja}</tbody></table>
+      </div>
+    </div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="btn-outline" onclick="exportarDrilldownCSV('${cajero.replace(/'/g,"\\'")}')">⬇ Export CSV de ${cajero}</button>
+    </div>`;
+  if (ico) ico.classList.add('open');
+}
+
+// ══ EFECTIVIDAD (ocupación aproximada del período, no atribuible a un
+// cajero individual porque varios se turnan la misma plaza) ══
+function renderEfectividad(actual, periodos) {
+  const el = document.getElementById('efectividad-box');
+  const dias = new Set(actual.map(t=>t.fecha)).size || 1;
+  const promDia = actual.length / dias;
+  const totalImporte = actual.reduce((s,o)=>s+o.importe,0);
+  const pagados = actual.filter(o=>o.importe>0).length;
+  const pctPagados = actual.length ? Math.round(pagados/actual.length*100) : 0;
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="text-align:center;background:var(--bg);border-radius:10px;padding:14px">
+        <div style="font-size:30px;font-weight:900;color:var(--purple)">${Math.round(promDia)}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Tickets promedio / día</div>
+      </div>
+      <div style="text-align:center;background:var(--bg);border-radius:10px;padding:14px">
+        <div style="font-size:24px;font-weight:900;color:var(--gold)">${fmt$(totalImporte)}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Importe total del período</div>
+      </div>
+      <div style="text-align:center;background:var(--bg);border-radius:10px;padding:14px">
+        <div style="font-size:24px;font-weight:900;color:#0D9457">${pctPagados}%</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Tickets pagados (vs cortesía/pensión/empleado)</div>
+      </div>
+    </div>`;
+}
+
+// ══ ACUMULADO AÑO (siempre visible, sin importar la vista elegida) ══
+function renderAcumuladoAnio() {
+  const t = document.getElementById('tabla-acumulado');
+  const p = periodosVista('anio');
+  document.getElementById('acumulado-sub').textContent = p.etiquetaActual+' vs '+p.etiquetaAnterior;
+  const rowsCajero = filtrarCajero(TODOS);
+  const actual = enRango(rowsCajero, p.actual.desde, p.actual.hasta);
+  const anterior = enRango(rowsCajero, p.anterior.desde, p.anterior.hasta);
+  const porCajAct = porCajero(actual), porCajAnt = porCajero(anterior);
+  const cajeros = [...new Set([...Object.keys(porCajAct), ...Object.keys(porCajAnt)])];
+  const totActTickets = actual.length, totAntTickets = anterior.length;
+
+  t.querySelector('thead').innerHTML = `<tr>
+    <th>Cajero</th><th class="num">Acum. ant</th><th class="num">Acum. act</th><th class="num">Var%</th>
+    <th class="num">% Part ant</th><th class="num">% Part act</th>
+  </tr>`;
+  const filas = cajeros.map(cj => {
+    const a = porCajAnt[cj] || {tickets:0,importe:0}, b = porCajAct[cj] || {tickets:0,importe:0};
+    const v = variacion(a.tickets, b.tickets);
+    const partAnt = totAntTickets ? (a.tickets/totAntTickets*100) : 0;
+    const partAct = totActTickets ? (b.tickets/totActTickets*100) : 0;
+    return { cj, a, b, v, partAnt, partAct };
+  }).sort((x,y)=>y.b.tickets-x.b.tickets);
+
+  t.querySelector('tbody').innerHTML = filas.map(f => `
+    <tr><td><span class="chip-cajero" style="background:${colorCajero(f.cj)}"></span>${f.cj}</td>
+      <td class="num">${f.a.tickets}</td><td class="num">${f.b.tickets}</td>
+      <td class="num ${f.v.clase}">${flecha(f.v)}</td>
+      <td class="num">${f.partAnt.toFixed(1)}%</td><td class="num">${f.partAct.toFixed(1)}%</td></tr>
+  `).join('') + `<tr class="fila-total"><td>Total</td><td class="num">${totAntTickets}</td><td class="num">${totActTickets}</td>
+      <td class="num ${variacion(totAntTickets,totActTickets).clase}">${flecha(variacion(totAntTickets,totActTickets))}</td>
+      <td class="num">100%</td><td class="num">100%</td></tr>`;
+}
+
+// ══ TOP DÍAS DE LA SEMANA ══
+function renderTablaDias(actual, anterior) {
+  const t = document.getElementById('tabla-dias');
+  const promAct = porDiaSemana(actual), promAnt = porDiaSemana(anterior);
+  t.querySelector('thead').innerHTML = `<tr><th>Día</th><th class="num">Prom. anterior</th><th class="num">Prom. actual</th><th class="num">Var%</th></tr>`;
+  t.querySelector('tbody').innerHTML = DIAS.map((d,i) => {
+    const v = variacion(promAnt[i], promAct[i]);
+    return `<tr><td>${d}</td><td class="num">${promAnt[i].toFixed(1)}</td><td class="num">${promAct[i].toFixed(1)}</td>
+      <td class="num ${v.clase}">${flecha(v)}</td></tr>`;
+  }).join('');
+}
+
+// ══ TABLA 12 MESES ══
+function renderTablaMeses() {
+  const t = document.getElementById('tabla-meses');
+  const rows = filtrarCajero(TODOS);
+  const agregPorMes = porMes(rows);
+  const hoy = new Date();
+  const meses = [];
+  for (let i=11;i>=0;i--) {
+    const m = new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+    meses.push(fmtLocal(m).slice(0,7));
+  }
+  t.querySelector('thead').innerHTML = `<tr><th>Mes</th><th class="num">Tickets</th><th class="num">Importe</th><th class="num">Var vs mes ant.</th></tr>`;
+  let totTickets=0, totImporte=0;
+  const filas = meses.map((m,i) => {
+    const d = agregPorMes[m] || {tickets:0,importe:0};
+    totTickets += d.tickets; totImporte += d.importe;
+    const esParcial = m === fmtLocal(hoy).slice(0,7);
+    let varHtml = '<span class="var-neu">—</span>';
+    if (i>0) {
+      const anteriorMes = agregPorMes[meses[i-1]] || {tickets:0};
+      const v = variacion(anteriorMes.tickets, d.tickets);
+      varHtml = `<span class="${v.clase}">${flecha(v)}</span>`;
+    }
+    const [anio, mes] = m.split('-');
+    return `<tr><td>${MESES[parseInt(mes,10)-1]} ${anio}${esParcial?' <span class="sin-actividad">(parcial)</span>':''}</td>
+      <td class="num">${d.tickets}</td><td class="num">${fmt$(d.importe)}</td><td class="num">${varHtml}</td></tr>`;
+  }).join('');
+  t.querySelector('tbody').innerHTML = filas + `<tr class="fila-total"><td>Total</td><td class="num">${totTickets}</td><td class="num">${fmt$(totImporte)}</td><td></td></tr>`;
+}
+
+// ══ EXPORT CSV ══
+function exportarTablaCSV(cual) {
+  const table = document.getElementById(cual==='principal'?'tabla-principal':'tabla-acumulado');
+  const header = [...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+  const filas = [...table.querySelectorAll('tbody tr')]
+    .filter(tr => !tr.classList.contains('drilldown-row'))
+    .map(tr => [...tr.children].map(td=>td.textContent.replace(/\s+/g,' ').trim()));
+  descargarCSV('IwolPark_cajeros_'+cual+'_'+fmtLocal(new Date())+'.csv', header, filas);
+}
+function exportarDrilldownCSV(cajero) {
+  const porTipoAct = porCajeroTipo(ULTIMO_ACTUAL, cajero), porTipoAnt = porCajeroTipo(ULTIMO_ANTERIOR, cajero);
+  const header = ['cajero','tipo','tickets_mes_ant','tickets_mes_act','variacion_pct','importe_mes_ant','importe_mes_act','participacion_pct'];
+  const totAct = porTipoAct.reduce((s,o)=>s+o.tickets,0) || 1;
+  const filas = porTipoAct.map((t,i) => {
+    const ant = porTipoAnt[i];
+    const v = variacion(ant.tickets, t.tickets);
+    return [cajero, t.label, ant.tickets, t.tickets, v.pct==null?'':v.pct.toFixed(1), ant.importe, t.importe, (t.tickets/totAct*100).toFixed(1)];
+  });
+  descargarCSV('IwolPark_cajero_'+cssId(cajero)+'_'+fmtLocal(new Date())+'.csv', header, filas);
+}
+
+// ══ GRÁFICAS (Chart.js) ══
+let CHARTS = {};
+function destruirChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+function renderCharts(actual, anterior) {
+  renderChart1();
+  renderChart2y3(actual);
+  renderChart4(actual);
+  renderChart5(actual, anterior);
+}
+
+// Gráfica 1: importe cobrado por mes, año anterior vs año actual (barras agrupadas)
+function renderChart1() {
+  destruirChart('c1');
+  const rows = filtrarCajero(TODOS);
+  const agregPorMes = porMes(rows);
+  const hoy = new Date();
+  const datosAct = [], datosAnt = [];
+  for (let m=0; m<12; m++) {
+    const keyAct = fmtLocal(new Date(hoy.getFullYear(), m, 1)).slice(0,7);
+    const keyAnt = fmtLocal(new Date(hoy.getFullYear()-1, m, 1)).slice(0,7);
+    datosAct.push(m <= hoy.getMonth() ? (agregPorMes[keyAct]?.importe||0) : null);
+    datosAnt.push(agregPorMes[keyAnt]?.importe||0);
+  }
+  CHARTS.c1 = new Chart(document.getElementById('chart1'), {
+    type:'bar',
+    data: { labels: MESES, datasets: [
+      { label:''+(hoy.getFullYear()-1), data:datosAnt, backgroundColor:'#B8D4F0' },
+      { label:''+hoy.getFullYear(), data:datosAct, backgroundColor:'#0A66C2' }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},
+      scales:{ y:{ ticks:{ callback:v=>'$'+v.toLocaleString('es-MX') } } } }
+  });
+}
+
+// Gráfica 2+3: evolución por cajero — tickets (línea) e importe (línea), combinadas con eje doble
+function renderChart2y3() {
+  destruirChart('c2');
+  const hoy = new Date();
+  const meses = []; for (let i=5;i>=0;i--) meses.push(fmtLocal(new Date(hoy.getFullYear(),hoy.getMonth()-i,1)).slice(0,7));
+  const cajeros = [...new Set(TODOS.map(t=>t.cajero))];
+  const cajeroSel = document.getElementById('sel-cajero').value;
+
+  document.getElementById('leyenda-cajeros-23').innerHTML = 'Línea sólida = tickets · línea punteada = importe ($)';
+
+  const datasets = [];
+  cajeros.forEach(cj => {
+    const destacado = !cajeroSel || cajeroSel===cj;
+    const color = colorCajero(cj);
+    const serieTickets = meses.map(m => TODOS.filter(t=>t.cajero===cj && t.mes===m).length);
+    const serieImporte = meses.map(m => TODOS.filter(t=>t.cajero===cj && t.mes===m).reduce((s,o)=>s+o.importe,0));
+    datasets.push({ label:cj+' (tickets)', data:serieTickets, borderColor:destacado?color:'#D2D2D7',
+      backgroundColor:'transparent', borderWidth:destacado?2.5:1.5, yAxisID:'y', tension:.3,
+      pointRadius:destacado?3:0, order:1 });
+    datasets.push({ label:cj+' (importe)', data:serieImporte, borderColor:destacado?color:'#E5E5EA',
+      backgroundColor:'transparent', borderWidth:destacado?2:1, borderDash:[5,4], yAxisID:'y1', tension:.3,
+      pointRadius:0, order:2, hidden:!destacado });
+  });
+
+  CHARTS.c2 = new Chart(document.getElementById('chart2'), {
+    type:'line',
+    data:{ labels: meses.map(m=>{const [a,mm]=m.split('-');return MESES[parseInt(mm,10)-1]+' '+a.slice(2);}), datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:10,font:{size:9}} } },
+      scales:{ y:{ position:'left', title:{display:true,text:'Tickets',font:{size:10}} },
+                y1:{ position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'Importe $',font:{size:10}} } } }
+  });
+}
+
+// Gráfica 4: mix cajero x tipo de boleto (barras horizontales apiladas, %)
+function renderChart4(actual) {
+  destruirChart('c4');
+  const cajeros = [...new Set(actual.map(t=>t.cajero))];
+  const datasets = cajeros.map(cj => ({
+    label: cj, backgroundColor: colorCajero(cj),
+    data: TIPO_BUCKETS.map(b => {
+      const delTipo = actual.filter(b.filter);
+      const total = delTipo.length || 1;
+      const delCajero = delTipo.filter(t=>t.cajero===cj).length;
+      return +(delCajero/total*100).toFixed(1);
+    })
+  }));
+  CHARTS.c4 = new Chart(document.getElementById('chart4'), {
+    type:'bar',
+    data:{ labels: TIPO_BUCKETS.map(b=>b.label), datasets },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+'%'}} },
+      scales:{ x:{ stacked:true, max:100, ticks:{callback:v=>v+'%'} }, y:{ stacked:true } } }
+  });
+}
+
+// Gráfica 5: promedio diario de tickets vs período anterior, por cajero (barras horizontales pareadas)
+function renderChart5(actual, anterior) {
+  destruirChart('c5');
+  const cajeros = [...new Set([...actual.map(t=>t.cajero), ...anterior.map(t=>t.cajero)])];
+  const diasAct = new Set(actual.map(t=>t.fecha)).size || 1;
+  const diasAnt = new Set(anterior.map(t=>t.fecha)).size || 1;
+  const promAct = cajeros.map(cj => +(actual.filter(t=>t.cajero===cj).length/diasAct).toFixed(1));
+  const promAnt = cajeros.map(cj => +(anterior.filter(t=>t.cajero===cj).length/diasAnt).toFixed(1));
+  CHARTS.c5 = new Chart(document.getElementById('chart5'), {
+    type:'bar',
+    data:{ labels: cajeros, datasets:[
+      { label:'Período anterior', data:promAnt, backgroundColor:'#B8D4F0' },
+      { label:'Período actual', data:promAct, backgroundColor:'#D93025' }
+    ]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
+        datalabels:{} },
+      scales:{ x:{ title:{display:true,text:'Tickets promedio / día',font:{size:10}} } } }
+  });
+}
+
+// ══ INIT ══
+cargarTodo();
+</script>
+</body>
+</html>
