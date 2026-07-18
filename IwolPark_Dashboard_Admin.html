@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v93</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v94</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -965,7 +965,12 @@ const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623'};
 // ══ Ingresos por cajero y día — esta semana (mismo widget que Demanda) ══
 const DIAS_CD = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 function fmtLocalCD(d) { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
-function lunesDeSemanaCD(d) { const dd=new Date(d); dd.setDate(dd.getDate()-((dd.getDay()+6)%7)); dd.setHours(0,0,0,0); return dd; }
+// Ancla a mediodía (no medianoche) porque las fechas de los tickets se
+// reconstruyen como new Date(fecha_op+'T12:00:00') más abajo -- si el lunes
+// quedara a medianoche, la resta daba 12h de más y cada ticket se corría un
+// día (bug real: el 15/julio, miércoles confirmado, aparecía en la columna
+// "Jue").
+function lunesDeSemanaCD(d) { const dd=new Date(d); dd.setDate(dd.getDate()-((dd.getDay()+6)%7)); dd.setHours(12,0,0,0); return dd; }
 // Normaliza el nombre del cajero para agrupar ("HUMBERTO"/"Humberto"/"humberto"
 // deben ser la misma fila) — tickets.cajero es texto libre con capitalización
 // inconsistente entre sesiones/cajeros.
