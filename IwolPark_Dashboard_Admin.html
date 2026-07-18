@@ -247,11 +247,12 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v91</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v92</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirParametros();">⚙ Parámetros del sistema</button>
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirBitacora();">📜 Bitácora</button>
         <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
         <a class="nav-menu-item" href="IwolPark_Demanda.html" target="_blank">📈 Análisis de demanda</a>
         <div class="nav-menu-sep"></div>
@@ -484,6 +485,47 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: BITÁCORA ══ -->
+  <div class="modal-overlay" id="modal-bitacora">
+    <div class="modal-box" style="max-width:1200px">
+      <div class="modal-head">
+        <span class="modal-title">📜 Bitácora de acciones</span>
+        <button class="modal-close" onclick="cerrarBitacora()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="param-card">
+          <div class="param-row">
+            <label style="font-size:11px;color:var(--muted)">Desde</label>
+            <input type="date" id="bit-desde">
+            <label style="font-size:11px;color:var(--muted)">Hasta</label>
+            <input type="date" id="bit-hasta">
+            <label style="font-size:11px;color:var(--muted)">Hora desde</label>
+            <input type="time" id="bit-hora-desde">
+            <label style="font-size:11px;color:var(--muted)">Hora hasta</label>
+            <input type="time" id="bit-hora-hasta">
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <input type="text" id="bit-usuario" placeholder="Usuario (nombre o usuario)">
+            <select id="bit-accion">
+              <option value="">Todas las acciones</option>
+              <option value="login">Login</option>
+              <option value="cobro">Cobro</option>
+              <option value="cancelacion">Cancelación</option>
+              <option value="arqueo">Arqueo</option>
+              <option value="relevo">Relevo</option>
+              <option value="cierre_dia">Cierre de día</option>
+              <option value="reimpresion_comprobante">Reimpresión comprobante</option>
+            </select>
+            <button class="param-btn" onclick="buscarBitacora()">🔍 Buscar</button>
+            <button class="param-btn outline" onclick="exportarBitacoraCSV()">⬇ Exportar CSV</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);font-weight:700" id="bitacora-count">—</div>
+        <div id="bitacora-tabla"></div>
       </div>
     </div>
   </div>
@@ -1388,6 +1430,118 @@ function exportarCSV() {
   a.download = 'IwolPark_admin_'+hoy+'.csv';
   a.click();
   showToast('CSV exportado · '+ops.length+' registros');
+}
+
+// ══ BITÁCORA ══
+let BITACORA_ACTUAL = [];
+const ACCION_LABELS = {
+  login:'🔑 Login', cobro:'💰 Cobro', cancelacion:'❌ Cancelación',
+  arqueo:'🧮 Arqueo', relevo:'🔄 Relevo', cierre_dia:'🌙 Cierre de día',
+  reimpresion_comprobante:'🖨 Reimpresión comprobante'
+};
+function accionLabel(a) { return ACCION_LABELS[a] || a || '—'; }
+function fmtFechaHoraMX(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('es-MX', {
+    timeZone:'America/Mexico_City', day:'2-digit', month:'2-digit', year:'numeric',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+  });
+}
+function abrirBitacora() {
+  document.getElementById('modal-bitacora').classList.add('open');
+  const hoy = fmtLocal(new Date());
+  document.getElementById('bit-desde').value = hoy;
+  document.getElementById('bit-hasta').value = hoy;
+  document.getElementById('bit-hora-desde').value = '';
+  document.getElementById('bit-hora-hasta').value = '';
+  document.getElementById('bit-usuario').value = '';
+  document.getElementById('bit-accion').value = '';
+  buscarBitacora();
+}
+function cerrarBitacora() {
+  document.getElementById('modal-bitacora').classList.remove('open');
+}
+async function buscarBitacora() {
+  const cont = document.getElementById('bitacora-tabla');
+  cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Cargando…</div>';
+  try {
+    const desde = document.getElementById('bit-desde').value;
+    const hasta = document.getElementById('bit-hasta').value;
+    const horaDesde = document.getElementById('bit-hora-desde').value;
+    const horaHasta = document.getElementById('bit-hora-hasta').value;
+    const usuario = document.getElementById('bit-usuario').value.trim();
+    const accion = document.getElementById('bit-accion').value;
+
+    // Los límites de día se arman en hora de México (UTC-6, sin horario de
+    // verano desde 2022) para que "Desde/Hasta" filtren por el día real
+    // operativo, no por el día en UTC que trae created_at.
+    let query = 'order=created_at.desc';
+    if (desde) query += `&created_at=gte.${encodeURIComponent(desde+'T00:00:00-06:00')}`;
+    if (hasta) query += `&created_at=lte.${encodeURIComponent(hasta+'T23:59:59-06:00')}`;
+    if (accion) query += `&accion=eq.${encodeURIComponent(accion)}`;
+    if (usuario) query += `&usuario=ilike.*${encodeURIComponent(usuario)}*`;
+
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    let rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/bitacora?${query}`, headers, 5000);
+
+    // El filtro de hora (rango del día, sin importar la fecha) se aplica del
+    // lado del cliente — PostgREST no tiene forma directa de comparar solo
+    // la parte de hora de un timestamptz contra un rango.
+    if (horaDesde || horaHasta) {
+      const aMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+      const hd = horaDesde ? aMin(horaDesde) : 0;
+      const hh = horaHasta ? aMin(horaHasta) : 1439;
+      rows = rows.filter(r => {
+        const mx = new Date(r.created_at).toLocaleString('en-US', {timeZone:'America/Mexico_City', hour12:false, hour:'2-digit', minute:'2-digit'});
+        const [h,m] = mx.split(':').map(Number);
+        const mins = h*60+m;
+        return mins>=hd && mins<=hh;
+      });
+    }
+
+    BITACORA_ACTUAL = rows;
+    renderBitacora(rows);
+  } catch (e) {
+    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">No se pudo cargar la bitácora</div>';
+  }
+}
+function renderBitacora(rows) {
+  document.getElementById('bitacora-count').textContent = rows.length+' registro'+(rows.length===1?'':'s');
+  const cont = document.getElementById('bitacora-tabla');
+  if (!rows.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Sin resultados para el filtro seleccionado</div>';
+    return;
+  }
+  cont.innerHTML = `<div class="tabla-wrap"><table>
+    <thead><tr><th>ID</th><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>Plaza</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${r.id}</td>
+      <td style="white-space:nowrap">${fmtFechaHoraMX(r.created_at)}</td>
+      <td>${escHtmlAttr(r.usuario)||'—'}</td>
+      <td>${escHtmlAttr(accionLabel(r.accion))}</td>
+      <td style="font-family:monospace;font-size:11px;max-width:340px;white-space:pre-wrap">${r.detalle ? escHtmlAttr(JSON.stringify(r.detalle)) : '—'}</td>
+      <td>${escHtmlAttr(r.plaza_id)||'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function csvEscapeBitacora(v) {
+  const s = String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportarBitacoraCSV() {
+  const rows = BITACORA_ACTUAL;
+  if (!rows.length) { showToast('No hay registros para exportar'); return; }
+  const header = ['ID','Fecha y hora (MX)','Usuario','Acción','Detalle','Plaza'].join(',');
+  const lines = rows.map(r => [
+    r.id, fmtFechaHoraMX(r.created_at), r.usuario||'', r.accion||'', r.detalle?JSON.stringify(r.detalle):'', r.plaza_id||''
+  ].map(csvEscapeBitacora).join(','));
+  const csv = '﻿' + [header,...lines].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'IwolPark_bitacora_'+fmtLocal(new Date())+'.csv';
+  a.click();
+  showToast('CSV exportado · '+rows.length+' registros');
 }
 
 // ══ PARÁMETROS DEL SISTEMA ══
