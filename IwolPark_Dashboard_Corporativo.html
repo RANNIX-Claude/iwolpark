@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v97</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v98</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -276,9 +276,9 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
 
   <div class="grid3">
     <!-- Ocupación gauge -->
-    <div class="card">
+    <div class="card" style="cursor:pointer" onclick="drillKPI('ocupacion')">
       <div class="card-title">Ocupación promedio</div>
-      <div class="card-sub">Promedio del período seleccionado</div>
+      <div class="card-sub">Promedio del período seleccionado · clic para ver el detalle</div>
       <div class="gauge-wrap" style="margin-top:8px">
         <svg width="120" height="70" viewBox="0 0 120 70">
           <path d="M10 65 A50 50 0 0 1 110 65" fill="none" stroke="#F0EEF8" stroke-width="12" stroke-linecap="round"/>
@@ -655,6 +655,98 @@ async function calcularOcupacionPromedio(desde, hasta) {
     // de uso como ocupacionProm/CAPACIDAD_TOTAL, igual que antes.
     return minutosOcupados / minutosVentana;
   } catch (e) { return 0; }
+}
+
+// Reporte de "cómo se calculó" el % de ocupación — el mismo cálculo que
+// calcularOcupacionPromedio(), pero mostrando el detalle por ticket (una
+// columna con el tiempo que estuvo cada auto) para que se pueda verificar
+// a mano la suma, a pedido del usuario.
+let REPORTE_OCUPACION_ACTUAL = [];
+async function construirReporteOcupacion() {
+  const periodo = document.getElementById('periodo-ej')?.value || 'mes';
+  const {desde,hasta} = fechasPeriodo(periodo);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,cajero,fecha_op,hora_entrada,hora_salida,hora_entrada_at,hora_salida_at,estatus&order=fecha_op.desc`, { headers: SB_HEADERS });
+  const rows = r.ok ? await r.json() : [];
+  const ahora = new Date();
+  const hoyStr = fmtLocal(ahora);
+
+  // Denominador — mismos días/horario que calcularOcupacionPromedio().
+  let minutosVentana = 0, diasContados = 0;
+  const d0 = new Date(desde+'T12:00:00'), d1 = new Date(hasta+'T12:00:00');
+  for (let d = new Date(d0); d <= d1; d.setDate(d.getDate()+1)) {
+    const diaStr = fmtLocal(d);
+    const vIni = new Date(diaStr+'T'+HORA_APERTURA_PLAZA+':00-06:00');
+    let vFin = new Date(diaStr+'T'+HORA_CIERRE_PLAZA+':00-06:00');
+    if (diaStr === hoyStr) { if (ahora < vIni) continue; if (ahora < vFin) vFin = ahora; }
+    if (vFin > vIni) { minutosVentana += (vFin - vIni) / 60000; diasContados++; }
+  }
+
+  const detalle = [];
+  let minutosOcupados = 0;
+  for (const t of rows) {
+    if (!t.hora_entrada_at || t.estatus === 'cancelado') continue;
+    const entrada = new Date(t.hora_entrada_at);
+    let salida, enCurso = false;
+    if (t.hora_salida_at) salida = new Date(t.hora_salida_at);
+    else if (t.estatus === 'abierto' && t.fecha_op === hoyStr) { salida = ahora; enCurso = true; }
+    else continue;
+
+    const vIni = new Date(t.fecha_op+'T'+HORA_APERTURA_PLAZA+':00-06:00');
+    let vFin = new Date(t.fecha_op+'T'+HORA_CIERRE_PLAZA+':00-06:00');
+    if (t.fecha_op === hoyStr && ahora < vFin) vFin = ahora;
+
+    const ini = Math.max(entrada.getTime(), vIni.getTime());
+    const fin = Math.min(salida.getTime(), vFin.getTime());
+    const minutos = fin > ini ? (fin - ini) / 60000 : 0;
+    if (minutos <= 0) continue;
+    minutosOcupados += minutos;
+    detalle.push({ folio: t.folio, tipo: t.tipo, cajero: t.cajero||'—', fecha: t.fecha_op,
+      entrada: t.hora_entrada||'—', salida: enCurso ? 'En curso' : (t.hora_salida||'—'),
+      minutos: Math.round(minutos) });
+  }
+  detalle.sort((a,b) => b.minutos - a.minutos);
+  REPORTE_OCUPACION_ACTUAL = detalle;
+
+  const pct = minutosVentana ? Math.round(minutosOcupados/minutosVentana/CAPACIDAD_TOTAL*100) : 0;
+  const resumen = `
+    <div style="background:#F8F5FF;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12.5px;line-height:1.9">
+      <b>Cómo se calcula:</b> se suman los minutos que cada auto ocupó un cajón dentro del horario de operación
+      (${HORA_APERTURA_PLAZA}–${HORA_CIERRE_PLAZA}, ${diasContados} día${diasContados===1?'':'s'} en este período),
+      y se dividen entre el universo disponible = ${CAPACIDAD_TOTAL} cajones × ${Math.round(minutosVentana)} minutos de horario.<br>
+      <b>Suma de minutos ocupados:</b> ${Math.round(minutosOcupados).toLocaleString('es-MX')} min ·
+      <b>Universo disponible:</b> ${Math.round(minutosVentana*CAPACIDAD_TOTAL).toLocaleString('es-MX')} min
+      (${CAPACIDAD_TOTAL} × ${Math.round(minutosVentana).toLocaleString('es-MX')}) ·
+      <b>Resultado:</b> ${Math.round(minutosOcupados).toLocaleString('es-MX')} / ${Math.round(minutosVentana*CAPACIDAD_TOTAL).toLocaleString('es-MX')} =
+      <span style="color:var(--purple);font-weight:900">${pct}%</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:12px;color:var(--muted);font-weight:700">${detalle.length} tickets con tiempo dentro del horario</span>
+      <button class="btn" style="padding:5px 12px;font-size:11px" onclick="exportarReporteOcupacionCSV()">⬇ Exportar CSV</button>
+    </div>`;
+
+  if (!detalle.length) return resumen + '<div style="padding:20px;color:var(--muted)">Sin operaciones en el período</div>';
+  return resumen + `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Tipo</th><th>Cajero</th><th>Fecha</th><th>Entrada</th><th>Salida</th><th style="text-align:right">Tiempo (min)</th></tr></thead>
+      <tbody>${detalle.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.tipo}</td><td>${o.cajero}</td><td>${o.fecha}</td>
+        <td>${o.entrada}</td><td>${o.salida==='En curso'?'<span style="color:var(--blue);font-weight:700">En curso</span>':o.salida}</td>
+        <td style="text-align:right;font-weight:700">${o.minutos.toLocaleString('es-MX')}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+}
+function exportarReporteOcupacionCSV() {
+  const rows = REPORTE_OCUPACION_ACTUAL;
+  if (!rows.length) { showToast('No hay registros para exportar'); return; }
+  const csvEsc = v => { const s=String(v==null?'':v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const header = ['Folio','Tipo','Cajero','Fecha','Entrada','Salida','Tiempo (min)'].join(',');
+  const lines = rows.map(o => [o.folio,o.tipo,o.cajero,o.fecha,o.entrada,o.salida,o.minutos].map(csvEsc).join(','));
+  const csv = '﻿' + [header,...lines].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'IwolPark_ocupacion_'+fmtLocal(new Date())+'.csv';
+  a.click();
+  showToast('CSV exportado · '+rows.length+' registros');
 }
 
 // Rango de fechas del "período anterior" comparable (mismo número de días,
@@ -1050,14 +1142,8 @@ async function drillKPI(tipo) {
         <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${Number(o.importe)?fmt$(Number(o.importe)):'$0.00'}</td>
       </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en el período</div>';
   } else if(tipo==='ocupacion') {
-    title.textContent = '🅿️ Detalle: Ocupación actual (en vivo)';
-    const abiertos = await cargarAbiertos();
-    cont.innerHTML = resumenTiposHTML(abiertos) + `<div class="tabla-wrap" style="margin-top:14px"><table>
-      <thead><tr><th>Folio</th><th>Cajero</th><th>Entrada</th><th>Franja</th></tr></thead>
-      <tbody>${abiertos.map(o=>`<tr>
-        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
-        <td>${o.cajero}</td><td>${o.hora}</td><td>${o.franja}</td>
-      </tr>`).join('')}</tbody></table></div>`;
+    title.textContent = '🅿️ Detalle: Ocupación promedio — cómo se calculó';
+    cont.innerHTML = await construirReporteOcupacion();
   } else {
     title.textContent = '📊 Detalle: '+tipo;
     cont.innerHTML = resumenTiposHTML(ops);
