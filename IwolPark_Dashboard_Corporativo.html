@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v90</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v91</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -306,6 +306,13 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
       <div class="card-sub">Avance del mes</div>
       <div id="meta-vs-real"></div>
     </div>
+  </div>
+
+  <!-- Ingresos por cajero y día -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-title">Ingresos por cajero y día — esta semana</div>
+    <div class="card-sub">Lunes a hoy · importe cobrado por día</div>
+    <div id="tabla-cajero-dia-ej" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
 </div>
@@ -662,6 +669,58 @@ async function cargarTodosPeriodo(desde, hasta, maxTotal=6000) {
   } catch (e) { return []; }
 }
 
+// Normaliza el nombre del cajero para agrupar ("HUMBERTO"/"Humberto"/"humberto"
+// deben ser la misma fila) — tickets.cajero es texto libre con capitalización
+// inconsistente entre sesiones/cajeros.
+function normCajero(n) {
+  const s = (n||'Sin cajero').trim().replace(/\s+/g,' ');
+  if (!s) return 'Sin cajero';
+  return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+}
+async function renderCajeroDiaEj() {
+  const el = document.getElementById('tabla-cajero-dia-ej');
+  if (!el) return;
+  try {
+    const hoy = new Date();
+    const lunes = new Date(hoy); lunes.setDate(lunes.getDate()-((lunes.getDay()+6)%7)); lunes.setHours(0,0,0,0);
+    const desde = fmtLocal(lunes), hasta = fmtLocal(hoy);
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,cajero,importe,estatus&order=fecha_op.asc`;
+    const rows = (await fetchPaginado(base, SB_HEADERS, 8000)).filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+
+    const porCajero = {};
+    rows.forEach(t => {
+      const cj = normCajero(t.cajero);
+      if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
+      const fd = new Date(t.fecha_op+'T12:00:00');
+      const idx = Math.round((fd-lunes)/86400000);
+      if (idx>=0 && idx<7) porCajero[cj][idx] += Number(t.importe)||0;
+    });
+    const filas = Object.entries(porCajero).sort((a,b) => b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
+    if (!filas.length) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+        <thead><tr style="border-bottom:2px solid var(--border)">
+          <th style="text-align:left;padding:7px">Cajero</th>
+          ${DIAS_S.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+          <th style="padding:7px;text-align:right">Suma días</th>
+        </tr></thead>
+        <tbody>
+        ${filas.map(([cj,vals]) => {
+          const total = vals.reduce((s,v)=>s+v,0);
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px;font-weight:700">${cj}</td>
+            ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple)">${fmt$(total)}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
+}
+
 async function cargarCortesDB(desde, hasta) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/cortes?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=fecha_op.desc,created_at.asc&limit=500`, { headers: SB_HEADERS });
@@ -883,6 +942,8 @@ async function renderEjecutivo() {
     <div style="font-size:12px;color:var(--muted);margin-top:10px">
       ${avance>=100?'✅ Meta alcanzada':'⏳ Faltan '+fmt$(meta-real)+' para la meta'}
     </div>`;
+
+  renderCajeroDiaEj();
 }
 
 // ══ DRILL KPI ══

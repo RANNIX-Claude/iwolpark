@@ -78,7 +78,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v90</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v91</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -253,6 +253,15 @@ function lunesDeSemana(d) {
 }
 function fmtMoney(n) { return '$'+Math.round(n||0).toLocaleString('es-MX'); }
 
+// Normaliza el nombre del cajero para agrupar ("HUMBERTO"/"Humberto"/"humberto"
+// deben ser la misma fila) — el campo tickets.cajero es texto libre y se ha
+// guardado con capitalización inconsistente entre sesiones/cajeros.
+function normCajero(n) {
+  const s = (n||'Sin cajero').trim().replace(/\s+/g,' ');
+  if (!s) return 'Sin cajero';
+  return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+}
+
 // Desglose Ticket (mismos 5 buckets que el tablero de Admin): "Cortesía" se
 // deriva de importe=0 en normal/preferencial (tolerancia ≤15min), no del
 // campo tipo — ver Fase G para el detalle de por qué.
@@ -335,7 +344,7 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
   const lunes = new Date(lunesActualStr+'T12:00:00');
   const porCajero = {};
   ticketsSemana.forEach(t => {
-    const cj = t.cajero || 'Sin cajero';
+    const cj = normCajero(t.cajero);
     if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
     const fd = new Date(t.fecha_op+'T12:00:00');
     const idx = Math.round((fd-lunes)/86400000);

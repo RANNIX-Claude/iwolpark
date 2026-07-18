@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v90</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v91</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -571,6 +571,13 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
       <div id="actividad-comparativa"></div>
     </div>
+  </div>
+
+  <!-- Ingresos por cajero y día -->
+  <div class="chart-card" style="margin-bottom:10px">
+    <div class="chart-title">Ingresos por cajero y día — esta semana</div>
+    <div class="chart-sub">Lunes a hoy · importe cobrado por día</div>
+    <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
   <!-- TABLA CORTE DIARIO -->
@@ -912,6 +919,63 @@ function franjaLabelDeHora(horaStr) {
   return f ? FRANJA_ADMIN_LABEL[f.key] : '—';
 }
 const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623'};
+
+// ══ Ingresos por cajero y día — esta semana (mismo widget que Demanda) ══
+const DIAS_CD = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+function fmtLocalCD(d) { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function lunesDeSemanaCD(d) { const dd=new Date(d); dd.setDate(dd.getDate()-((dd.getDay()+6)%7)); dd.setHours(0,0,0,0); return dd; }
+// Normaliza el nombre del cajero para agrupar ("HUMBERTO"/"Humberto"/"humberto"
+// deben ser la misma fila) — tickets.cajero es texto libre con capitalización
+// inconsistente entre sesiones/cajeros.
+function normCajero(n) {
+  const s = (n||'Sin cajero').trim().replace(/\s+/g,' ');
+  if (!s) return 'Sin cajero';
+  return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
+}
+async function renderCajeroDia() {
+  const el = document.getElementById('tabla-cajero-dia');
+  if (!el) return;
+  try {
+    const hoy = new Date();
+    const lunes = lunesDeSemanaCD(hoy);
+    const desde = fmtLocalCD(lunes), hasta = fmtLocalCD(hoy);
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,cajero,importe,estatus&order=fecha_op.asc`;
+    const rows = (await fetchPaginado(base, headers, 8000)).filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+
+    const porCajero = {};
+    rows.forEach(t => {
+      const cj = normCajero(t.cajero);
+      if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
+      const fd = new Date(t.fecha_op+'T12:00:00');
+      const idx = Math.round((fd-lunes)/86400000);
+      if (idx>=0 && idx<7) porCajero[cj][idx] += Number(t.importe)||0;
+    });
+    const filas = Object.entries(porCajero).sort((a,b) => b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
+    if (!filas.length) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+        <thead><tr style="border-bottom:2px solid var(--border)">
+          <th style="text-align:left;padding:7px">Cajero</th>
+          ${DIAS_CD.map(d=>`<th style="padding:7px">${d}</th>`).join('')}
+          <th style="padding:7px;text-align:right">Suma días</th>
+        </tr></thead>
+        <tbody>
+        ${filas.map(([cj,vals]) => {
+          const total = vals.reduce((s,v)=>s+v,0);
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px;font-weight:700">${cj}</td>
+            ${vals.map(v=>`<td style="padding:7px;text-align:center;color:${v?'var(--text)':'var(--muted)'}">${v?fmt$(v):'—'}</td>`).join('')}
+            <td style="padding:7px;text-align:right;font-weight:800;color:var(--accent)">${fmt$(total)}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
+}
 // Usa DATOS.todosDetalle (abiertos + cerrados), NO solo DATOS.operaciones
 // (cerrados) — antes esta tarjeta y "Actividad" (número de tickets por
 // hora, que sí cuenta todo) no reconciliaban: la suma de horas de una
@@ -1735,7 +1799,9 @@ let USUARIO_ACTUAL = null;
   logBitacora('login', { app: 'admin' });
   document.getElementById('filtro-periodo').value = 'hoy';
   cargarDatos();
+  renderCajeroDia();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+  setInterval(renderCajeroDia, 300000); // esta tabla cambia poco, refresca cada 5 min
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
