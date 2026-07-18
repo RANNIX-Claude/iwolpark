@@ -172,14 +172,15 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v98</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v99</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab active" onclick="showTab('ejecutivo',this)">📊 Ejecutivo</div>
+  <div class="tab active" onclick="showTab('admin',this)">🛠️ Admin</div>
+  <div class="tab" onclick="showTab('ejecutivo',this)">📊 Ejecutivo</div>
   <div class="tab" onclick="showTab('operativo',this)">⚙️ Operativo</div>
   <div class="tab" onclick="showTab('cajeros',this)">👤 Cajeros</div>
   <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
@@ -188,8 +189,169 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
 
 <div class="container">
 
+<!-- ══ TAB ADMIN (copia del tablero de Admin — solo el dashboard, sin menú
+     ni herramientas de administración, que se quedan exclusivas de Admin) ══ -->
+<div class="tab-section active" id="tab-admin">
+
+  <div class="filtros">
+    <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Período</label>
+    <select id="filtro-periodo-adm" onchange="onFiltroCambioAdm()">
+      <option value="hoy">Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="antier">Antier</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes">Este mes</option>
+      <option value="custom">Personalizado</option>
+    </select>
+    <input type="date" id="filtro-desde-adm" style="display:none">
+    <input type="date" id="filtro-hasta-adm" style="display:none">
+    <select id="filtro-cajero-adm">
+      <option value="">Todos los cajeros</option>
+    </select>
+    <button class="btn" onclick="cargarDatosAdm()">Aplicar</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="ultima-actualizacion-adm">Cargando…</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi" onclick="drillDownAdm('ingresos')" title="Ver detalle">
+      <div class="kpi-label">Ingresos del día</div>
+      <div class="kpi-val" style="color:var(--gold)" id="kpi-ingresos-adm">$0</div>
+      <div class="kpi-sub" id="kpi-ingresos-sub-adm">0 operaciones</div>
+    </div>
+    <div class="kpi" onclick="drillDownAdm('tickets_dia')" title="Ver detalle">
+      <div class="kpi-label">Tickets del día</div>
+      <div class="kpi-val" style="color:var(--purple)" id="kpi-tickets-dia-adm">0</div>
+      <div class="kpi-sub">total emitidos (abiertos + cerrados)</div>
+    </div>
+    <div class="kpi" onclick="drillDownAdm('ocupacion')" title="Ver detalle" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF)">
+      <div class="kpi-label">Autos en plaza AHORA</div>
+      <div class="kpi-val" style="color:var(--purple);font-size:26px" id="kpi-ocupacion-num-adm">0</div>
+      <div class="kpi-sub" id="kpi-ocupacion-sub-adm">de 0 lugares</div>
+    </div>
+    <div class="kpi" onclick="drillDownAdm('boletos_perdidos')" title="Ver detalle">
+      <div class="kpi-label">Boletos perdidos</div>
+      <div class="kpi-val" style="color:var(--red)" id="kpi-perdidos-adm">0</div>
+      <div class="kpi-sub" id="kpi-perdidos-sub-adm">$0 en penalizaciones</div>
+    </div>
+    <div class="kpi" onclick="drillDownAdm('ticket_promedio')" title="Ver detalle">
+      <div class="kpi-label">Ticket promedio</div>
+      <div class="kpi-val" style="color:var(--green)" id="kpi-ticket-adm">$0</div>
+      <div class="kpi-sub" id="kpi-ticket-sub-adm">Tiempo prom: 0 min</div>
+    </div>
+    <div class="kpi" onclick="drillDownAdm('ocupacion')" title="Ver detalle">
+      <div class="kpi-label">Ocupación (%)</div>
+      <div class="kpi-val" style="color:var(--purple)" id="kpi-ocupacion-adm">0%</div>
+      <div class="kpi-sub">del total de cajones</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title">Ocupación actual</div>
+      <div class="card-sub">Autos en plaza en este momento</div>
+      <div style="display:flex;gap:12px;font-size:11px;font-weight:700;margin-bottom:6px" title="IN = autos dentro ahora · OUT = tickets del período que ya salieron">
+        <span style="color:var(--blue)">🅿 IN: <span id="stat-in-adm">0</span></span>
+        <span style="color:var(--muted)">↗ OUT: <span id="stat-out-adm">0</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--purple);line-height:1" id="gauge-pct-adm">0%</div>
+          <div style="font-size:10px;color:var(--muted)" id="gauge-sub-adm">0 / 40</div>
+        </div>
+        <div style="flex:1;min-width:130px">
+          <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
+            <div id="gauge-fill-adm" style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--purple),var(--blue));width:0%;transition:width .6s"></div>
+          </div>
+          <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipoAdm('normal')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Normales</div>
+              <div style="font-size:14px;font-weight:900;color:var(--blue)" id="ocu-normal-adm">0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipoAdm('preferencial')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Preferenciales</div>
+              <div style="font-size:14px;font-weight:900;color:var(--purple)" id="ocu-pref-adm">0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipoAdm('empleado')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Empleados</div>
+              <div style="font-size:14px;font-weight:900;color:#1D3557" id="ocu-empleado-adm">0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:6px;padding:5px 6px;text-align:center;cursor:pointer" onclick="drillOcupacionTipoAdm('pension')" title="Ver detalle">
+              <div style="font-size:9px;color:var(--muted);font-weight:700">Pensión</div>
+              <div style="font-size:14px;font-weight:900;color:var(--green)" id="ocu-pension-adm">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Desglose Ticket</div>
+      <div class="card-sub">Normal · Preferente · Perdido · Cortesía (≤15 min) · Pensión · Empleado · clic para ver detalle</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px" id="desglose-pagos-adm"></div>
+      <div id="mix-bars-adm" style="display:flex;flex-direction:column;gap:4px;margin-top:4px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Rendimiento por cajero</div>
+      <div class="card-sub">Clic para ver detalle del turno</div>
+      <div id="cajero-ranking-adm"></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Ingresos por franja horaria</div>
+      <div class="card-sub">05–10 · 10–17 · 17–22 · clic para ver detalle</div>
+      <div id="franja-bars-adm" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Actividad — Comparativo</div>
+      <div class="card-sub">Número de tickets por hora · clic en barra para ver detalle</div>
+      <div style="display:flex;gap:12px;font-size:9px;font-weight:700;margin-bottom:2px">
+        <span style="color:var(--purple)">■ Período actual</span>
+        <span style="color:#F5A623">— Período anterior (<span id="actividad-anterior-sub-adm">—</span>)</span>
+      </div>
+      <div id="actividad-comparativa-adm"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-title">Ingresos por cajero y día — esta semana</div>
+    <div class="card-sub">Lunes a hoy · importe cobrado por día</div>
+    <div id="tabla-cajero-dia-adm" style="overflow-x:auto;margin-top:8px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div>
+        <div class="card-title">Corte del día — Detalle de operaciones</div>
+        <div class="card-sub">Todas las transacciones del período · Clic en fila para ver detalle</div>
+      </div>
+      <button onclick="exportarCSVAdm()" style="margin-left:auto;background:var(--purple);
+              color:#fff;border:none;border-radius:8px;padding:8px 16px;
+              font-size:12px;font-weight:700;cursor:pointer">⬇ Export CSV</button>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Folio</th><th>Tipo</th><th>Cajero</th>
+            <th>Entrada</th><th>Salida</th><th>Min</th>
+            <th>Franja</th><th style="text-align:right">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-ops-adm"></tbody>
+      </table>
+    </div>
+    <div id="tabla-empty-adm" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;display:none">
+      Sin operaciones para el período seleccionado
+    </div>
+  </div>
+
+</div>
+
 <!-- ══ TAB EJECUTIVO ══ -->
-<div class="tab-section active" id="tab-ejecutivo">
+<div class="tab-section" id="tab-ejecutivo">
 
   <div class="filtros">
     <select id="periodo-ej" onchange="renderEjecutivo()">
@@ -472,6 +634,7 @@ function showTab(id, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
+  if(id==='admin')     renderAdminTab();
   if(id==='ejecutivo') renderEjecutivo();
   if(id==='operativo') renderOperativo();
   if(id==='cajeros')   renderCajeros();
@@ -785,8 +948,13 @@ let CAJERO_DIA_EJ_ROWS = [];
 let CAJERO_DIA_EJ_LUNES = null;
 
 async function renderCajeroDiaEj() {
-  const el = document.getElementById('tabla-cajero-dia-ej');
-  if (!el) return;
+  // Se pinta en Ejecutivo y, si existe, también en la copia de la pestaña
+  // Admin ("Ingresos por cajero y día" es siempre "esta semana", sin
+  // depender del filtro de período de ninguna de las dos pestañas, así que
+  // ambas muestran exactamente lo mismo — no hace falta pedirlo dos veces).
+  const targets = ['tabla-cajero-dia-ej','tabla-cajero-dia-adm']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  if (!targets.length) return;
   try {
     const hoy = new Date();
     // Ancla a mediodía, no medianoche: fecha_op se reconstruye como
@@ -810,13 +978,13 @@ async function renderCajeroDiaEj() {
     });
     const filas = Object.entries(porCajero).sort((a,b) => b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
     if (!filas.length) {
-      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
+      targets.forEach(el => el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>');
       return;
     }
     const totalesDia = [0,0,0,0,0,0,0];
     filas.forEach(([,vals]) => vals.forEach((v,i)=>totalesDia[i]+=v));
     const granTotal = totalesDia.reduce((s,v)=>s+v,0);
-    el.innerHTML = `
+    const html = `
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;font-variant-numeric:tabular-nums">
         <thead><tr style="border-bottom:2px solid var(--border)">
           <th style="text-align:left;padding:7px">Cajero</th>
@@ -841,7 +1009,8 @@ async function renderCajeroDiaEj() {
           </tr>
         </tfoot>
       </table>`;
-  } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
+    targets.forEach(el => el.innerHTML = html);
+  } catch (e) { targets.forEach(el => el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'); }
 }
 
 // Drill-down de "Ingresos por cajero y día": cajero=null -> todos los cajeros
@@ -956,6 +1125,450 @@ function resumenTiposHTML(ops) {
 // ══ UTILS ══
 function fmt$(n){return '$'+(n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}
 let _tt; function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500)}
+
+// ══ ADMIN (copia del tablero de Admin — mismo cálculo/estructura que
+// IwolPark_Dashboard_Admin.html, portado tal cual, sólo el dashboard sin
+// menú ni herramientas de administración) ══
+let DATOS_ADM = { operaciones:[], todosDetalle:[], todosDetalleAnterior:[], abiertosDetalle:[], autos_en_plaza:0, ticketsDia:0 };
+let _admInicializada = false;
+
+function onFiltroCambioAdm() {
+  const p = document.getElementById('filtro-periodo-adm').value;
+  document.getElementById('filtro-desde-adm').style.display = p==='custom'?'':'none';
+  document.getElementById('filtro-hasta-adm').style.display = p==='custom'?'':'none';
+  if (p !== 'custom') cargarDatosAdm();
+}
+function getFechasAdm() {
+  const p = document.getElementById('filtro-periodo-adm').value;
+  const hoy = new Date();
+  const fmt = fmtLocal;
+  if (p === 'hoy')    return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (p === 'ayer')   { const d=new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmt(d), hasta: fmt(d) }; }
+  if (p === 'antier') { const d=new Date(hoy); d.setDate(d.getDate()-2); return { desde: fmt(d), hasta: fmt(d) }; }
+  if (p === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1); return { desde: fmt(ini), hasta: fmt(hoy) }; }
+  if (p === 'mes')    return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
+  return { desde: document.getElementById('filtro-desde-adm').value, hasta: document.getElementById('filtro-hasta-adm').value };
+}
+
+function renderAdminTab() {
+  if (!_admInicializada) { _admInicializada = true; document.getElementById('filtro-periodo-adm').value = 'hoy'; }
+  cargarDatosAdm();
+}
+
+async function cargarDatosAdm() {
+  try {
+    const {desde, hasta} = getFechasAdm();
+    const cajeroFiltro = document.getElementById('filtro-cajero-adm')?.value || '';
+    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc`;
+    if (cajeroFiltro) query += `&cajero=eq.${encodeURIComponent(cajeroFiltro)}`;
+
+    const rows = (await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, SB_HEADERS, 15000))
+      .filter(o => o.estatus !== 'cancelado');
+
+    DATOS_ADM.ticketsDia = rows.length;
+    DATOS_ADM.todosDetalle = rows.map(o => ({
+      folio: o.folio, tipo: o.tipo || 'normal', estatus: o.estatus,
+      cajero: o.cajero || '—', hora_entrada: o.hora_entrada || '—',
+      hora_salida: o.hora_salida || '', cajero_entrada: o.cajero_entrada || o.cajero || '—',
+      cajero_salida: o.cajero_salida || '', importe: parseFloat(o.importe) || 0
+    }));
+    const completadas = rows.filter(o => o.estatus !== 'abierto');
+    DATOS_ADM.operaciones = completadas.map(o => ({
+      folio: o.folio, tipo: o.tipo || 'normal', estatus: o.estatus,
+      cajero: o.cajero || '—', cajero_entrada: o.cajero_entrada || o.cajero || '—',
+      cajero_salida: o.cajero_salida || o.cajero || '—',
+      hora_entrada: o.hora_entrada || '—', hora_salida: o.hora_salida || '—',
+      minutos: o.minutos_estancia || 0, franja: franjaLabelDeHora(o.hora_entrada),
+      importe: parseFloat(o.importe) || 0, fecha: o.fecha_op || desde
+    }));
+
+    // Autos en plaza AHORA: consulta aparte sin filtro de período, limitada
+    // a fecha_op=hoy (la regla del negocio es que nadie se queda de un día
+    // para otro; un "abierto" de días pasados es residuo, no auto real).
+    try {
+      const hoyStr = fmtLocal(new Date());
+      const rAbiertos = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=folio,tipo,cajero,cajero_entrada,hora_entrada&limit=1000`, { headers: SB_HEADERS });
+      const abiertos = (rAbiertos.ok ? await rAbiertos.json() : []).map(o => ({ ...o, cajero_entrada: o.cajero_entrada || o.cajero || '—' }));
+      DATOS_ADM.autos_en_plaza = abiertos.length;
+      DATOS_ADM.abiertosDetalle = abiertos;
+      DATOS_ADM.abiertos_normal   = abiertos.filter(o => o.tipo === 'normal').length;
+      DATOS_ADM.abiertos_pref     = abiertos.filter(o => o.tipo === 'preferencial').length;
+      DATOS_ADM.abiertos_empleado = abiertos.filter(o => o.tipo === 'empleado').length;
+      DATOS_ADM.abiertos_pension  = abiertos.filter(o => o.tipo === 'pension').length;
+    } catch (e) {
+      DATOS_ADM.autos_en_plaza = 0; DATOS_ADM.abiertos_normal = 0; DATOS_ADM.abiertos_pref = 0;
+      DATOS_ADM.abiertos_empleado = 0; DATOS_ADM.abiertos_pension = 0; DATOS_ADM.abiertosDetalle = [];
+    }
+
+    // Actividad — período anterior comparable (mismo número de días, justo antes).
+    try {
+      const anterior = getFechasAnterior(desde, hasta);
+      const rAnt = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${anterior.desde}&fecha_op=lte.${anterior.hasta}&select=hora_entrada,estatus`, SB_HEADERS, 15000);
+      DATOS_ADM.todosDetalleAnterior = rAnt.filter(o => o.estatus !== 'cancelado');
+      const elSub = document.getElementById('actividad-anterior-sub-adm');
+      if (elSub) elSub.textContent = anterior.desde===anterior.hasta ? anterior.desde : (anterior.desde+' a '+anterior.hasta);
+    } catch (e) { DATOS_ADM.todosDetalleAnterior = []; }
+
+    const cajeros = [...new Set(rows.map(o=>o.cajero).filter(Boolean))];
+    const sel = document.getElementById('filtro-cajero-adm');
+    if (sel) sel.innerHTML = '<option value="">Todos los cajeros</option>' + cajeros.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+    renderTodoAdm();
+    const elUlt = document.getElementById('ultima-actualizacion-adm');
+    if (elUlt) elUlt.textContent = 'Actualizado: ' + new Date().toLocaleTimeString('es-MX');
+  } catch (e) {
+    const elUlt = document.getElementById('ultima-actualizacion-adm');
+    if (elUlt) elUlt.textContent = 'No se pudo cargar';
+  }
+}
+
+function renderTodoAdm() {
+  const ops = DATOS_ADM.operaciones;
+  renderKPIsAdm(ops);
+  renderFranjasAdm();
+  renderOcupacionAdm();
+  renderMixAdm(ops);
+  renderRankingCajerosAdm(ops);
+  renderTablaAdm(ops);
+  renderActividadComparativaAdm();
+  renderCajeroDiaEj(); // "Ingresos por cajero y día" también llena #tabla-cajero-dia-adm si existe
+}
+
+function renderKPIsAdm(ops) {
+  const cobros = ops.filter(o => o.importe > 0);
+  const total = cobros.reduce((s,o) => s+o.importe, 0);
+  const perdidos = ops.filter(o => o.tipo==='perdido');
+  const pTotal = perdidos.reduce((s,o) => s+o.importe, 0);
+  const ticket = cobros.length ? total/cobros.length : 0;
+  const minProm = ops.filter(o=>o.minutos>0).reduce((s,o,_,a)=>s+o.minutos/a.length,0);
+
+  document.getElementById('kpi-ingresos-adm').textContent = fmt$(total);
+  document.getElementById('kpi-ingresos-sub-adm').textContent = cobros.length + ' cobrados';
+  document.getElementById('kpi-tickets-dia-adm').textContent = DATOS_ADM.ticketsDia || 0;
+  document.getElementById('kpi-perdidos-adm').textContent = perdidos.length;
+  document.getElementById('kpi-perdidos-sub-adm').textContent = fmt$(pTotal) + ' en penalizaciones';
+  document.getElementById('kpi-ticket-adm').textContent = fmt$(ticket);
+  document.getElementById('kpi-ticket-sub-adm').textContent = 'Tiempo prom: ' + Math.round(minProm) + ' min';
+}
+
+// Mini-stats de un drill (contextual al subconjunto exacto que se muestra),
+// insertadas dentro del propio contenido del drill en vez de la franja
+// persistente #drill-ministats (esa la usa Ejecutivo para su resumen fijo
+// del período — mezclar semánticas ahí causaría que un drill de esta
+// pestaña le pisara el resumen a Ejecutivo hasta el próximo refresh).
+function miniStatsHTMLAdm(rows) {
+  const total = rows.length;
+  const conEstatus = rows.some(o => o.estatus);
+  const cerrados = rows.filter(o => o.estatus && o.estatus !== 'abierto').length;
+  const monto = rows.reduce((s,o)=>s+(Number(o.importe)||0),0);
+  return `<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;font-weight:700;background:#F8F5FF;border-radius:8px;padding:8px 14px;margin-bottom:14px">
+    <span>🎫 ${total} ticket${total===1?'':'s'}</span>
+    ${conEstatus ? `<span style="color:#0D9457">✅ ${cerrados} cerrados</span>` : ''}
+    <span style="color:var(--gold)">💰 ${fmt$(monto)}</span>
+  </div>`;
+}
+
+const TIPO_LABEL_MOV_ADM = {normal:'Normal',preferencial:'Preferencial',perdido:'Boleto perdido',cortesia:'Cortesía',empleado:'Empleado',pension:'Pensión'};
+function movimientosTablaHTMLAdm(rows) {
+  if (!rows.length) return '<div style="padding:20px;color:var(--muted)">Sin movimientos</div>';
+  return `<div class="tabla-wrap"><table>
+      <thead><tr>
+        <th>Folio</th><th>Tipo</th><th>Entrada</th><th>Salida</th>
+        <th>Cajero entrada</th><th>Cajero salida</th>
+        <th style="text-align:right">Importe</th><th>Estatus</th>
+      </tr></thead>
+      <tbody>${rows.map(o => {
+        const esAbierto = o.estatus ? o.estatus==='abierto' : !o.hora_salida;
+        const io = esAbierto ? 'IN' : 'OUT';
+        const ioColor = esAbierto ? '#0A66C2' : '#0D9457';
+        return `<tr onclick="drillTicketAdm('${o.folio}')">
+          <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+          <td>${TIPO_LABEL_MOV_ADM[o.tipo]||o.tipo||'—'}</td>
+          <td>${o.hora_entrada||'—'}</td>
+          <td>${o.hora_salida||'—'}</td>
+          <td>${o.cajero_entrada||o.cajero||'—'}</td>
+          <td>${o.cajero_salida||'—'}</td>
+          <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${o.importe?fmt$(o.importe):'$0.00'}</td>
+          <td><span class="badge" style="background:${ioColor}22;color:${ioColor}">${io}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+}
+
+// Franja horaria (mismos 3 bloques que FRANJAS_CORP) con conteo/monto propio
+// de esta pestaña — usa DATOS_ADM.todosDetalle (abiertos+cerrados), no solo
+// operaciones cerradas, para que cuadre con "Actividad".
+const FRANJA_ADM_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623'};
+function franjaKeyDeOpAdm(o) {
+  const h = parseInt((o.hora_entrada||'0').split(':')[0]);
+  const f = FRANJAS_CORP.find(f => f.test(h));
+  return f ? f.key : null;
+}
+function renderFranjasAdm() {
+  const todos = DATOS_ADM.todosDetalle || [];
+  const montos = {f1:0,f2:0,f3:0}, cuentas = {f1:0,f2:0,f3:0};
+  todos.forEach(o => { const k = franjaKeyDeOpAdm(o); if (k) { montos[k] += (Number(o.importe)||0); cuentas[k]++; } });
+  const total = todos.length || 1;
+  const el = document.getElementById('franja-bars-adm');
+  el.innerHTML = FRANJAS_CORP.map(f => {
+    const cnt = cuentas[f.key], pct = Math.round(cnt/total*100), color = FRANJA_ADM_COLOR[f.key];
+    return `<div onclick="drillFranjaAdm('${f.key}')" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+        <span style="font-weight:700;color:${color}">${f.label}</span>
+        <span style="color:var(--muted)">${cnt} ops · ${fmt$(montos[f.key])}</span>
+        <span style="font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:#F0EEF8;border-radius:99px;height:6px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;border-radius:99px;background:${color};transition:width .5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderOcupacionAdm() {
+  const cap = CAPACIDAD_TOTAL || 40;
+  const pct = Math.min(100, Math.round(DATOS_ADM.autos_en_plaza / cap * 100));
+  document.getElementById('kpi-ocupacion-adm').textContent = pct+'%';
+  document.getElementById('kpi-ocupacion-num-adm').textContent = DATOS_ADM.autos_en_plaza;
+  document.getElementById('kpi-ocupacion-sub-adm').textContent = 'de '+cap+' lugares';
+  document.getElementById('gauge-pct-adm').textContent = pct+'%';
+  document.getElementById('gauge-sub-adm').textContent = DATOS_ADM.autos_en_plaza+' / '+cap;
+  document.getElementById('gauge-fill-adm').style.width = pct+'%';
+  document.getElementById('ocu-normal-adm').textContent = DATOS_ADM.abiertos_normal || 0;
+  document.getElementById('ocu-pref-adm').textContent = DATOS_ADM.abiertos_pref || 0;
+  document.getElementById('ocu-empleado-adm').textContent = DATOS_ADM.abiertos_empleado || 0;
+  document.getElementById('ocu-pension-adm').textContent = DATOS_ADM.abiertos_pension || 0;
+  document.getElementById('stat-in-adm').textContent = DATOS_ADM.autos_en_plaza || 0;
+  document.getElementById('stat-out-adm').textContent = (DATOS_ADM.operaciones||[]).length;
+}
+
+// Desglose Ticket: reutiliza los mismos 6 buckets ya definidos para
+// Ejecutivo (RESUMEN_TIPO_BUCKETS) — misma lógica de "Cortesía" derivada de
+// importe=0, no leída del campo tipo.
+function renderMixAdm(ops) {
+  const total = ops.length || 1;
+  const el = document.getElementById('mix-bars-adm');
+  el.innerHTML = RESUMEN_TIPO_BUCKETS.map((b,i) => {
+    const subset = ops.filter(b.filter);
+    const cnt = subset.length, pct = Math.round(cnt/total*100);
+    const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
+    return `<div onclick="drillTipoAdm(${i})" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+        <span style="font-weight:700;color:${b.color}">${b.label}</span>
+        <span style="color:var(--muted)">${cnt} ops · ${fmt$(ing)}</span>
+        <span style="font-weight:700">${pct}%</span>
+      </div>
+      <div style="background:#F0EEF8;border-radius:99px;height:6px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;border-radius:99px;background:${b.color};transition:width .5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+  const pagados = ops.filter(o=>Number(o.importe)>0).length;
+  const noPagados = ops.length - pagados;
+  const elPagos = document.getElementById('desglose-pagos-adm');
+  if (elPagos) elPagos.innerHTML = `
+    <div style="background:#F0EEF8;border-radius:6px;padding:4px 8px;text-align:center;flex:1;cursor:pointer" onclick="drillPagadosAdm(true)">
+      <div style="font-size:14px;font-weight:900;color:#0D9457">${pagados}</div>
+      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;font-weight:700">Pagados</div>
+    </div>
+    <div style="background:#F0EEF8;border-radius:6px;padding:4px 8px;text-align:center;flex:1;cursor:pointer" onclick="drillPagadosAdm(false)">
+      <div style="font-size:14px;font-weight:900;color:#888">${noPagados}</div>
+      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
+    </div>`;
+}
+
+function renderRankingCajerosAdm(ops) {
+  const cajeros = {};
+  ops.forEach(o => {
+    if (!cajeros[o.cajero]) cajeros[o.cajero] = {ops:0,total:0};
+    cajeros[o.cajero].ops++;
+    cajeros[o.cajero].total += o.importe;
+  });
+  const sorted = Object.entries(cajeros).sort((a,b)=>b[1].total-a[1].total);
+  const max = sorted[0]?.[1]?.total || 1;
+  const el = document.getElementById('cajero-ranking-adm');
+  el.innerHTML = sorted.map(([nom,d],i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F0EEF8;cursor:pointer" onclick="drillCajeroAdm('${nom.replace(/'/g,"\\'")}')">
+      <div style="font-size:14px;font-weight:900;color:var(--purple);min-width:20px">${i+1}</div>
+      <div style="flex:1;font-size:11px;font-weight:700">${nom}<br>
+        <span style="font-size:11px;color:var(--muted);font-weight:400">${d.ops} operaciones</span>
+      </div>
+      <div style="flex:2">
+        <div style="background:#F0EEF8;border-radius:99px;height:6px">
+          <div style="height:100%;border-radius:99px;background:var(--purple);width:${d.total/max*100}%"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:800;color:var(--gold);min-width:70px;text-align:right">${fmt$(d.total)}</div>
+    </div>`).join('');
+}
+
+function renderTablaAdm(ops) {
+  const el = document.getElementById('tabla-ops-adm');
+  const em = document.getElementById('tabla-empty-adm');
+  if (!ops.length) { el.innerHTML=''; em.style.display='block'; return; }
+  em.style.display='none';
+  el.innerHTML = ops.map(o => `
+    <tr onclick="drillTicketAdm('${o.folio}')">
+      <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+      <td>${TIPO_LABEL_MOV_ADM[o.tipo]||o.tipo}</td>
+      <td>${o.cajero}</td>
+      <td>${o.hora_entrada}</td>
+      <td>${o.hora_salida||'—'}</td>
+      <td>${o.minutos||'—'}</td>
+      <td><span style="font-size:11px;color:var(--muted)">${o.franja}</span></td>
+      <td style="text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${o.importe?fmt$(o.importe):'$0.00'}</td>
+    </tr>`).join('');
+}
+
+function renderActividadComparativaAdm() {
+  const el = document.getElementById('actividad-comparativa-adm');
+  if (!el) return;
+  const horas = Array.from({length:24}, (_,i)=>i);
+  const actual = DATOS_ADM.todosDetalle || [];
+  const anterior = DATOS_ADM.todosDetalleAnterior || [];
+  const cActual = horas.map(h => actual.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const cAnterior = horas.map(h => anterior.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const max = Math.max(...cActual, ...cAnterior, 1);
+  const slot = 10, plotTop = 12, plotBottom = 82, plotH = plotBottom - plotTop;
+  const barW = slot * 0.6;
+  const bars = horas.map((h,i) => {
+    const x = i*slot + (slot-barW)/2;
+    const bh = cActual[i]/max*plotH;
+    const y = plotBottom - bh;
+    const label = cActual[i] ? `<text x="${x+barW/2}" y="${y-1.5}" font-size="4.5" text-anchor="middle" fill="var(--purple)" font-weight="700">${cActual[i]}</text>` : '';
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="1" fill="var(--purple)" style="cursor:pointer" onclick="drillHoraAdm(${h})"><title>${h}:00 · ${cActual[i]} tickets (período actual)</title></rect>${label}`;
+  }).join('');
+  const puntos = horas.map((h,i) => ({ x: i*slot + slot/2, y: plotBottom - (cAnterior[i]/max*plotH), v: cAnterior[i], h }));
+  const linePath = puntos.map((p,i) => (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const dots = puntos.map(p => `<circle cx="${p.x}" cy="${p.y}" r="1.6" fill="#F5A623"><title>${p.h}:00 · ${p.v} tickets (período anterior)</title></circle>`).join('');
+  const xLabels = horas.map((h,i) => `<text x="${i*slot+slot/2}" y="92" font-size="4" text-anchor="middle" fill="var(--muted)">${h}</text>`).join('');
+  el.innerHTML = `<svg viewBox="0 0 240 96" style="width:100%;height:auto;display:block">${bars}<path d="${linePath}" fill="none" stroke="#F5A623" stroke-width="1.2"/>${dots}${xLabels}</svg>`;
+}
+
+// ══ Drill-downs de la pestaña Admin — reutilizan el mismo #drill-panel
+// compartido del resto de Corporativo, con mini-stats propias insertadas
+// dentro del contenido (ver miniStatsHTMLAdm). ══
+function drillDownAdm(tipo) {
+  const panel = document.getElementById('drill-panel');
+  const cont = document.getElementById('drill-content');
+  const title = document.getElementById('drill-title');
+  panel.classList.add('open');
+  const ops = DATOS_ADM.operaciones;
+  const titulos = {
+    ingresos: '💰 Detalle de ingresos', ocupacion: '🅿 Análisis de ocupación',
+    boletos_perdidos: '⚠ Boletos perdidos', ticket_promedio: '📊 Análisis de ticket promedio',
+    tickets_dia: '🎫 Tickets del día (abiertos + cerrados)'
+  };
+  title.textContent = titulos[tipo] || tipo;
+
+  if (tipo === 'boletos_perdidos') {
+    const perdidos = ops.filter(o=>o.tipo==='perdido');
+    cont.innerHTML = miniStatsHTMLAdm(perdidos) + movimientosTablaHTMLAdm(perdidos);
+  } else if (tipo === 'ingresos') {
+    const tipos = ['normal','preferencial','perdido'];
+    const colors={normal:'#0A66C2',preferencial:'#7B5EA7',perdido:'#D93025'};
+    const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Perdido'};
+    cont.innerHTML = miniStatsHTMLAdm(ops.filter(o=>o.importe>0)) +
+      `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      ${tipos.map(t=>{
+        const sub = ops.filter(o=>o.tipo===t);
+        const tot = sub.reduce((s,o)=>s+o.importe,0);
+        return `<div style="background:var(--bg);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:${colors[t]};margin-bottom:4px">${labels[t]}</div>
+          <div style="font-size:24px;font-weight:900">${fmt$(tot)}</div>
+          <div style="font-size:11px;color:var(--muted)">${sub.length} ops</div>
+        </div>`;
+      }).join('')}</div>`;
+  } else if (tipo === 'ocupacion') {
+    const abiertos = DATOS_ADM.abiertosDetalle || [];
+    cont.innerHTML = miniStatsHTMLAdm(abiertos) + movimientosTablaHTMLAdm(abiertos);
+  } else if (tipo === 'ticket_promedio') {
+    const cobros = ops.filter(o=>o.importe>0);
+    cont.innerHTML = miniStatsHTMLAdm(cobros) + movimientosTablaHTMLAdm(cobros);
+  } else if (tipo === 'tickets_dia') {
+    const todos = DATOS_ADM.todosDetalle || [];
+    cont.innerHTML = miniStatsHTMLAdm(todos) + movimientosTablaHTMLAdm(todos);
+  }
+}
+function drillGenericoAdm(titulo, ops) {
+  document.getElementById('drill-title').textContent = titulo;
+  document.getElementById('drill-content').innerHTML = miniStatsHTMLAdm(ops) + movimientosTablaHTMLAdm(ops);
+  document.getElementById('drill-panel').classList.add('open');
+}
+function drillFranjaAdm(key) {
+  const ops = (DATOS_ADM.todosDetalle||[]).filter(o => franjaKeyDeOpAdm(o) === key);
+  const f = FRANJAS_CORP.find(f=>f.key===key);
+  drillGenericoAdm('Franja: '+(f?f.label:key), ops);
+}
+function drillTipoAdm(i) {
+  const b = RESUMEN_TIPO_BUCKETS[i];
+  if (!b) return;
+  const ops = DATOS_ADM.operaciones.filter(b.filter);
+  drillGenericoAdm('Desglose: '+b.label, ops);
+}
+function drillCajeroAdm(cajero) {
+  const ops = DATOS_ADM.operaciones.filter(o=>o.cajero===cajero);
+  drillGenericoAdm('Cajero: '+cajero, ops);
+}
+function drillPagadosAdm(esPagado) {
+  const ops = DATOS_ADM.operaciones.filter(o => (Number(o.importe)>0) === esPagado);
+  document.getElementById('drill-title').textContent = esPagado ? '💰 Pagados' : '🚫 No pagados';
+  document.getElementById('drill-content').innerHTML = miniStatsHTMLAdm(ops) + movimientosTablaHTMLAdm(ops);
+  document.getElementById('drill-panel').classList.add('open');
+}
+function drillOcupacionTipoAdm(tipo) {
+  const labels={normal:'Normales',preferencial:'Preferenciales',empleado:'Empleados',pension:'Pensión'};
+  const rows = (DATOS_ADM.abiertosDetalle||[]).filter(o=>o.tipo===tipo);
+  document.getElementById('drill-title').textContent = '🅿 En plaza — '+(labels[tipo]||tipo);
+  document.getElementById('drill-content').innerHTML = miniStatsHTMLAdm(rows) + movimientosTablaHTMLAdm(rows);
+  document.getElementById('drill-panel').classList.add('open');
+}
+function drillHoraAdm(h) {
+  const todos = DATOS_ADM.todosDetalle || [];
+  const ops = todos.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h);
+  document.getElementById('drill-title').textContent = '🕐 Tickets a las '+h+':00';
+  document.getElementById('drill-content').innerHTML = miniStatsHTMLAdm(ops) + movimientosTablaHTMLAdm(ops);
+  document.getElementById('drill-panel').classList.add('open');
+}
+function drillTicketAdm(folio) {
+  const op = DATOS_ADM.operaciones.find(o=>o.folio===folio)
+    || (DATOS_ADM.abiertosDetalle||[]).find(o=>o.folio===folio)
+    || (DATOS_ADM.todosDetalle||[]).find(o=>o.folio===folio);
+  if (!op) return;
+  const labels={normal:'Normal',preferencial:'Preferencial',perdido:'Boleto Perdido',cortesia:'Cortesía',empleado:'Empleado',pension:'Pensión'};
+  const esAbierto = op.estatus ? op.estatus==='abierto' : !op.hora_salida;
+  const campos = [['Folio',folio],['Tipo',labels[op.tipo]||op.tipo],
+    ['Estatus', esAbierto ? 'IN (en plaza)' : 'OUT (ya salió)'],
+    ['Entrada',op.hora_entrada],['Salida',op.hora_salida||'—'],
+    ['Cajero entrada',op.cajero_entrada||op.cajero||'—'],
+    ['Cajero salida',op.cajero_salida||'—']];
+  if (op.franja) campos.push(['Franja',op.franja]);
+  if (op.minutos !== undefined) campos.push(['Minutos',op.minutos||'—']);
+  campos.push(['Importe', op.importe!=null ? fmt$(op.importe) : '—']);
+  document.getElementById('drill-title').textContent = '🎫 Ticket '+folio;
+  document.getElementById('drill-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      ${campos.map(([k,v])=>`<div style="background:var(--bg);border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${k}</div>
+          <div style="font-size:16px;font-weight:800;margin-top:4px">${v}</div>
+        </div>`).join('')}
+    </div>`;
+  document.getElementById('drill-panel').classList.add('open');
+}
+
+function exportarCSVAdm() {
+  const ops = DATOS_ADM.operaciones;
+  const hoy = fmtLocal(new Date());
+  const header = 'Folio,Tipo,Cajero,Entrada,Salida,Minutos,Franja,Importe,Plaza';
+  const lines = ops.map(o => [o.folio,o.tipo,o.cajero,o.hora_entrada,o.hora_salida||'',o.minutos||'',o.franja,o.importe,'Plaza IWOL'].join(','));
+  const csv = '﻿' + [header,...lines].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'IwolPark_admin_'+hoy+'.csv';
+  a.click();
+  showToast('CSV exportado · '+ops.length+' registros');
+}
 
 // ══ EJECUTIVO ══
 async function renderEjecutivo() {
@@ -1528,9 +2141,10 @@ let USUARIO_ACTUAL = null;
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
   logBitacora('login', { app: 'corporativo' });
   await cargarCapacidadTotal();
-  renderEjecutivo();
+  renderAdminTab();
   setInterval(() => {
     const activo = document.querySelector('.tab-section.active')?.id;
+    if (activo==='tab-admin')     renderAdminTab();
     if (activo==='tab-ejecutivo') renderEjecutivo();
     if (activo==='tab-operativo') renderOperativo();
     if (activo==='tab-cajeros')   renderCajeros();
