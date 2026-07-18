@@ -39,10 +39,10 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 .tab.active{color:var(--purple);border-bottom-color:var(--purple)}
 .tab:hover{color:var(--text)}
 
-.container{max-width:1400px;margin:0 auto;padding:20px 24px}
+.container{max-width:1400px;margin:0 auto;padding:10px 20px}
 
 /* FILTROS */
-.filtros{display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.filtros{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .filtros select,.filtros input{border:1.5px solid var(--border);border-radius:7px;
   padding:7px 12px;font-size:13px;background:#fff;color:var(--text)}
 .btn{background:var(--purple);color:#fff;border:none;border-radius:7px;
@@ -51,30 +51,30 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
              border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer}
 
 /* KPI GRID */
-.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:10px}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-.kpi{background:#fff;border-radius:12px;border:1px solid var(--border);
-     padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;
+.kpi{background:#fff;border-radius:10px;border:1px solid var(--border);
+     padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;
      transition:transform .15s}
 .kpi:hover{transform:translateY(-2px)}
-.kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
-           letter-spacing:.8px;margin-bottom:6px}
-.kpi-val{font-size:28px;font-weight:900;line-height:1;margin-bottom:3px}
-.kpi-sub{font-size:11px;color:var(--muted)}
+.kpi-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;
+           letter-spacing:.6px;margin-bottom:3px}
+.kpi-val{font-size:20px;font-weight:900;line-height:1;margin-bottom:2px}
+.kpi-sub{font-size:10px;color:var(--muted)}
 .kpi-delta{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;
            border-radius:3px;margin-top:4px}
 .up{background:#DCFCE7;color:#16A34A} .dn{background:#FEE2E2;color:#DC2626}
 
 /* 2-COL */
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
 @media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
 
-.card{background:#fff;border-radius:12px;border:1px solid var(--border);
-      padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-.card-title{font-size:13px;font-weight:800;margin-bottom:3px}
-.card-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);
+      padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.card-title{font-size:12px;font-weight:800;margin-bottom:2px}
+.card-sub{font-size:10px;color:var(--muted);margin-bottom:6px}
 
 /* BARRAS HORIZONTALES */
 .hbar-row{display:flex;align-items:center;gap:10px;padding:8px 0;
@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v89</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v90</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -290,11 +290,15 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
         <div style="font-size:12px;color:var(--muted)" id="gauge-sub">0 / 40 lugares</div>
       </div>
     </div>
-    <!-- Pico del día -->
+    <!-- Actividad comparativo -->
     <div class="card">
-      <div class="card-title">Actividad hoy</div>
-      <div class="card-sub">Evolución por hora</div>
-      <div class="mini-bars" id="mini-hoy"></div>
+      <div class="card-title">Actividad — Comparativo</div>
+      <div class="card-sub">Tickets por hora · clic en barra para ver detalle</div>
+      <div style="display:flex;gap:10px;font-size:8px;font-weight:700;margin-bottom:2px;flex-wrap:wrap">
+        <span style="color:var(--purple)">■ Período actual</span>
+        <span style="color:#F5A623">— Período anterior (<span id="actividad-anterior-sub-ej">—</span>)</span>
+      </div>
+      <div id="actividad-comparativa-ej"></div>
     </div>
     <!-- Meta vs Real -->
     <div class="card">
@@ -636,6 +640,28 @@ async function calcularOcupacionPromedio(desde, hasta) {
   } catch (e) { return 0; }
 }
 
+// Rango de fechas del "período anterior" comparable (mismo número de días,
+// inmediatamente antes) — usado por la gráfica Actividad Comparativo.
+function getFechasAnterior(desde, hasta) {
+  const d1 = new Date(desde+'T12:00:00'), d2 = new Date(hasta+'T12:00:00');
+  const dias = Math.round((d2-d1)/86400000) + 1;
+  const finAnt = new Date(d1); finAnt.setDate(finAnt.getDate()-1);
+  const iniAnt = new Date(finAnt); iniAnt.setDate(iniAnt.getDate()-dias+1);
+  return { desde: fmtLocal(iniAnt), hasta: fmtLocal(finAnt) };
+}
+
+// Todos los tickets del rango (abiertos + cerrados, sin cancelados) por
+// hora_entrada — a diferencia de cargarOps (solo cerrados), esto es lo que
+// alimenta "Actividad" por hora, para que cuadre con el total de tickets
+// del período (mismo criterio que Admin: evita el desfase franja/actividad).
+async function cargarTodosPeriodo(desde, hasta, maxTotal=6000) {
+  try {
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,hora_entrada,estatus&order=created_at.desc`;
+    const rows = await fetchPaginado(base, SB_HEADERS, maxTotal);
+    return rows.filter(t => t.estatus !== 'cancelado');
+  } catch (e) { return []; }
+}
+
 async function cargarCortesDB(desde, hasta) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/cortes?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=fecha_op.desc,created_at.asc&limit=500`, { headers: SB_HEADERS });
@@ -646,6 +672,7 @@ async function cargarCortesDB(desde, hasta) {
 // Caches de la última consulta por pestaña (para drill-down/export sin refetch)
 let OPS_EJECUTIVO = [], OPS_OPERATIVO = [], OPS_CAJEROS = [], CORTES_ACTUAL = [];
 let OPS_HIST_MESES = [], MESES_INFO = [];
+let TODOS_EJ_ACTUAL = [];
 
 // Tickets con estatus='abierto' ahora mismo, mapeados igual que cargarOps
 async function cargarAbiertos() {
@@ -823,18 +850,19 @@ async function renderEjecutivo() {
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">No pagados</div>
     </div>`;
 
-  // Actividad de hoy por hora (a partir de operaciones de hoy)
-  const hoyStr = fechasPeriodo('hoy').hasta;
-  const opsHoy = periodo==='hoy' ? ops : await cargarOps(hoyStr, hoyStr);
-  const horas = Array.from({length:16},(_,i)=>i+7);
-  const autosH = horas.map(h => opsHoy.filter(o => parseInt((o.hora||'0').split(':')[0])===h).length);
-  const maxA = Math.max(...autosH,1);
-  document.getElementById('mini-hoy').innerHTML = horas.map((h,i)=>`
-    <div style="flex:1;border-radius:3px 3px 0 0;min-height:2px;
-         background:${h<12?'#0A66C2':h<19?'#7B5EA7':'#F5A623'};
-         height:${autosH[i]/maxA*56}px;cursor:pointer"
-         onclick="showToast('${h}:00 → ${autosH[i]} operaciones')">
-    </div>`).join('');
+  // Actividad comparativo: tickets por hora del período actual (barras) vs
+  // el período anterior comparable (línea) — mismo criterio que Admin:
+  // abiertos+cerrados por hora_entrada, no solo cerrados (cargarOps),
+  // para que el total cuadre con "Tickets del período".
+  const anteriorRango = getFechasAnterior(desde,hasta);
+  const [todosActual, todosAnterior] = await Promise.all([
+    cargarTodosPeriodo(desde,hasta),
+    cargarTodosPeriodo(anteriorRango.desde, anteriorRango.hasta)
+  ]);
+  TODOS_EJ_ACTUAL = todosActual;
+  const subAnt = document.getElementById('actividad-anterior-sub-ej');
+  if (subAnt) subAnt.textContent = anteriorRango.desde===anteriorRango.hasta ? anteriorRango.desde : anteriorRango.desde+' a '+anteriorRango.hasta;
+  renderActividadComparativaEj(todosActual, todosAnterior);
 
   // Meta vs real
   const meta=40000, real=total, avance=Math.round(real/meta*100);
@@ -948,6 +976,45 @@ function drillFranjaOp(franja) {
   panel.classList.add('open');
 }
 function cerrarDrill(){document.getElementById('drill-panel').classList.remove('open')}
+
+// Barras (período actual) + línea (período anterior) por hora — mismo
+// patrón SVG hecho a mano que en Admin, sin librería.
+function renderActividadComparativaEj(actual, anterior) {
+  const el = document.getElementById('actividad-comparativa-ej');
+  if (!el) return;
+  const horas = Array.from({length:24}, (_,i)=>i);
+  const cActual   = horas.map(h => actual.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const cAnterior = horas.map(h => anterior.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h).length);
+  const max = Math.max(...cActual, ...cAnterior, 1);
+  const slot = 10, plotTop = 12, plotBottom = 82, plotH = plotBottom - plotTop;
+  const barW = slot * 0.6;
+  const bars = horas.map((h,i) => {
+    const x = i*slot + (slot-barW)/2;
+    const bh = cActual[i]/max*plotH;
+    const y = plotBottom - bh;
+    const label = cActual[i] ? `<text x="${x+barW/2}" y="${y-1.5}" font-size="4.5" text-anchor="middle" fill="var(--purple)" font-weight="700">${cActual[i]}</text>` : '';
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="1" fill="var(--purple)" style="cursor:pointer" onclick="drillHoraEj(${h})"><title>${h}:00 · ${cActual[i]} tickets (período actual)</title></rect>${label}`;
+  }).join('');
+  const puntos = horas.map((h,i) => ({ x: i*slot + slot/2, y: plotBottom - (cAnterior[i]/max*plotH), v: cAnterior[i], h }));
+  const linePath = puntos.map((p,i) => (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const dots = puntos.map(p => `<circle cx="${p.x}" cy="${p.y}" r="1.6" fill="#F5A623"><title>${p.h}:00 · ${p.v} tickets (período anterior)</title></circle>`).join('');
+  const xLabels = horas.map((h,i) => `<text x="${i*slot+slot/2}" y="92" font-size="4" text-anchor="middle" fill="var(--muted)">${h}</text>`).join('');
+  el.innerHTML = `<svg viewBox="0 0 240 96" style="width:100%;height:auto;display:block">${bars}<path d="${linePath}" fill="none" stroke="#F5A623" stroke-width="1.2"/>${dots}${xLabels}</svg>`;
+}
+
+function drillHoraEj(h) {
+  const rows = TODOS_EJ_ACTUAL.filter(o => parseInt((o.hora_entrada||'-1').split(':')[0])===h);
+  const estatusLabel = {abierto:'Abierto',cobrado:'Cobrado',perdido:'Perdido',cortesia:'Cortesía'};
+  document.getElementById('drill-title').textContent = '🕐 Detalle: '+h+':00 h';
+  document.getElementById('drill-content').innerHTML = rows.length ? `<div class="tabla-wrap"><table>
+      <thead><tr><th>Folio</th><th>Hora entrada</th><th>Estatus</th></tr></thead>
+      <tbody>${rows.map(o=>`<tr>
+        <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
+        <td>${o.hora_entrada||'—'}</td>
+        <td>${estatusLabel[o.estatus]||o.estatus}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin tickets en esa hora</div>';
+  document.getElementById('drill-panel').classList.add('open');
+}
 
 // ══ OPERATIVO ══
 async function renderOperativo() {
