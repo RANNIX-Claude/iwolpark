@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v96</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v97</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -598,13 +598,16 @@ async function cargarOps(desde, hasta, maxTotal=6000) {
   } catch (e) { return []; }
 }
 
-// Ocupación promedio de un periodo: en vez de "cuántos hay abiertos ahora
-// mismo" (que se infla con tickets 'abierto' que quedaron mal cerrados de
-// días pasados), se toma una "fotografía" cada hora dentro del periodo y se
-// cuenta cuántos tickets ocupaban un cajón en ese instante exacto
-// (entrada_at <= instante < salida_at). El promedio de esas fotografías
-// nunca puede superar la capacidad real, porque cada fotografía es un
-// conteo simultáneo real, no una suma acumulada.
+// Ocupación promedio de un periodo — redefinida (2026-07-18, a pedido del
+// usuario): la plaza tiene 68 cajones que "rentamos" durante el horario real
+// de operación (dim_plaza.hora_apertura–hora_cierre, hoy 06:00–22:00 = 16h),
+// no las 24 horas del día. El universo de recurso disponible es
+// capacidad × horas de operación; sumamos cuántos minutos ocupó cada auto
+// DENTRO de ese horario (recortando lo que cae fuera, p.ej. si entró antes
+// de abrir) y dividimos entre ese universo. La versión anterior promediaba
+// "fotografías" cada hora sobre las 24 horas completas (medianoche a
+// medianoche), lo que diluía el % a la mitad o menos aunque la ocupación
+// real durante el horario de operación fuera alta.
 async function calcularOcupacionPromedio(desde, hasta) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=hora_entrada_at,hora_salida_at,estatus,fecha_op`, { headers: SB_HEADERS });
@@ -612,10 +615,26 @@ async function calcularOcupacionPromedio(desde, hasta) {
     const ahora = new Date();
     const hoyStr = fmtLocal(ahora);
 
-    const intervalos = [];
+    // Denominador: minutos de horario de operación disponibles en el rango.
+    // Si el rango incluye hoy, el día de hoy se recorta a "ahora" (no se
+    // puede rentar tiempo que todavía no ha pasado), igual que ya hacía la
+    // versión anterior con "ahora" en vez de medianoche.
+    let minutosVentana = 0;
+    const d0 = new Date(desde+'T12:00:00'), d1 = new Date(hasta+'T12:00:00');
+    for (let d = new Date(d0); d <= d1; d.setDate(d.getDate()+1)) {
+      const diaStr = fmtLocal(d);
+      const vIni = new Date(diaStr+'T'+HORA_APERTURA_PLAZA+':00-06:00');
+      let vFin = new Date(diaStr+'T'+HORA_CIERRE_PLAZA+':00-06:00');
+      if (diaStr === hoyStr) { if (ahora < vIni) continue; if (ahora < vFin) vFin = ahora; }
+      if (vFin > vIni) minutosVentana += (vFin - vIni) / 60000;
+    }
+    if (!minutosVentana) return 0;
+
+    // Numerador: minutos reales que cada ticket ocupó un cajón, recortados
+    // al horario de operación de SU día (fecha_op).
+    let minutosOcupados = 0;
     for (const t of rows) {
-      if (!t.hora_entrada_at) continue;
-      if (t.estatus === 'cancelado') continue; // boleto erróneo, no ocupó lugar real
+      if (!t.hora_entrada_at || t.estatus === 'cancelado') continue;
       const entrada = new Date(t.hora_entrada_at);
       let salida;
       if (t.hora_salida_at) salida = new Date(t.hora_salida_at);
@@ -623,27 +642,18 @@ async function calcularOcupacionPromedio(desde, hasta) {
       else continue; // 'abierto' de un día pasado: dato inconsistente (la
                       // regla del negocio es que nadie se queda de un día
                       // para otro) — se excluye para no inflar el promedio
-      if (salida > entrada) intervalos.push([entrada, salida]);
-    }
-    if (!intervalos.length) return 0;
 
-    const inicioMuestreo = new Date(desde+'T00:00:00');
-    const finMuestreo = hasta >= hoyStr ? ahora : new Date(hasta+'T23:00:00');
-    const totalMuestras = Math.floor((finMuestreo.getTime()-inicioMuestreo.getTime())/3600000) + 1;
+      const vIni = new Date(t.fecha_op+'T'+HORA_APERTURA_PLAZA+':00-06:00');
+      let vFin = new Date(t.fecha_op+'T'+HORA_CIERRE_PLAZA+':00-06:00');
+      if (t.fecha_op === hoyStr && ahora < vFin) vFin = ahora;
 
-    // Barrido (sweep-line) con arreglo de diferencias: en vez de comparar cada
-    // muestra contra cada ticket (O(muestras×tickets), lento para "Este año"),
-    // se marca +1 en la muestra donde entra y -1 en la que sale, y se
-    // acumula — mismo resultado, muchísimo más rápido.
-    const delta = new Array(totalMuestras+1).fill(0);
-    for (const [e,s] of intervalos) {
-      const idxStart = Math.max(0, Math.ceil((e.getTime()-inicioMuestreo.getTime())/3600000));
-      const idxEnd   = Math.min(totalMuestras, Math.ceil((s.getTime()-inicioMuestreo.getTime())/3600000));
-      if (idxStart < idxEnd) { delta[idxStart]++; delta[idxEnd]--; }
+      const ini = Math.max(entrada.getTime(), vIni.getTime());
+      const fin = Math.min(salida.getTime(), vFin.getTime());
+      if (fin > ini) minutosOcupados += (fin - ini) / 60000;
     }
-    let ocupados = 0, suma = 0;
-    for (let i=0; i<totalMuestras; i++) { ocupados += delta[i]; suma += ocupados; }
-    return totalMuestras ? suma/totalMuestras : 0;
+    // Promedio de cajones ocupados (no un %) — el % se calcula en el punto
+    // de uso como ocupacionProm/CAPACIDAD_TOTAL, igual que antes.
+    return minutosOcupados / minutosVentana;
   } catch (e) { return 0; }
 }
 
@@ -1409,11 +1419,19 @@ function logBitacora(accion, detalle) {
 // real a Parámetros (bug detectado en QA: mostraba 40 aunque la plaza
 // esté configurada con 68 cajones).
 let CAPACIDAD_TOTAL = 40;
+// Horario real de operación (dim_plaza.hora_apertura/hora_cierre) — usado
+// por calcularOcupacionPromedio() para no diluir la ocupación con horas en
+// que la plaza ni siquiera está abierta. 06:00–22:00 son los valores
+// configurados hoy; quedan como respaldo si el campo viene vacío.
+let HORA_APERTURA_PLAZA = '06:00';
+let HORA_CIERRE_PLAZA = '22:00';
 async function cargarCapacidadTotal() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=capacidad_total&limit=1`, { headers: SB_HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=capacidad_total,hora_apertura,hora_cierre&limit=1`, { headers: SB_HEADERS });
     const rows = r.ok ? await r.json() : [];
     if (rows[0]?.capacidad_total) CAPACIDAD_TOTAL = rows[0].capacidad_total;
+    if (rows[0]?.hora_apertura) HORA_APERTURA_PLAZA = rows[0].hora_apertura.slice(0,5);
+    if (rows[0]?.hora_cierre) HORA_CIERRE_PLAZA = rows[0].hora_cierre.slice(0,5);
   } catch (e) {}
 }
 
