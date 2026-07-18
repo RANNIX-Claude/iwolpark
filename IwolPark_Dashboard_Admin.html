@@ -247,12 +247,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v95</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v96</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirParametros();">⚙ Parámetros del sistema</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirBitacora();">📜 Bitácora</button>
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirConsultaTickets();">🔎 Consulta de tickets</button>
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
         <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
         <a class="nav-menu-item" href="IwolPark_Demanda.html" target="_blank">📈 Análisis de demanda</a>
         <div class="nav-menu-sep"></div>
@@ -526,6 +528,128 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         </div>
         <div style="font-size:12px;color:var(--muted);font-weight:700" id="bitacora-count">—</div>
         <div id="bitacora-tabla"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: CONSULTA DE TICKETS (todas las columnas) ══ -->
+  <div class="modal-overlay" id="modal-consulta-tickets">
+    <div class="modal-box" style="max-width:1500px">
+      <div class="modal-head">
+        <span class="modal-title">🔎 Consulta de tickets — todas las columnas</span>
+        <button class="modal-close" onclick="cerrarConsultaTickets()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="param-card">
+          <div class="param-row">
+            <input type="text" id="ct-folio" placeholder="Folio (parcial)" style="min-width:120px">
+            <label style="font-size:11px;color:var(--muted)">Desde</label>
+            <input type="date" id="ct-desde">
+            <label style="font-size:11px;color:var(--muted)">Hasta</label>
+            <input type="date" id="ct-hasta">
+            <select id="ct-tipo">
+              <option value="">Todos los tipos</option>
+              <option value="normal">Normal</option>
+              <option value="preferencial">Preferencial</option>
+              <option value="pension">Pensión</option>
+              <option value="empleado">Empleado</option>
+              <option value="perdido">Perdido</option>
+            </select>
+            <select id="ct-estatus">
+              <option value="">Todos los estatus</option>
+              <option value="abierto">Abierto</option>
+              <option value="cobrado">Cobrado</option>
+              <option value="cortesia">Cortesía</option>
+              <option value="perdido">Perdido</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <input type="text" id="ct-cajero-entrada" placeholder="Cajero entrada (parcial)">
+            <input type="text" id="ct-cajero-salida" placeholder="Cajero salida (parcial)">
+            <label style="font-size:11px;color:var(--muted)">Hora entrada</label>
+            <input type="time" id="ct-hora-entrada-desde">
+            <span style="font-size:11px;color:var(--muted)">a</span>
+            <input type="time" id="ct-hora-entrada-hasta">
+            <label style="font-size:11px;color:var(--muted)">Hora salida</label>
+            <input type="time" id="ct-hora-salida-desde">
+            <span style="font-size:11px;color:var(--muted)">a</span>
+            <input type="time" id="ct-hora-salida-hasta">
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <label style="font-size:11px;color:var(--muted)">Monto</label>
+            <input type="number" id="ct-monto-desde" placeholder="Desde $" style="max-width:110px">
+            <span style="font-size:11px;color:var(--muted)">a</span>
+            <input type="number" id="ct-monto-hasta" placeholder="Hasta $" style="max-width:110px">
+            <button class="param-btn" onclick="buscarTicketsConsulta()">🔍 Buscar</button>
+            <button class="param-btn outline" onclick="limpiarFiltrosConsulta()">Limpiar filtros</button>
+            <button class="param-btn outline" onclick="exportarTicketsCSV()">⬇ Exportar CSV</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);font-weight:700" id="ct-count">—</div>
+        <div id="ct-tabla"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: GESTIÓN MANUAL DE TICKETS ══ -->
+  <div class="modal-overlay" id="modal-gestion-manual">
+    <div class="modal-box" style="max-width:820px">
+      <div class="modal-head">
+        <span class="modal-title">✍️ Gestión manual de tickets</span>
+        <button class="modal-close" onclick="cerrarGestionManual()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="param-card">
+          <h3>Cancelar ticket</h3>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+            Busca un folio, revisa sus datos y cancélalo con un motivo — queda marcado como CANCELADO (no se borra) y no cuenta en reportes ni ingresos. El motivo se registra en la bitácora.
+          </div>
+          <div class="param-row">
+            <input type="text" id="gm-folio-buscar" placeholder="Folio a cancelar">
+            <button class="param-btn outline" onclick="buscarTicketParaCancelar()">Buscar</button>
+          </div>
+          <div id="gm-cancelar-detalle" style="margin-top:10px"></div>
+        </div>
+
+        <div class="param-card">
+          <h3>Captura manual de ticket</h3>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+            Para registrar movimientos que no quedaron en el sistema (ej. falla de energía) — captura folio, fecha, horas, cajeros e importe a mano.
+          </div>
+          <div class="param-row">
+            <input type="text" id="gm-folio" placeholder="Folio">
+            <select id="gm-tipo">
+              <option value="normal">Normal</option>
+              <option value="preferencial">Preferencial</option>
+              <option value="pension">Pensión</option>
+              <option value="empleado">Empleado</option>
+            </select>
+            <input type="date" id="gm-fecha">
+          </div>
+          <div class="param-row" style="margin-top:8px">
+            <label style="font-size:11px;color:var(--muted);min-width:95px">Entrada</label>
+            <input type="time" id="gm-hora-entrada">
+            <input type="text" id="gm-cajero-entrada" placeholder="Cajero de entrada">
+          </div>
+          <div class="param-row" style="margin-top:8px">
+            <label style="font-size:11px;color:var(--muted);min-width:95px">Salida</label>
+            <input type="time" id="gm-hora-salida">
+            <input type="text" id="gm-cajero-salida" placeholder="Cajero de salida (si ya salió)">
+          </div>
+          <div class="param-row" style="margin-top:8px">
+            <label style="font-size:11px;color:var(--muted);min-width:95px">Cobro</label>
+            <input type="number" id="gm-importe" placeholder="Monto cobrado ($)" min="0" step="0.5" style="max-width:140px">
+          </div>
+          <div class="param-row" style="margin-top:8px">
+            <textarea id="gm-motivo" placeholder="Nota / motivo de la captura manual (ej. falla de energía el 15/julio en la mañana)" style="flex:1;min-height:50px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit"></textarea>
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <button class="param-btn" onclick="guardarCapturaManual()">+ Guardar ticket</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1590,6 +1714,237 @@ function exportarBitacoraCSV() {
   a.download = 'IwolPark_bitacora_'+fmtLocal(new Date())+'.csv';
   a.click();
   showToast('CSV exportado · '+rows.length+' registros');
+}
+
+// ══ CONSULTA DE TICKETS (todas las columnas de la tabla, con filtros) ══
+let CT_ACTUAL = [];
+const CT_COLUMNAS = [
+  {k:'id', h:'ID'}, {k:'folio', h:'Folio'}, {k:'tipo', h:'Tipo'}, {k:'estatus', h:'Estatus'},
+  {k:'cajero', h:'Cajero'}, {k:'cajero_entrada', h:'Cajero entrada'}, {k:'cajero_salida', h:'Cajero salida'},
+  {k:'turno_id', h:'Turno'}, {k:'hora_entrada_at', h:'Entrada (registro)'}, {k:'hora_salida_at', h:'Salida (registro)'},
+  {k:'hora_entrada', h:'Hora entrada'}, {k:'hora_salida', h:'Hora salida'},
+  {k:'minutos_estancia', h:'Min. estancia'}, {k:'horas_cobradas', h:'Hrs cobradas'}, {k:'tarifa', h:'Tarifa'},
+  {k:'penalizacion', h:'Penalización'}, {k:'importe', h:'Importe'}, {k:'franja', h:'Franja'},
+  {k:'fecha_op', h:'Fecha op'}, {k:'dia_semana', h:'Día'}, {k:'mes', h:'Mes'}, {k:'anio', h:'Año'},
+  {k:'plaza', h:'Plaza'}, {k:'created_at', h:'Creado'}
+];
+const ESTATUS_COLOR_CT = {abierto:'#0A66C222', cobrado:'#0D945722', cortesia:'#88888822', perdido:'#D9302522', cancelado:'#D9302522'};
+const ESTATUS_COLOR_TXT_CT = {abierto:'#0A66C2', cobrado:'#0D9457', cortesia:'#666', perdido:'#D93025', cancelado:'#D93025'};
+
+function abrirConsultaTickets() {
+  document.getElementById('modal-consulta-tickets').classList.add('open');
+  const hoy = fmtLocal(new Date());
+  document.getElementById('ct-desde').value = hoy;
+  document.getElementById('ct-hasta').value = hoy;
+  buscarTicketsConsulta();
+}
+function cerrarConsultaTickets() {
+  document.getElementById('modal-consulta-tickets').classList.remove('open');
+}
+function limpiarFiltrosConsulta() {
+  ['ct-folio','ct-cajero-entrada','ct-cajero-salida','ct-hora-entrada-desde','ct-hora-entrada-hasta',
+   'ct-hora-salida-desde','ct-hora-salida-hasta','ct-monto-desde','ct-monto-hasta'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ct-tipo').value = '';
+  document.getElementById('ct-estatus').value = '';
+  const hoy = fmtLocal(new Date());
+  document.getElementById('ct-desde').value = hoy;
+  document.getElementById('ct-hasta').value = hoy;
+  buscarTicketsConsulta();
+}
+async function buscarTicketsConsulta() {
+  const cont = document.getElementById('ct-tabla');
+  cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Cargando…</div>';
+  try {
+    const folio = document.getElementById('ct-folio').value.trim();
+    const desde = document.getElementById('ct-desde').value;
+    const hasta = document.getElementById('ct-hasta').value;
+    const tipo = document.getElementById('ct-tipo').value;
+    const estatus = document.getElementById('ct-estatus').value;
+    const cajeroEntrada = document.getElementById('ct-cajero-entrada').value.trim();
+    const cajeroSalida = document.getElementById('ct-cajero-salida').value.trim();
+    const horaEntDesde = document.getElementById('ct-hora-entrada-desde').value;
+    const horaEntHasta = document.getElementById('ct-hora-entrada-hasta').value;
+    const horaSalDesde = document.getElementById('ct-hora-salida-desde').value;
+    const horaSalHasta = document.getElementById('ct-hora-salida-hasta').value;
+    const montoDesde = document.getElementById('ct-monto-desde').value;
+    const montoHasta = document.getElementById('ct-monto-hasta').value;
+
+    let query = 'order=created_at.desc';
+    if (folio) query += `&folio=ilike.*${encodeURIComponent(folio)}*`;
+    if (desde) query += `&fecha_op=gte.${desde}`;
+    if (hasta) query += `&fecha_op=lte.${hasta}`;
+    if (tipo) query += `&tipo=eq.${tipo}`;
+    if (estatus) query += `&estatus=eq.${estatus}`;
+    if (cajeroEntrada) query += `&cajero_entrada=ilike.*${encodeURIComponent(cajeroEntrada)}*`;
+    if (cajeroSalida) query += `&cajero_salida=ilike.*${encodeURIComponent(cajeroSalida)}*`;
+    if (horaEntDesde) query += `&hora_entrada=gte.${horaEntDesde}`;
+    if (horaEntHasta) query += `&hora_entrada=lte.${horaEntHasta}`;
+    if (horaSalDesde) query += `&hora_salida=gte.${horaSalDesde}`;
+    if (horaSalHasta) query += `&hora_salida=lte.${horaSalHasta}`;
+    if (montoDesde) query += `&importe=gte.${montoDesde}`;
+    if (montoHasta) query += `&importe=lte.${montoHasta}`;
+
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    const rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 3000);
+    CT_ACTUAL = rows;
+    renderTablaTicketsCompleta(rows);
+  } catch (e) {
+    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">No se pudo cargar</div>';
+  }
+}
+function fmtCeldaTicket(campo, v) {
+  if (v==null || v==='') return '—';
+  if (campo==='hora_entrada_at' || campo==='hora_salida_at' || campo==='created_at') return fmtFechaHoraMX(v);
+  if (campo==='importe' || campo==='tarifa' || campo==='penalizacion') return fmt$(Number(v));
+  if (campo==='estatus') return `<span class="badge" style="background:${ESTATUS_COLOR_CT[v]||'#88888822'};color:${ESTATUS_COLOR_TXT_CT[v]||'#666'}">${escHtmlAttr(v)}</span>`;
+  return escHtmlAttr(v);
+}
+function renderTablaTicketsCompleta(rows) {
+  document.getElementById('ct-count').textContent = rows.length+' registro'+(rows.length===1?'':'s')+(rows.length>=3000?' (límite alcanzado, afina el filtro)':'');
+  const cont = document.getElementById('ct-tabla');
+  if (!rows.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Sin resultados para el filtro seleccionado</div>';
+    return;
+  }
+  cont.innerHTML = `<div class="tabla-wrap"><table style="font-size:11px">
+    <thead><tr>${CT_COLUMNAS.map(c=>`<th style="white-space:nowrap">${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${CT_COLUMNAS.map(c=>`<td style="white-space:nowrap">${fmtCeldaTicket(c.k, r[c.k])}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function exportarTicketsCSV() {
+  const rows = CT_ACTUAL;
+  if (!rows.length) { showToast('No hay registros para exportar'); return; }
+  const header = CT_COLUMNAS.map(c=>c.h).join(',');
+  const lines = rows.map(r => CT_COLUMNAS.map(c => {
+    const v = r[c.k];
+    if (v==null) return '';
+    if (c.k==='hora_entrada_at'||c.k==='hora_salida_at'||c.k==='created_at') return fmtFechaHoraMX(v);
+    return v;
+  }).map(csvEscapeBitacora).join(','));
+  const csv = '﻿' + [header,...lines].join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'IwolPark_tickets_'+fmtLocal(new Date())+'.csv';
+  a.click();
+  showToast('CSV exportado · '+rows.length+' registros');
+}
+
+// ══ GESTIÓN MANUAL DE TICKETS (cancelar con motivo + captura manual) ══
+let GM_TICKET_ACTUAL = null;
+function abrirGestionManual() {
+  document.getElementById('modal-gestion-manual').classList.add('open');
+  document.getElementById('gm-folio-buscar').value = '';
+  document.getElementById('gm-cancelar-detalle').innerHTML = '';
+  GM_TICKET_ACTUAL = null;
+  document.getElementById('gm-fecha').value = fmtLocal(new Date());
+}
+function cerrarGestionManual() {
+  document.getElementById('modal-gestion-manual').classList.remove('open');
+}
+async function buscarTicketParaCancelar() {
+  const folio = document.getElementById('gm-folio-buscar').value.trim();
+  const cont = document.getElementById('gm-cancelar-detalle');
+  if (!folio) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="color:var(--muted);font-size:12px">Buscando…</div>';
+  try {
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?folio=eq.${encodeURIComponent(folio)}&select=*`, {headers});
+    const rows = r.ok ? await r.json() : [];
+    if (!rows.length) { cont.innerHTML = '<div style="color:var(--red);font-size:12px">Folio no encontrado</div>'; GM_TICKET_ACTUAL = null; return; }
+    const t = rows[0];
+    GM_TICKET_ACTUAL = t;
+    if (t.estatus === 'cancelado') {
+      cont.innerHTML = `<div style="font-size:12px;color:var(--muted)">Folio <b>${escHtmlAttr(t.folio)}</b> ya está cancelado.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <div style="background:var(--bg);border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:10px">
+        <b>${escHtmlAttr(t.folio)}</b> · ${escHtmlAttr(t.tipo)} · ${escHtmlAttr(t.estatus)} ·
+        Entrada ${t.hora_entrada||'—'} (${escHtmlAttr(t.cajero_entrada)||'—'}) ·
+        Salida ${t.hora_salida||'—'} (${escHtmlAttr(t.cajero_salida)||'—'}) ·
+        Importe ${fmt$(Number(t.importe)||0)}
+      </div>
+      <textarea id="gm-motivo-cancelar" placeholder="Motivo de la cancelación" style="width:100%;min-height:44px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box"></textarea>
+      <button class="param-btn" style="background:var(--red)" onclick="confirmarCancelarTicket()">Cancelar este ticket</button>
+    `;
+  } catch (e) { cont.innerHTML = '<div style="color:var(--red);font-size:12px">Error al buscar</div>'; }
+}
+async function confirmarCancelarTicket() {
+  const t = GM_TICKET_ACTUAL;
+  if (!t) return;
+  const motivo = (document.getElementById('gm-motivo-cancelar')?.value || '').trim();
+  if (!motivo) { showToast('Indica un motivo antes de cancelar', '#D93025'); return; }
+  if (!confirm('¿Cancelar el ticket '+t.folio+'? Esto no se puede deshacer desde aquí.')) return;
+  try {
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal'};
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?folio=eq.${encodeURIComponent(t.folio)}`, {
+      method:'PATCH', headers, body: JSON.stringify({estatus:'cancelado'})
+    });
+    if (!r.ok) throw new Error('http '+r.status);
+    logBitacora('cancelacion', { folio: t.folio, motivo, estatus_anterior: t.estatus, importe_anterior: Number(t.importe)||0, origen: 'admin_gestion_manual' });
+    showToast('Ticket '+t.folio+' cancelado');
+    document.getElementById('gm-cancelar-detalle').innerHTML = '<div style="font-size:12px;color:var(--muted)">Cancelado.</div>';
+    GM_TICKET_ACTUAL = null;
+    cargarDatos();
+  } catch (e) { showToast('No se pudo cancelar', '#D93025'); }
+}
+async function guardarCapturaManual() {
+  const folio = document.getElementById('gm-folio').value.trim();
+  const tipo = document.getElementById('gm-tipo').value;
+  const fecha = document.getElementById('gm-fecha').value;
+  const horaEntrada = document.getElementById('gm-hora-entrada').value;
+  const cajeroEntrada = document.getElementById('gm-cajero-entrada').value.trim();
+  const horaSalida = document.getElementById('gm-hora-salida').value;
+  const cajeroSalida = document.getElementById('gm-cajero-salida').value.trim();
+  const importe = parseFloat(document.getElementById('gm-importe').value) || 0;
+  const motivo = document.getElementById('gm-motivo').value.trim();
+
+  if (!folio || !fecha || !horaEntrada || !cajeroEntrada) {
+    showToast('Folio, fecha, hora de entrada y cajero de entrada son obligatorios', '#D93025'); return;
+  }
+  try {
+    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
+    const chk = await fetch(`${SUPABASE_URL}/rest/v1/tickets?folio=eq.${encodeURIComponent(folio)}&select=folio`, {headers});
+    const existe = chk.ok ? await chk.json() : [];
+    if (existe.length) { showToast('Ese folio ya existe, usa otro', '#D93025'); return; }
+
+    const d = new Date(fecha+'T12:00:00');
+    const diaSemana = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][d.getDay()];
+    // Sin hora de salida el ticket queda abierto (igual que uno real que aún
+    // no cobra); con hora de salida se infieren horas_cobradas/tarifa a
+    // partir del importe capturado, mismo criterio que usa el cobro normal.
+    let estatus = 'abierto', minutosEstancia = null, horasCobradas = null, tarifa = null;
+    if (horaSalida) {
+      const [h1,m1] = horaEntrada.split(':').map(Number), [h2,m2] = horaSalida.split(':').map(Number);
+      minutosEstancia = Math.max(0, (h2*60+m2) - (h1*60+m1));
+      horasCobradas = Math.max(1, Math.ceil(minutosEstancia/60));
+      estatus = importe > 0 ? 'cobrado' : 'cortesia';
+      tarifa = importe > 0 ? Math.round((importe/horasCobradas)*100)/100 : null;
+    }
+    const payload = {
+      folio, tipo, estatus,
+      cajero: horaSalida ? (cajeroSalida||cajeroEntrada) : cajeroEntrada,
+      cajero_entrada: cajeroEntrada, cajero_salida: horaSalida ? (cajeroSalida||null) : null,
+      hora_entrada_at: `${fecha}T${horaEntrada}:00-06:00`,
+      hora_salida_at: horaSalida ? `${fecha}T${horaSalida}:00-06:00` : null,
+      hora_entrada: horaEntrada, hora_salida: horaSalida || null,
+      minutos_estancia: minutosEstancia, horas_cobradas: horasCobradas, tarifa,
+      penalizacion: 0, importe,
+      fecha_op: fecha, dia_semana: diaSemana, mes: d.getMonth()+1, anio: d.getFullYear(),
+      plaza: 'Plaza IWOL'
+    };
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets`, {
+      method:'POST',
+      headers: {...headers, 'Content-Type':'application/json', Prefer:'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('http '+r.status);
+    logBitacora('captura_manual', { folio, fecha, hora_entrada: horaEntrada, hora_salida: horaSalida||null, importe, motivo: motivo||null });
+    showToast('Ticket '+folio+' registrado manualmente');
+    ['gm-folio','gm-hora-entrada','gm-cajero-entrada','gm-hora-salida','gm-cajero-salida','gm-importe','gm-motivo'].forEach(id => document.getElementById(id).value = '');
+    cargarDatos();
+  } catch (e) { showToast('No se pudo guardar el ticket', '#D93025'); }
 }
 
 // ══ PARÁMETROS DEL SISTEMA ══
