@@ -30,7 +30,7 @@ NEXT=$((CURRENT + 1))
 echo "$NEXT" > .prod2_version
 
 BUILD_DIR=$(mktemp -d)
-PAGES="IwolPark_Index.html IwolPark_TABLET.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html IwolPark_Dashboard_Cajeros.html"
+PAGES="IwolPark_Index.html IwolPark_TABLET.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html IwolPark_Dashboard_Cajeros.html IwolPark_Promo_Admin.html"
 EXTRA="manifest_tablet.json manifest_admin.json manifest_corporativo.json sw.js"
 
 for f in $PAGES $EXTRA; do

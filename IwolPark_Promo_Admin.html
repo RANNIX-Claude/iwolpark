@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IwolPark · Promociones</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IwolPark Promo">
+<meta name="theme-color" content="#7B5EA7">
+<style>
+:root {
+  --bg:      #F5F5F7;
+  --white:   #FFFFFF;
+  --border:  #D2D2D7;
+  --accent:  #7B5EA7;
+  --accent2: #0A66C2;
+  --green:   #0D9457;
+  --red:     #D93025;
+  --gold:    #F5A623;
+  --text:    #1D1D1F;
+  --muted:   #6E6E73;
+  --card-sh: 0 2px 12px rgba(0,0,0,.08);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+       color:var(--text); min-height:100vh; }
+
+/* NAV */
+nav { background:#fff; border-bottom:1px solid var(--border);
+      padding:0 24px; height:52px; display:flex; align-items:center;
+      gap:12px; position:sticky; top:0; z-index:100;
+      box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.nav-title { font-size:15px; font-weight:800; color:var(--text); }
+.nav-badge { font-size:10px; font-weight:700; background:var(--accent);
+             color:#fff; border-radius:4px; padding:2px 8px; }
+.nav-right { margin-left:auto; display:flex; align-items:center; gap:16px; }
+.nav-clock { font-size:12px; color:var(--muted); font-family:monospace; }
+.btn-refresh { background:var(--accent); color:#fff; border:none;
+               border-radius:8px; padding:7px 16px; font-size:12px;
+               font-weight:700; cursor:pointer; }
+
+/* TABS */
+.tabs { background:#fff; border-bottom:2px solid var(--border);
+        display:flex; padding:0 24px; gap:0; }
+.tab { padding:14px 20px; font-size:13px; font-weight:600; color:var(--muted);
+       cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;
+       transition:all .15s; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab:hover { color:var(--text); }
+.tab-section { display:none; }
+.tab-section.active { display:block; }
+
+.container { max-width:1400px; margin:0 auto; padding:18px 20px 60px; }
+
+/* TOOLBAR / FILTROS */
+.toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+.toolbar select, .toolbar input { border:1.5px solid var(--border); border-radius:8px;
+  padding:8px 12px; font-size:13px; background:#fff; }
+.btn { background:var(--accent); color:#fff; border:none; border-radius:8px;
+       padding:9px 18px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.btn.outline { background:#fff; color:var(--accent); border:1.5px solid var(--accent); }
+.btn.green { background:var(--green); }
+.btn.red { background:var(--red); }
+.btn.gold { background:var(--gold); }
+.btn.sm { padding:5px 12px; font-size:11px; }
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* CARD / TABLE */
+.card { background:var(--white); border-radius:12px; border:1px solid var(--border);
+        padding:16px 18px; box-shadow:var(--card-sh); margin-bottom:16px; }
+.tabla-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:#F8F5FF; padding:10px 14px; text-align:left;
+     font-size:11px; font-weight:700; color:var(--muted);
+     text-transform:uppercase; letter-spacing:.5px;
+     border-bottom:2px solid var(--border); white-space:nowrap; }
+td { padding:10px 14px; border-bottom:1px solid #F0EEF8; vertical-align:middle; }
+tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+.b-on  { background:#E6F7EF; color:var(--green); }
+.b-off { background:#FEE2E2; color:var(--red); }
+.estado-chip { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; }
+
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+                  z-index:1000; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--white); border-radius:14px; max-width:760px; width:100%;
+             max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.modal-box.wide { max-width:1000px; }
+.modal-head { display:flex; align-items:center; gap:10px; padding:18px 22px;
+              border-bottom:1px solid var(--border); position:sticky; top:0;
+              background:var(--white); border-radius:14px 14px 0 0; z-index:2; }
+.modal-title { font-size:16px; font-weight:900; }
+.modal-close { margin-left:auto; background:none; border:none; font-size:20px;
+               color:var(--muted); cursor:pointer; line-height:1; }
+.modal-body { padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.modal-foot { padding:16px 22px; border-top:1px solid var(--border);
+              display:flex; gap:10px; justify-content:flex-end; }
+
+.param-card { border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+.param-card h3 { font-size:12px; font-weight:800; text-transform:uppercase;
+                  letter-spacing:.5px; color:var(--muted); margin-bottom:10px; }
+.field { display:flex; flex-direction:column; gap:4px; flex:1; min-width:160px; }
+.field label { font-size:11px; font-weight:700; color:var(--muted); }
+.field input, .field select, .field textarea {
+  border:1.5px solid var(--border); border-radius:8px; padding:9px 12px; font-size:13px;
+  font-family:inherit; background:#fff; width:100%; }
+.field textarea { resize:vertical; min-height:56px; }
+.row { display:flex; gap:12px; flex-wrap:wrap; }
+
+.chip-group { display:flex; gap:6px; flex-wrap:wrap; }
+.chip { border:1.5px solid var(--border); border-radius:99px; padding:6px 14px;
+        font-size:12px; font-weight:700; cursor:pointer; background:#fff; color:var(--muted); user-select:none; }
+.chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.chip-quick { font-size:11px; font-weight:700; color:var(--accent2); cursor:pointer;
+              background:none; border:none; text-decoration:underline; padding:0; }
+
+.logo-preview { width:80px; height:80px; border:1.5px dashed var(--border); border-radius:10px;
+  display:flex; align-items:center; justify-content:center; overflow:hidden; background:#FAFAFA; flex-shrink:0; }
+.logo-preview img { max-width:100%; max-height:100%; }
+
+/* MÉTRICAS */
+.metric-card { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; }
+.metric-nums { display:flex; gap:22px; flex-wrap:wrap; margin:10px 0; }
+.metric-num { text-align:center; }
+.metric-num b { display:block; font-size:22px; font-weight:900; color:var(--accent); }
+.metric-num span { font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; }
+.bars { display:flex; gap:10px; align-items:flex-end; height:70px; padding-top:6px; }
+.bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; }
+.bar { width:100%; border-radius:6px 6px 0 0; background:var(--accent); transition:height .4s ease; }
+.bar-label { font-size:9px; color:var(--muted); font-weight:700; text-align:center; }
+.bar-value { font-size:11px; font-weight:800; }
+
+/* TOAST */
+.toast { position:fixed; bottom:20px; right:20px; background:#1D1D1F;
+         color:#fff; border-radius:10px; padding:12px 18px;
+         font-size:13px; font-weight:600; z-index:9999;
+         transform:translateY(60px); opacity:0; transition:all .3s; }
+.toast.show { transform:translateY(0); opacity:1; }
+
+/* LOGIN */
+#iwol-login-overlay { position:fixed; inset:0; background:#1D1D1F; z-index:999999;
+  display:flex; align-items:center; justify-content:center; }
+#iwol-login-overlay.hidden { display:none; }
+.iwol-login-box { background:#fff; border-radius:16px; padding:32px 28px; width:90%; max-width:340px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; }
+.iwol-login-box h2 { font-size:18px; font-weight:900; margin-bottom:4px; }
+.iwol-login-box p { font-size:12px; color:#6E6E73; margin-bottom:18px; }
+.iwol-login-box input { width:100%; border:1.5px solid #D2D2D7; border-radius:8px; padding:11px 12px;
+  font-size:14px; margin-bottom:10px; box-sizing:border-box; }
+.iwol-login-box button { width:100%; background:#7B5EA7; color:#fff; border:none; border-radius:8px;
+  padding:12px; font-size:14px; font-weight:700; cursor:pointer; }
+.iwol-login-error { color:#D93025; font-size:12px; margin-top:8px; min-height:16px; }
+.empty { text-align:center; padding:30px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div id="iwol-login-overlay" class="hidden">
+  <div class="iwol-login-box">
+    <h2>🔒 Iniciar sesión</h2>
+    <p>IwolPark · <span id="iwol-login-app-nombre"></span></p>
+    <input type="text" id="iwol-login-usuario" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="iwol-login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button onclick="iwolIntentarLogin()">Entrar</button>
+    <div class="iwol-login-error" id="iwol-login-error"></div>
+  </div>
+</div>
+
+<nav>
+  <span style="font-size:22px;font-weight:900;color:var(--accent)">·iwol·</span>
+  <span class="nav-title">IwolPark</span>
+  <span class="nav-badge">📢 PROMOCIONES</span>
+  <div class="nav-right">
+    <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
+    <span class="nav-clock" id="nav-clock">--:--:--</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v106</span>
+    <a href="IwolPark_Dashboard_Admin.html" class="btn-refresh" style="background:var(--text);text-decoration:none">← Admin</a>
+    <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
+  </div>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('locales',this)">🏪 Locales</div>
+  <div class="tab" onclick="showTab('campanas',this)">📣 Campañas</div>
+  <div class="tab" onclick="showTab('metricas',this)">📊 Métricas</div>
+</div>
+
+<div class="container">
+
+  <!-- ══ TAB LOCALES ══ -->
+  <div class="tab-section active" id="tab-locales">
+    <div class="toolbar">
+      <button class="btn" onclick="abrirModalLocal(null)">+ Nuevo local</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="locales-count"></span>
+    </div>
+    <div class="card">
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr>
+            <th>#Local</th><th>Nombre</th><th>Categoría</th><th>Teléfono</th>
+            <th>Campañas activas</th><th>Estado</th>
+          </tr></thead>
+          <tbody id="tabla-locales"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="locales-empty" style="display:none">Sin locales registrados todavía.</div>
+    </div>
+  </div>
+
+  <!-- ══ TAB CAMPAÑAS ══ -->
+  <div class="tab-section" id="tab-campanas">
+    <div class="toolbar">
+      <select id="filtro-local-campana" onchange="renderCampanas()">
+        <option value="todos">Todos los locales</option>
+      </select>
+      <select id="filtro-estado-campana" onchange="renderCampanas()">
+        <option value="todas">Todos los estados</option>
+        <option value="activa">🟢 Activa</option>
+        <option value="programada">🟡 Programada</option>
+        <option value="pausada">🔴 Pausada</option>
+        <option value="terminada">⚫ Terminada</option>
+      </select>
+      <button class="btn" style="margin-left:auto" onclick="abrirModalCampana(null)">+ Nueva campaña</button>
+    </div>
+    <div class="card">
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr>
+            <th>Local</th><th>Campaña</th><th>Tipo</th><th>Vigencia</th><th>Horario</th>
+            <th>Días</th><th>Impactos</th><th>Estado</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="tabla-campanas"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="campanas-empty" style="display:none">Sin campañas que coincidan con el filtro.</div>
+    </div>
+  </div>
+
+  <!-- ══ TAB MÉTRICAS ══ -->
+  <div class="tab-section" id="tab-metricas">
+    <div class="toolbar">
+      <select id="filtro-metricas-campana" onchange="renderMetricas()">
+        <option value="todas">Todas las campañas activas</option>
+      </select>
+    </div>
+    <div id="metricas-lista"></div>
+    <div class="empty" id="metricas-empty" style="display:none">No hay campañas activas o programadas para mostrar métricas.</div>
+  </div>
+
+</div>
+
+<!-- MODAL LOCAL -->
+<div class="modal-overlay" id="modal-local">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="modal-title" id="local-modal-title">🏪 Nuevo local</span>
+      <button class="modal-close" onclick="cerrarModalLocal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="local-id">
+      <div class="row">
+        <div class="field"><label>Nombre del negocio *</label><input id="local-nombre" placeholder="ej. Gym Fit"></div>
+        <div class="field"><label>Número de local *</label><input id="local-numero" placeholder='ej. "Local 12"'></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Categoría</label>
+          <select id="local-categoria">
+            <option>Restaurante</option><option>Gym</option><option>Farmacia</option>
+            <option>Ropa</option><option>Servicios</option><option>Otro</option>
+          </select>
+        </div>
+        <div class="field"><label>Teléfono / contacto</label><input id="local-telefono" placeholder="ej. 722 123 4567"></div>
+      </div>
+      <div class="param-card">
+        <h3>Logo (blanco/negro para impresora térmica)</h3>
+        <div class="row" style="align-items:center">
+          <div class="logo-preview" id="local-logo-preview"><span style="color:var(--muted);font-size:10px">Sin logo</span></div>
+          <div class="field" style="min-width:220px">
+            <input type="file" id="local-logo-file" accept="image/*" onchange="procesarLogoLocal(event)">
+            <label style="font-weight:400;margin-top:4px">Recomendado: imagen cuadrada, menor a 100×100px.</label>
+          </div>
+        </div>
+        <input type="hidden" id="local-logo-base64">
+      </div>
+      <div class="row" style="align-items:center">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700">
+          <input type="checkbox" id="local-activo" checked style="width:16px;height:16px"> Local activo
+        </label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="cerrarModalLocal()">Cancelar</button>
+      <button class="btn" onclick="guardarLocal()">Guardar local</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMPAÑA -->
+<div class="modal-overlay" id="modal-campana">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <span class="modal-title" id="campana-modal-title">📣 Nueva campaña</span>
+      <button class="modal-close" onclick="cerrarModalCampana()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="campana-id">
+      <input type="hidden" id="campana-origen-id">
+
+      <div class="param-card">
+        <h3>Información de la campaña</h3>
+        <div class="row">
+          <div class="field"><label>Local</label>
+            <select id="campana-local"></select>
+          </div>
+          <div class="field"><label>Nombre de la campaña</label>
+            <input id="campana-nombre" placeholder='ej. "Promo Julio 2026"'></div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <h3>Tipo y mensaje</h3>
+        <div class="row">
+          <div class="field"><label>Tipo de promo</label>
+            <select id="campana-tipo-promo" onchange="onCambioTipoPromo()">
+              <option value="descuento_pct">Descuento %</option>
+              <option value="descuento_fijo">Descuento fijo</option>
+              <option value="2x1">2x1</option>
+              <option value="leyenda">Leyenda libre</option>
+              <option value="codigo">Código promocional</option>
+            </select>
+          </div>
+          <div class="field" id="campana-valor-wrap">
+            <label id="campana-valor-label">¿Cuánto? (%)</label>
+            <input id="campana-valor-promo" placeholder="20">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Título (grande en el voucher)</label>
+            <input id="campana-titulo" placeholder='ej. "20% de descuento"'></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Texto del voucher</label>
+            <textarea id="campana-texto" placeholder="ej. Presenta este voucher en tu próxima visita"></textarea></div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <h3>Vigencia</h3>
+        <div class="row">
+          <div class="field"><label>Fecha inicio</label><input type="date" id="campana-fecha-inicio"></div>
+          <div class="field"><label>Fecha fin</label><input type="date" id="campana-fecha-fin"></div>
+          <div class="field"><label>Presupuesto de impactos (vacío = sin límite)</label>
+            <input type="number" id="campana-presupuesto" min="0" placeholder="ej. 500"></div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <h3>Targeting — Horario</h3>
+        <div class="row">
+          <div class="field"><label>Hora inicio</label><input type="time" id="campana-hora-inicio" value="00:00"></div>
+          <div class="field"><label>Hora fin</label><input type="time" id="campana-hora-fin" value="23:59"></div>
+        </div>
+        <div class="chip-group" id="chips-franja" style="margin-top:8px"></div>
+        <button class="chip-quick" style="margin-top:8px" onclick="limpiarFranjas()">Todo el día (limpiar selección)</button>
+      </div>
+
+      <div class="param-card">
+        <h3>Targeting — Días de semana</h3>
+        <div class="chip-group" id="chips-dias"></div>
+        <div style="margin-top:8px;display:flex;gap:14px">
+          <button class="chip-quick" onclick="seleccionarDias('todos')">Todos</button>
+          <button class="chip-quick" onclick="seleccionarDias('semana')">Entre semana</button>
+          <button class="chip-quick" onclick="seleccionarDias('finde')">Fin de semana</button>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <h3>Targeting — Tipo de cliente</h3>
+        <div class="chip-group" id="chips-tipo-cliente"></div>
+      </div>
+
+      <div class="param-card">
+        <h3>Costo</h3>
+        <div class="row">
+          <div class="field"><label>Costo de campaña (pago fijo del local)</label>
+            <input type="number" id="campana-costo-fijo" min="0" step="0.01" placeholder="$0.00"></div>
+          <div class="field"><label>Costo por impacto (pago adicional c/voucher)</label>
+            <input type="number" id="campana-costo-impacto" min="0" step="0.0001" placeholder="$0.00"></div>
+        </div>
+      </div>
+
+      <div class="field"><label>Notas internas</label><textarea id="campana-notas"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="cerrarModalCampana()">Cancelar</button>
+      <button class="btn" onclick="guardarCampana()">Guardar campaña</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FACTURACIÓN -->
+<div class="modal-overlay" id="modal-facturacion">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span class="modal-title">🧾 Facturación de campaña</span>
+      <button class="modal-close" onclick="document.getElementById('modal-facturacion').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="facturacion-body"></div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="exportarFacturacionCSV()">⬇ Exportar CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://knaibgqehwvjuclsfdmo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE';
+const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+
+let _tt;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function showTab(id, el) {
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  if (id === 'campanas') renderCampanas();
+  if (id === 'metricas') renderMetricas();
+}
+
+// ══ LOGIN (mismo patrón que el resto de IwolPark) ══
+function iwolUsuarioActual() {
+  try { return JSON.parse(sessionStorage.getItem('iwol_usuario') || 'null'); } catch(e) { return null; }
+}
+function cerrarSesion() { sessionStorage.removeItem('iwol_usuario'); location.reload(); }
+let _iwolRolesPermitidos = [];
+let _iwolLoginResolve = null;
+function requerirLogin(rolesPermitidos, nombreApp) {
+  _iwolRolesPermitidos = rolesPermitidos;
+  const actual = iwolUsuarioActual();
+  if (actual && rolesPermitidos.includes(actual.rol)) return Promise.resolve(actual);
+  document.getElementById('iwol-login-app-nombre').textContent = nombreApp || '';
+  document.getElementById('iwol-login-overlay').classList.remove('hidden');
+  document.getElementById('iwol-login-usuario').focus();
+  return new Promise(res => { _iwolLoginResolve = res; });
+}
+async function sha256Hex(texto) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function iwolIntentarLogin() {
+  const usuario = document.getElementById('iwol-login-usuario').value.trim();
+  const password = document.getElementById('iwol-login-password').value;
+  const errEl = document.getElementById('iwol-login-error');
+  errEl.textContent = '';
+  if (!usuario || !password) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  try {
+    const hash = await sha256Hex(password);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
+      method: 'POST', headers: SB_HEADERS,
+      body: JSON.stringify({ p_usuario: usuario, p_password_hash: hash })
+    });
+    if (!r.ok) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; return; }
+    const rows = await r.json();
+    const cajero = rows[0];
+    if (!cajero) { errEl.textContent = 'Usuario o contraseña incorrectos'; return; }
+    if (!_iwolRolesPermitidos.includes(cajero.rol)) { errEl.textContent = 'Tu usuario no tiene permiso para entrar aquí'; return; }
+    const datosUsuario = { cajero_id: cajero.cajero_id, nombre: cajero.nombre, usuario: cajero.usuario, rol: cajero.rol };
+    sessionStorage.setItem('iwol_usuario', JSON.stringify(datosUsuario));
+    document.getElementById('iwol-login-overlay').classList.add('hidden');
+    document.getElementById('iwol-login-usuario').value = '';
+    document.getElementById('iwol-login-password').value = '';
+    if (_iwolLoginResolve) { _iwolLoginResolve(datosUsuario); _iwolLoginResolve = null; }
+  } catch (e) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; }
+}
+document.addEventListener('keydown', e => {
+  const overlay = document.getElementById('iwol-login-overlay');
+  if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
+});
+
+function logBitacora(accion, detalle) {
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/bitacora`, {
+      method: 'POST', headers: { ...SB_HEADERS, Prefer: 'return=minimal' },
+      body: JSON.stringify({ usuario: USUARIO_ACTUAL ? (USUARIO_ACTUAL.usuario || USUARIO_ACTUAL.nombre) : null, accion, detalle: detalle || null })
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+setInterval(() => {
+  document.getElementById('nav-clock').textContent = new Date().toLocaleTimeString('es-MX',{hour12:false});
+}, 1000);
+
+// ══ CATÁLOGOS ══
+// Mismas 3 franjas ya usadas en TABLET/Admin/Corporativo (no las 3 francas
+// "Matutino/Vespertino/Nocturno" originales del prompt) — evita que una
+// campaña targeteada aquí nunca combine con lo que calcularFranja() calcula
+// en la caseta al momento de imprimir el voucher.
+const FRANJAS_PROMO = ['05:00–10:00','10:00–17:00','17:00–22:00'];
+const DIAS_PROMO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const TIPOS_CLIENTE_PROMO = [
+  {key:'normal', label:'Normal'}, {key:'preferencial', label:'Preferencial'},
+  {key:'pension', label:'Pensionado'}, {key:'empleado', label:'Empleado'},
+  {key:'cortesia', label:'Cortesía'}
+];
+const TIPO_PROMO_LABEL = {descuento_pct:'Descuento %', descuento_fijo:'Descuento fijo', '2x1':'2x1', leyenda:'Leyenda', codigo:'Código'};
+
+let LOCALES = [];
+let CAMPANAS = [];
+
+async function cargarLocales() {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/locales?order=nombre.asc&limit=1000`, { headers: SB_HEADERS });
+  LOCALES = r.ok ? await r.json() : [];
+}
+async function cargarCampanas() {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?order=created_at.desc&limit=1000`, { headers: SB_HEADERS });
+  CAMPANAS = r.ok ? await r.json() : [];
+}
+function localPorId(id) { return LOCALES.find(l => String(l.id) === String(id)); }
+
+// ══ ESTADO VISUAL (semáforo) ══
+// El campo `estado` guardado solo distingue lo que el admin controla a mano
+// (activa/pausada/terminada) — "Programada" y "Terminada por vigencia/cupo"
+// se calculan aquí, nunca se guardan, para no tener que sincronizar un cron.
+function hoyStr() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function estadoVisual(c) {
+  if (c.estado === 'pausada') return {key:'pausada', label:'🔴 Pausada'};
+  if (c.estado === 'terminada') return {key:'terminada', label:'⚫ Terminada'};
+  const hoy = hoyStr();
+  if (c.fecha_inicio > hoy) return {key:'programada', label:'🟡 Programada'};
+  if (c.fecha_fin < hoy) return {key:'terminada', label:'⚫ Terminada'};
+  if (c.presupuesto_impactos && c.impactos >= c.presupuesto_impactos) return {key:'terminada', label:'⚫ Terminada (cupo agotado)'};
+  return {key:'activa', label:'🟢 Activa'};
+}
+
+// ══ TAB LOCALES ══
+function renderLocales() {
+  const tbody = document.getElementById('tabla-locales');
+  document.getElementById('locales-count').textContent = LOCALES.length + ' locales';
+  if (!LOCALES.length) {
+    tbody.innerHTML = ''; document.getElementById('locales-empty').style.display = 'block'; return;
+  }
+  document.getElementById('locales-empty').style.display = 'none';
+  tbody.innerHTML = LOCALES.map(l => {
+    const activas = CAMPANAS.filter(c => String(c.local_id) === String(l.id) && estadoVisual(c).key === 'activa').length;
+    return `<tr class="clickable" onclick="abrirModalLocal(${l.id})">
+      <td>${l.numero_local || '—'}</td>
+      <td><b>${escapeHtml(l.nombre)}</b></td>
+      <td>${l.categoria || '—'}</td>
+      <td>${l.telefono || '—'}</td>
+      <td>${activas}</td>
+      <td><span class="badge ${l.activo ? 'b-on' : 'b-off'}">${l.activo ? 'Activo' : 'Inactivo'}</span></td>
+    </tr>`;
+  }).join('');
+}
+function escapeHtml(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function abrirModalLocal(id) {
+  const l = id ? localPorId(id) : null;
+  document.getElementById('local-modal-title').textContent = l ? '🏪 Editar local' : '🏪 Nuevo local';
+  document.getElementById('local-id').value = l ? l.id : '';
+  document.getElementById('local-nombre').value = l ? l.nombre : '';
+  document.getElementById('local-numero').value = l ? (l.numero_local||'') : '';
+  document.getElementById('local-categoria').value = l ? (l.categoria||'Restaurante') : 'Restaurante';
+  document.getElementById('local-telefono').value = l ? (l.contacto||l.telefono||'') : '';
+  document.getElementById('local-activo').checked = l ? !!l.activo : true;
+  document.getElementById('local-logo-base64').value = l ? (l.logo_base64||'') : '';
+  const prev = document.getElementById('local-logo-preview');
+  prev.innerHTML = (l && l.logo_base64) ? `<img src="${l.logo_base64}">` : '<span style="color:var(--muted);font-size:10px">Sin logo</span>';
+  document.getElementById('local-logo-file').value = '';
+  document.getElementById('modal-local').classList.add('open');
+}
+function cerrarModalLocal() { document.getElementById('modal-local').classList.remove('open'); }
+
+// Convierte el logo subido a blanco/negro (umbral simple) para que se vea
+// nítido en la impresora térmica de 58mm, que no maneja escala de grises.
+function procesarLogoLocal(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 200;
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0,0,w,h);
+    for (let i=0; i<data.data.length; i+=4) {
+      const gris = 0.3*data.data[i] + 0.59*data.data[i+1] + 0.11*data.data[i+2];
+      const bn = gris < 150 ? 0 : 255;
+      data.data[i] = data.data[i+1] = data.data[i+2] = bn;
+    }
+    ctx.putImageData(data, 0, 0);
+    const base64 = canvas.toDataURL('image/png');
+    document.getElementById('local-logo-base64').value = base64;
+    document.getElementById('local-logo-preview').innerHTML = `<img src="${base64}">`;
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+async function guardarLocal() {
+  const id = document.getElementById('local-id').value;
+  const nombre = document.getElementById('local-nombre').value.trim();
+  const numero = document.getElementById('local-numero').value.trim();
+  if (!nombre || !numero) { showToast('Falta nombre o número de local'); return; }
+  const body = {
+    nombre, numero_local: numero,
+    categoria: document.getElementById('local-categoria').value,
+    contacto: document.getElementById('local-telefono').value.trim(),
+    telefono: document.getElementById('local-telefono').value.trim(),
+    logo_base64: document.getElementById('local-logo-base64').value || null,
+    activo: document.getElementById('local-activo').checked
+  };
+  try {
+    let r;
+    if (id) {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/locales?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(body) });
+    } else {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/locales`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(body) });
+    }
+    if (!r.ok) throw new Error(await r.text());
+    logBitacora('promo_local_guardado', { id: id||null, nombre });
+    showToast('Local guardado'); cerrarModalLocal();
+    await cargarLocales(); renderLocales(); poblarSelectsLocales();
+  } catch (e) { showToast('Error al guardar: ' + e.message); }
+}
+
+function poblarSelectsLocales() {
+  const activos = LOCALES.filter(l => l.activo);
+  const optsLocal = activos.map(l => `<option value="${l.id}">${escapeHtml(l.nombre)}${l.numero_local ? ' · '+l.numero_local : ''}</option>`).join('');
+  document.getElementById('campana-local').innerHTML = optsLocal;
+  document.getElementById('filtro-local-campana').innerHTML = '<option value="todos">Todos los locales</option>' +
+    LOCALES.map(l => `<option value="${l.id}">${escapeHtml(l.nombre)}</option>`).join('');
+}
+
+// ══ TAB CAMPAÑAS ══
+function chipsHtml(containerId, opciones, seleccionados) {
+  return opciones.map(o => {
+    const val = typeof o === 'string' ? o : o.key;
+    const label = typeof o === 'string' ? o : o.label;
+    const on = seleccionados.includes(val);
+    return `<span class="chip ${on?'on':''}" data-val="${val}" onclick="toggleChip(this)">${label}</span>`;
+  }).join('');
+}
+function toggleChip(el) { el.classList.toggle('on'); }
+function chipsSeleccionados(containerId) {
+  return [...document.querySelectorAll('#'+containerId+' .chip.on')].map(c => c.dataset.val);
+}
+function limpiarFranjas() { document.querySelectorAll('#chips-franja .chip').forEach(c => c.classList.remove('on')); }
+function seleccionarDias(modo) {
+  const semana = ['Lun','Mar','Mié','Jue','Vie'], finde = ['Sáb','Dom'];
+  document.querySelectorAll('#chips-dias .chip').forEach(c => {
+    const v = c.dataset.val;
+    const on = modo==='todos' ? true : modo==='semana' ? semana.includes(v) : finde.includes(v);
+    c.classList.toggle('on', on);
+  });
+}
+
+function onCambioTipoPromo() {
+  const tipo = document.getElementById('campana-tipo-promo').value;
+  const label = document.getElementById('campana-valor-label');
+  const input = document.getElementById('campana-valor-promo');
+  const wrap = document.getElementById('campana-valor-wrap');
+  wrap.style.display = tipo === 'leyenda' ? 'none' : 'flex';
+  if (tipo === 'descuento_pct') { label.textContent = '¿Cuánto? (%)'; input.placeholder = '20'; }
+  else if (tipo === 'descuento_fijo') { label.textContent = '¿Cuánto? ($)'; input.placeholder = '50'; }
+  else if (tipo === '2x1') { label.textContent = '¿En qué producto?'; input.placeholder = 'ej. Café americano'; }
+  else if (tipo === 'codigo') { label.textContent = 'Código'; input.placeholder = 'IWOL10'; }
+}
+
+function renderCampanas() {
+  const filtroLocal = document.getElementById('filtro-local-campana').value;
+  const filtroEstado = document.getElementById('filtro-estado-campana').value;
+  let filtradas = CAMPANAS.filter(c => {
+    if (filtroLocal !== 'todos' && String(c.local_id) !== String(filtroLocal)) return false;
+    if (filtroEstado !== 'todas' && estadoVisual(c).key !== filtroEstado) return false;
+    return true;
+  });
+  const tbody = document.getElementById('tabla-campanas');
+  if (!filtradas.length) { tbody.innerHTML = ''; document.getElementById('campanas-empty').style.display = 'block'; return; }
+  document.getElementById('campanas-empty').style.display = 'none';
+  tbody.innerHTML = filtradas.map(c => {
+    const l = localPorId(c.local_id);
+    const ev = estadoVisual(c);
+    const dias = (c.dias_semana && c.dias_semana.length) ? c.dias_semana.join('-') : 'Todos';
+    const horario = (c.hora_inicio==='00:00:00'||c.hora_inicio==='00:00') && (c.hora_fin==='23:59:00'||c.hora_fin==='23:59') ? 'Todo el día' : `${(c.hora_inicio||'').slice(0,5)}-${(c.hora_fin||'').slice(0,5)}`;
+    const vigencia = `${fmtFechaCorta(c.fecha_inicio)} - ${fmtFechaCorta(c.fecha_fin)}`;
+    const puedeActivar = ev.key === 'pausada';
+    const puedePausar = ev.key === 'activa' || ev.key === 'programada';
+    return `<tr>
+      <td>${l ? escapeHtml(l.nombre) : '—'}</td>
+      <td><b>${escapeHtml(c.nombre_campana)}</b><br><span style="font-size:11px;color:var(--muted)">${escapeHtml(c.titulo_promo)}</span></td>
+      <td>${TIPO_PROMO_LABEL[c.tipo_promo]||c.tipo_promo}</td>
+      <td>${vigencia}</td>
+      <td>${horario}</td>
+      <td>${dias}</td>
+      <td>${c.impactos||0}</td>
+      <td><span class="estado-chip">${ev.label}</span></td>
+      <td style="white-space:nowrap">
+        ${puedePausar ? `<button class="btn sm outline" onclick="cambiarEstadoCampana(${c.id},'pausada')">Pausar</button>` : ''}
+        ${puedeActivar ? `<button class="btn sm green" onclick="cambiarEstadoCampana(${c.id},'activa')">Activar</button>` : ''}
+        <button class="btn sm outline" onclick="clonarCampana(${c.id})">Clonar</button>
+        <button class="btn sm outline" onclick="abrirModalCampana(${c.id})">Ver</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function fmtFechaCorta(iso) {
+  if (!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return d + ' ' + MES[parseInt(m,10)-1];
+}
+
+async function cambiarEstadoCampana(id, estado) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify({estado}) });
+    if (!r.ok) throw new Error(await r.text());
+    logBitacora('promo_campana_estado', { id, estado });
+    showToast(estado === 'activa' ? 'Campaña activada' : 'Campaña pausada');
+    await cargarCampanas(); renderCampanas(); renderLocales();
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+function abrirModalCampana(id, clonDe) {
+  const c = id ? CAMPANAS.find(x => x.id === id) : null;
+  const origen = clonDe || null;
+  document.getElementById('campana-modal-title').textContent = c ? '📣 Editar campaña' : (origen ? '📣 Clonar campaña' : '📣 Nueva campaña');
+  document.getElementById('campana-id').value = c ? c.id : '';
+  document.getElementById('campana-origen-id').value = origen ? origen.id : (c ? (c.campana_origen_id||'') : '');
+  const base = c || origen || {};
+  document.getElementById('campana-local').value = base.local_id || (LOCALES.find(l=>l.activo)||{}).id || '';
+  document.getElementById('campana-nombre').value = c ? base.nombre_campana : (origen ? base.nombre_campana + ' (copia)' : '');
+  document.getElementById('campana-tipo-promo').value = base.tipo_promo || 'descuento_pct';
+  document.getElementById('campana-valor-promo').value = base.valor_promo || '';
+  document.getElementById('campana-titulo').value = base.titulo_promo || '';
+  document.getElementById('campana-texto').value = base.texto_promo || '';
+  document.getElementById('campana-fecha-inicio').value = (!c && !origen) ? hoyStr() : (base.fecha_inicio || '');
+  document.getElementById('campana-fecha-fin').value = base.fecha_fin || '';
+  document.getElementById('campana-presupuesto').value = base.presupuesto_impactos != null ? base.presupuesto_impactos : '';
+  document.getElementById('campana-hora-inicio').value = (base.hora_inicio||'00:00').slice(0,5);
+  document.getElementById('campana-hora-fin').value = (base.hora_fin||'23:59').slice(0,5);
+  document.getElementById('campana-costo-fijo').value = base.costo_campana != null ? base.costo_campana : '';
+  document.getElementById('campana-costo-impacto').value = base.costo_por_impacto != null ? base.costo_por_impacto : '';
+  document.getElementById('campana-notas').value = base.notas || '';
+  onCambioTipoPromo();
+
+  document.getElementById('chips-franja').innerHTML = chipsHtml('chips-franja', FRANJAS_PROMO, base.franjas || []);
+  document.getElementById('chips-dias').innerHTML = chipsHtml('chips-dias', DIAS_PROMO, base.dias_semana || []);
+  const tiposDefault = (c || origen) ? (base.tipos_cliente || []) : ['normal','preferencial','pension'];
+  document.getElementById('chips-tipo-cliente').innerHTML = chipsHtml('chips-tipo-cliente', TIPOS_CLIENTE_PROMO, tiposDefault);
+
+  document.getElementById('modal-campana').classList.add('open');
+}
+function cerrarModalCampana() { document.getElementById('modal-campana').classList.remove('open'); }
+function clonarCampana(id) {
+  const c = CAMPANAS.find(x => x.id === id);
+  if (!c) return;
+  abrirModalCampana(null, c);
+}
+
+async function guardarCampana() {
+  const id = document.getElementById('campana-id').value;
+  const nombre = document.getElementById('campana-nombre').value.trim();
+  const titulo = document.getElementById('campana-titulo').value.trim();
+  const texto = document.getElementById('campana-texto').value.trim();
+  const fechaInicio = document.getElementById('campana-fecha-inicio').value;
+  const fechaFin = document.getElementById('campana-fecha-fin').value;
+  if (!nombre || !titulo || !texto || !fechaInicio || !fechaFin) { showToast('Faltan campos obligatorios'); return; }
+  if (fechaFin < fechaInicio) { showToast('La fecha fin no puede ser antes que la fecha inicio'); return; }
+  const presupuesto = document.getElementById('campana-presupuesto').value;
+  const origenId = document.getElementById('campana-origen-id').value;
+  const body = {
+    local_id: document.getElementById('campana-local').value,
+    nombre_campana: nombre,
+    titulo_promo: titulo,
+    texto_promo: texto,
+    tipo_promo: document.getElementById('campana-tipo-promo').value,
+    valor_promo: document.getElementById('campana-valor-promo').value.trim() || null,
+    fecha_inicio: fechaInicio, fecha_fin: fechaFin,
+    hora_inicio: document.getElementById('campana-hora-inicio').value || '00:00',
+    hora_fin: document.getElementById('campana-hora-fin').value || '23:59',
+    franjas: chipsSeleccionados('chips-franja'),
+    dias_semana: chipsSeleccionados('chips-dias'),
+    tipos_cliente: chipsSeleccionados('chips-tipo-cliente'),
+    presupuesto_impactos: presupuesto ? parseInt(presupuesto,10) : null,
+    costo_campana: parseFloat(document.getElementById('campana-costo-fijo').value) || 0,
+    costo_por_impacto: parseFloat(document.getElementById('campana-costo-impacto').value) || 0,
+    notas: document.getElementById('campana-notas').value.trim() || null,
+    creado_por: USUARIO_ACTUAL ? USUARIO_ACTUAL.nombre : null,
+    updated_at: new Date().toISOString()
+  };
+  if (origenId) body.campana_origen_id = parseInt(origenId,10);
+  try {
+    let r;
+    if (id) {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(body) });
+    } else {
+      body.estado = 'activa'; body.impactos = 0;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/campanas`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(body) });
+    }
+    if (!r.ok) throw new Error(await r.text());
+    logBitacora('promo_campana_guardada', { id: id||null, nombre });
+    showToast('Campaña guardada'); cerrarModalCampana();
+    await cargarCampanas(); renderCampanas(); renderLocales();
+  } catch (e) { showToast('Error al guardar: ' + e.message); }
+}
+
+// ══ TAB MÉTRICAS ══
+function poblarSelectMetricas() {
+  const vigentes = CAMPANAS.filter(c => ['activa','programada'].includes(estadoVisual(c).key));
+  document.getElementById('filtro-metricas-campana').innerHTML = '<option value="todas">Todas las campañas activas</option>' +
+    vigentes.map(c => `<option value="${c.id}">${escapeHtml(c.nombre_campana)}</option>`).join('');
+}
+async function renderMetricas() {
+  poblarSelectMetricas();
+  const filtro = document.getElementById('filtro-metricas-campana').value;
+  let lista = CAMPANAS.filter(c => ['activa','programada'].includes(estadoVisual(c).key));
+  if (filtro !== 'todas') lista = lista.filter(c => String(c.id) === String(filtro));
+  const cont = document.getElementById('metricas-lista');
+  document.getElementById('metricas-empty').style.display = lista.length ? 'none' : 'block';
+  cont.innerHTML = lista.map(c => `<div class="card metric-card" id="metric-card-${c.id}">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">${localPorId(c.local_id)?escapeHtml(localPorId(c.local_id).nombre):'—'}</div>
+        <div style="font-size:15px;font-weight:900">${escapeHtml(c.nombre_campana)}</div>
+        <div class="metric-nums" id="metric-nums-${c.id}"><span style="font-size:11px;color:var(--muted)">Cargando…</span></div>
+        <div class="row">
+          <div style="flex:1;min-width:200px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">POR FRANJA</div><div class="bars" id="bars-franja-${c.id}"></div></div>
+          <div style="flex:1;min-width:200px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px">POR DÍA</div><div class="bars" id="bars-dia-${c.id}"></div></div>
+        </div>
+      </div>
+      <button class="btn gold sm" onclick="abrirFacturacion(${c.id})">🧾 Facturación</button>
+    </div>`).join('');
+  lista.forEach(c => cargarMetricasCampana(c));
+}
+async function cargarMetricasCampana(c) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/impactos_detalle?campana_id=eq.${c.id}&select=fecha,franja,dia_semana&limit=10000`, { headers: SB_HEADERS });
+  const rows = r.ok ? await r.json() : [];
+  const hoy = hoyStr();
+  const lunes = new Date(); lunes.setHours(12,0,0,0);
+  lunes.setDate(lunes.getDate() - ((lunes.getDay()+6)%7));
+  const lunesStr = lunes.getFullYear()+'-'+String(lunes.getMonth()+1).padStart(2,'0')+'-'+String(lunes.getDate()).padStart(2,'0');
+  const impactosHoy = rows.filter(x => x.fecha === hoy).length;
+  const impactosSemana = rows.filter(x => x.fecha >= lunesStr).length;
+  const costo = (c.impactos||0) * (Number(c.costo_por_impacto)||0) + (Number(c.costo_campana)||0);
+  const numsEl = document.getElementById('metric-nums-'+c.id);
+  if (numsEl) numsEl.innerHTML = `
+    <div class="metric-num"><b>${impactosHoy}</b><span>Hoy</span></div>
+    <div class="metric-num"><b>${impactosSemana}</b><span>Esta semana</span></div>
+    <div class="metric-num"><b>${c.impactos||0}</b><span>Total</span></div>
+    <div class="metric-num"><b>$${costo.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}</b><span>Costo acum.</span></div>`;
+  renderBarras('bars-franja-'+c.id, FRANJAS_PROMO, rows.map(x=>x.franja));
+  renderBarras('bars-dia-'+c.id, DIAS_PROMO, rows.map(x=>x.dia_semana));
+}
+function renderBarras(contId, categorias, valores) {
+  const el = document.getElementById(contId);
+  if (!el) return;
+  const counts = categorias.map(cat => valores.filter(v => v === cat).length);
+  const max = Math.max(1, ...counts);
+  el.innerHTML = categorias.map((cat,i) => `<div class="bar-col">
+      <div class="bar-value">${counts[i]}</div>
+      <div class="bar-wrap"><div class="bar" style="height:${Math.max(4,(counts[i]/max)*100)}%"></div></div>
+      <div class="bar-label">${cat.length>4?cat.slice(0,3):cat}</div>
+    </div>`).join('');
+}
+
+let _facturacionActual = null;
+async function abrirFacturacion(id) {
+  const c = CAMPANAS.find(x => x.id === id);
+  const l = localPorId(c.local_id);
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/impactos_detalle?campana_id=eq.${id}&select=fecha&limit=10000`, { headers: SB_HEADERS });
+  const rows = r.ok ? await r.json() : [];
+  const costoFijo = Number(c.costo_campana)||0;
+  const costoVariable = (c.impactos||0) * (Number(c.costo_por_impacto)||0);
+  const total = costoFijo + costoVariable;
+  _facturacionActual = { campana: c, local: l, impactos: c.impactos||0, costoFijo, costoVariable, total, registros: rows.length };
+  document.getElementById('facturacion-body').innerHTML = `
+    <div class="row"><div class="field"><label>Local</label><div style="font-weight:700;font-size:14px">${l?escapeHtml(l.nombre):'—'}</div></div>
+      <div class="field"><label>Campaña</label><div style="font-weight:700;font-size:14px">${escapeHtml(c.nombre_campana)}</div></div></div>
+    <div class="row"><div class="field"><label>Vigencia</label><div>${fmtFechaCorta(c.fecha_inicio)} – ${fmtFechaCorta(c.fecha_fin)}</div></div>
+      <div class="field"><label>Impactos totales</label><div style="font-weight:900;font-size:18px;color:var(--accent)">${c.impactos||0}</div></div></div>
+    <div class="param-card">
+      <div class="row" style="justify-content:space-between"><span>Costo fijo de campaña</span><b>$${costoFijo.toFixed(2)}</b></div>
+      <div class="row" style="justify-content:space-between"><span>Costo variable (${c.impactos||0} × $${(Number(c.costo_por_impacto)||0).toFixed(4)})</span><b>$${costoVariable.toFixed(2)}</b></div>
+      <div class="row" style="justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-top:6px">
+        <span style="font-weight:800">TOTAL A COBRAR</span><b style="font-size:18px;color:var(--green)">$${total.toFixed(2)}</b></div>
+    </div>`;
+  document.getElementById('modal-facturacion').classList.add('open');
+}
+function exportarFacturacionCSV() {
+  if (!_facturacionActual) return;
+  const f = _facturacionActual;
+  const filas = [
+    ['Local', f.local?f.local.nombre:''],
+    ['Campaña', f.campana.nombre_campana],
+    ['Vigencia', f.campana.fecha_inicio + ' a ' + f.campana.fecha_fin],
+    ['Impactos', f.impactos],
+    ['Costo fijo', f.costoFijo.toFixed(2)],
+    ['Costo variable', f.costoVariable.toFixed(2)],
+    ['Total a cobrar', f.total.toFixed(2)]
+  ];
+  const csv = filas.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `facturacion_${f.campana.nombre_campana.replace(/\s+/g,'_')}.csv`;
+  a.click();
+}
+
+// ══ INIT ══
+let USUARIO_ACTUAL = null;
+(async () => {
+  USUARIO_ACTUAL = await requerirLogin(['admin_plaza','super_admin'], 'Promociones');
+  document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
+  logBitacora('login', { app: 'promo' });
+  await cargarLocales();
+  await cargarCampanas();
+  poblarSelectsLocales();
+  renderLocales();
+  renderCampanas();
+})();
+</script>
+</body>
+</html>
