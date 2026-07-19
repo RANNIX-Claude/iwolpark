@@ -22,8 +22,8 @@ if [ -z "$PROD2_SUPABASE_URL" ] || [ -z "$PROD2_SUPABASE_KEY" ]; then
 fi
 
 PROD2_SITE_ID="0143f712-153f-4afd-919b-7cde0a300ce9"   # iwolpark-produccion2
-QA_URL="https://knaibgqehwvjuclsfdmo.supabase.co"
-QA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYWliZ3FlaHd2anVjbHNmZG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MzEzNjcsImV4cCI6MjA5OTIwNzM2N30.CCUxpvi8IdAtxwx5PUBefstJvflmUabovE92IbotGvE"
+QA_URL="https://gbciwuprgrzllagtlqij.supabase.co"
+QA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdiY2l3dXByZ3J6bGxhZ3RscWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDMzNzcsImV4cCI6MjEwMDAxOTM3N30.vmFhOv4eI3atO4TmBP5rEN-zz1mpXDLlKbxaaYPsm3o"
 
 CURRENT=$(cat .prod2_version 2>/dev/null || echo 0)
 NEXT=$((CURRENT + 1))

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Despliega el ambiente de QA (iwolpark-qa.netlify.app) — usa el proyecto
-# Supabase de siempre (knaibgqehwvjuclsfdmo), con todos los datos históricos
-# y de prueba. Para Producción (iwol.click, base de datos separada) usa
+# Supabase IWOL_QA (gbciwuprgrzllagtlqij), réplica exacta de Producción
+# (esquema + datos reales, ver scratchpad de la sesión que lo generó).
+# Para Producción (iwol.click, base de datos separada) usa
 # deploy_prod.sh en vez de este. Bumps VERSION, stamps it into every page's
 # nav badge, commits, pushes, and deploys. Run from the project root.
 set -e
