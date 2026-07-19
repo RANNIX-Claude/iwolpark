@@ -172,7 +172,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v107</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v108</span>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">Cerrar sesión</button>
   </div>
 </nav>
@@ -665,7 +665,7 @@ function fechasPeriodo(periodo) {
   if (periodo === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
   if (periodo === 'ayer')   { const d=new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmt(d), hasta: fmt(d) }; }
   if (periodo === 'antier') { const d=new Date(hoy); d.setDate(d.getDate()-2); return { desde: fmt(d), hasta: fmt(d) }; }
-  if (periodo === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1); return {desde:fmt(ini), hasta:fmt(hoy)}; }
+  if (periodo === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-((hoy.getDay()+6)%7)); return {desde:fmt(ini), hasta:fmt(hoy)}; }
   if (periodo === 'mes') return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
   if (periodo === 'año') return { desde: fmt(new Date(hoy.getFullYear(),0,1)), hasta: fmt(hoy) };
   return { desde: fmt(hoy), hasta: fmt(hoy) };
@@ -1145,7 +1145,7 @@ function getFechasAdm() {
   if (p === 'hoy')    return { desde: fmt(hoy), hasta: fmt(hoy) };
   if (p === 'ayer')   { const d=new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmt(d), hasta: fmt(d) }; }
   if (p === 'antier') { const d=new Date(hoy); d.setDate(d.getDate()-2); return { desde: fmt(d), hasta: fmt(d) }; }
-  if (p === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1); return { desde: fmt(ini), hasta: fmt(hoy) }; }
+  if (p === 'semana') { const ini=new Date(hoy); ini.setDate(hoy.getDate()-((hoy.getDay()+6)%7)); return { desde: fmt(ini), hasta: fmt(hoy) }; }
   if (p === 'mes')    return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
   return { desde: document.getElementById('filtro-desde-adm').value, hasta: document.getElementById('filtro-hasta-adm').value };
 }

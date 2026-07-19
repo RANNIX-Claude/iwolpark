@@ -247,7 +247,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v107</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v108</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -823,7 +823,9 @@ function getFechas() {
   if (p === 'ayer')   { const d=new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmt(d), hasta: fmt(d) }; }
   if (p === 'antier') { const d=new Date(hoy); d.setDate(d.getDate()-2); return { desde: fmt(d), hasta: fmt(d) }; }
   if (p === 'semana') {
-    const ini = new Date(hoy); ini.setDate(hoy.getDate()-hoy.getDay()+1);
+    // getDay()-1 falla en domingo (getDay()===0 da lunes de la semana
+    // SIGUIENTE, no la actual) — (getDay()+6)%7 funciona los 7 días.
+    const ini = new Date(hoy); ini.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
     return { desde: fmt(ini), hasta: fmt(hoy) };
   }
   if (p === 'mes') {
