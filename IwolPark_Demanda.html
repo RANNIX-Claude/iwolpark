@@ -93,7 +93,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v109</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v110</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -156,8 +156,13 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 
   <!-- SEMANAL: cajero x día -->
   <div class="card">
-    <div class="card-title">👤 Ingresos por cajero y día — esta semana</div>
-    <div class="card-sub">Lunes a hoy · importe cobrado por día</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <div class="card-title">👤 Ingresos por cajero y día</div>
+        <div class="card-sub" id="cajero-dia-sub">Importe cobrado por día</div>
+      </div>
+      <select id="sel-semana-cajero-dia" onchange="cargarYRenderCajeroDia()" style="margin-left:auto;border:1.5px solid var(--border);border-radius:7px;padding:7px 12px;font-size:13px;background:#fff;color:var(--text)"></select>
+    </div>
     <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
@@ -370,6 +375,45 @@ function renderDesgloseSemana(ticketsSemana) {
 let CAJERO_DIA_DEM_ROWS = [];
 let CAJERO_DIA_DEM_LUNES = null;
 
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+// Llena el combo con las últimas 12 semanas (lunes como value) para poder
+// consultar el mismo cuadro en semanas pasadas, no solo la actual.
+function poblarSelectSemanasCajeroDia() {
+  const sel = document.getElementById('sel-semana-cajero-dia');
+  if (!sel || sel.options.length) return; // ya poblado, no perder la selección del usuario
+  const lunesActual = lunesDeSemana(new Date());
+  let html = '';
+  for (let i = 0; i < 12; i++) {
+    const lunes = new Date(lunesActual); lunes.setDate(lunes.getDate() - i*7);
+    const domingo = new Date(lunes); domingo.setDate(domingo.getDate()+6);
+    const rango = `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`;
+    const label = i===0 ? `Esta semana (${rango})` : i===1 ? `Semana pasada (${rango})` : `Semana del ${rango}`;
+    html += `<option value="${fmtFechaLocal(lunes)}">${label}</option>`;
+  }
+  sel.innerHTML = html;
+}
+
+// Consulta y renderiza SOLO el widget de cajero-día, para la semana elegida
+// en el combo — independiente del resto de la página (que sigue mostrando
+// siempre la semana actual en Evolución/Desglose).
+async function cargarYRenderCajeroDia() {
+  const lunesStr = document.getElementById('sel-semana-cajero-dia').value;
+  const lunes = new Date(lunesStr+'T12:00:00');
+  const domingo = new Date(lunes); domingo.setDate(domingo.getDate()+6);
+  const hastaStr = fmtFechaLocal(domingo);
+  document.getElementById('cajero-dia-sub').textContent =
+    `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]} · importe cobrado por día`;
+  try {
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${lunesStr}&fecha_op=lte.${hastaStr}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
+    const rows = await fetchPaginado(base, SB_HEADERS, 8000);
+    const cerrados = rows.filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
+    renderTablaCajeroDia(cerrados, lunesStr);
+  } catch (e) {
+    document.getElementById('tabla-cajero-dia').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>';
+  }
+}
+
 function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
   const lunes = new Date(lunesActualStr+'T12:00:00');
   CAJERO_DIA_DEM_ROWS = ticketsSemana;
@@ -386,7 +430,7 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
     b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
   const el = document.getElementById('tabla-cajero-dia');
   if (!filas.length) {
-    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones en esa semana</div>';
     return;
   }
   const totalesDia = [0,0,0,0,0,0,0];
@@ -461,7 +505,8 @@ async function renderSemanaWidgets() {
   renderEvolucionLW(cerrados, lunesActualStr, lunesPasadoStr);
   const ticketsSemana = cerrados.filter(t => t.fecha_op >= lunesActualStr);
   renderDesgloseSemana(ticketsSemana);
-  renderTablaCajeroDia(ticketsSemana, lunesActualStr);
+  poblarSelectSemanasCajeroDia();
+  cargarYRenderCajeroDia();
 }
 
 // Construye {dia:{hora:valor}} — 'autos' = promedio de entradas por hora en ese

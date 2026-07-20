@@ -57,6 +57,17 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 .nav-menu-item:hover { background:var(--bg); }
 .nav-menu-sep { height:1px; background:var(--border); margin:6px 4px; }
 
+/* TABS */
+.tabs { background:#fff; border-bottom:2px solid var(--border);
+        display:flex; padding:0 24px; gap:0; }
+.tab { padding:14px 20px; font-size:13px; font-weight:600; color:var(--muted);
+       cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;
+       transition:all .15s; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab:hover { color:var(--text); }
+.tab-section { display:none; }
+.tab-section.active { display:block; }
+
 /* LAYOUT */
 .container { max-width:1400px; margin:0 auto; padding:10px 20px; }
 
@@ -247,7 +258,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v109</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v110</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -257,7 +268,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
         <a class="nav-menu-item" href="IwolPark_Promo_Admin.html" target="_blank">📢 Promociones</a>
         <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
-        <a class="nav-menu-item" href="IwolPark_Demanda.html" target="_blank">📈 Análisis de demanda</a>
         <div class="nav-menu-sep"></div>
         <a class="nav-menu-item" href="IwolPark_Index.html">🏠 Portal principal</a>
       </div>
@@ -267,7 +277,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   </div>
 </nav>
 
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard',this)">🏠 Dashboard</div>
+  <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
+</div>
+
 <div class="container">
+
+<div class="tab-section active" id="tab-dashboard">
 
   <!-- FILTROS -->
   <div class="filtros">
@@ -745,13 +762,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     </div>
   </div>
 
-  <!-- Ingresos por cajero y día -->
-  <div class="chart-card" style="margin-bottom:10px">
-    <div class="chart-title">Ingresos por cajero y día — esta semana</div>
-    <div class="chart-sub">Lunes a hoy · importe cobrado por día</div>
-    <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
-  </div>
-
   <!-- TABLA CORTE DIARIO -->
   <div class="chart-card" style="margin-bottom:20px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
@@ -779,6 +789,14 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       Sin operaciones para el período seleccionado
     </div>
   </div>
+
+</div><!-- /tab-section dashboard -->
+
+<!-- ══ TAB DEMANDA (embebida — carga perezosa la primera vez que se abre) ══ -->
+<div class="tab-section" id="tab-demanda">
+  <iframe id="iframe-demanda" title="Análisis de Demanda"
+    style="width:100%;height:1650px;border:none;border-radius:12px;background:#fff"></iframe>
+</div>
 
 </div><!-- /container -->
 
@@ -1101,110 +1119,6 @@ function franjaLabelDeHora(horaStr) {
 }
 const FRANJA_ADMIN_COLOR = {f1:'#0A66C2',f2:'#7B5EA7',f3:'#F5A623'};
 
-// ══ Ingresos por cajero y día — esta semana (mismo widget que Demanda) ══
-const DIAS_CD = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-function fmtLocalCD(d) { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
-// Ancla a mediodía (no medianoche) porque las fechas de los tickets se
-// reconstruyen como new Date(fecha_op+'T12:00:00') más abajo -- si el lunes
-// quedara a medianoche, la resta daba 12h de más y cada ticket se corría un
-// día (bug real: el 15/julio, miércoles confirmado, aparecía en la columna
-// "Jue").
-function lunesDeSemanaCD(d) { const dd=new Date(d); dd.setDate(dd.getDate()-((dd.getDay()+6)%7)); dd.setHours(12,0,0,0); return dd; }
-// Normaliza el nombre del cajero para agrupar ("HUMBERTO"/"Humberto"/"humberto"
-// deben ser la misma fila) — tickets.cajero es texto libre con capitalización
-// inconsistente entre sesiones/cajeros.
-function normCajero(n) {
-  const s = (n||'Sin cajero').trim().replace(/\s+/g,' ');
-  if (!s) return 'Sin cajero';
-  return s.replace(/\p{L}+/gu, w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase());
-}
-// Filas crudas de la semana (con columnas suficientes para el drill-down) y
-// el lunes de referencia, cacheados para que drillCajeroDia() no tenga que
-// volver a pedirlos a Supabase.
-let CAJERO_DIA_ROWS = [];
-let CAJERO_DIA_LUNES = null;
-
-async function renderCajeroDia() {
-  const el = document.getElementById('tabla-cajero-dia');
-  if (!el) return;
-  try {
-    const hoy = new Date();
-    const lunes = lunesDeSemanaCD(hoy);
-    const desde = fmtLocalCD(lunes), hasta = fmtLocalCD(hoy);
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,cajero,cajero_entrada,cajero_salida,hora_entrada,hora_salida,importe,estatus,fecha_op&order=fecha_op.asc`;
-    const rows = (await fetchPaginado(base, headers, 8000)).filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
-    CAJERO_DIA_ROWS = rows;
-    CAJERO_DIA_LUNES = lunes;
-
-    const porCajero = {};
-    rows.forEach(t => {
-      const cj = normCajero(t.cajero);
-      if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
-      const fd = new Date(t.fecha_op+'T12:00:00');
-      const idx = Math.round((fd-lunes)/86400000);
-      if (idx>=0 && idx<7) porCajero[cj][idx] += Number(t.importe)||0;
-    });
-    const filas = Object.entries(porCajero).sort((a,b) => b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
-    if (!filas.length) {
-      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Sin operaciones esta semana</div>';
-      return;
-    }
-    const totalesDia = [0,0,0,0,0,0,0];
-    filas.forEach(([,vals]) => vals.forEach((v,i)=>totalesDia[i]+=v));
-    const granTotal = totalesDia.reduce((s,v)=>s+v,0);
-    el.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;font-variant-numeric:tabular-nums">
-        <thead><tr style="border-bottom:2px solid var(--border)">
-          <th style="text-align:left;padding:7px">Cajero</th>
-          ${DIAS_CD.map(d=>`<th style="padding:7px;text-align:right">${d}</th>`).join('')}
-          <th style="padding:7px;text-align:right">Suma días</th>
-        </tr></thead>
-        <tbody>
-        ${filas.map(([cj,vals]) => {
-          const total = vals.reduce((s,v)=>s+v,0);
-          return `<tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:7px;font-weight:700">${cj}</td>
-            ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDia('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
-            <td style="padding:7px;text-align:right;font-weight:800;color:var(--accent);cursor:pointer" onclick="drillCajeroDia('${cj.replace(/'/g,"\\'")}',null)">${fmt$(total)}</td>
-          </tr>`;
-        }).join('')}
-        </tbody>
-        <tfoot>
-          <tr style="border-top:2px solid var(--border)">
-            <td style="padding:7px;font-weight:800">Total</td>
-            ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDia(null,${i})"`:''}>${v?fmt$(v):'—'}</td>`).join('')}
-            <td style="padding:7px;text-align:right;font-weight:900;color:var(--accent);cursor:pointer" onclick="drillCajeroDia(null,null)">${fmt$(granTotal)}</td>
-          </tr>
-        </tfoot>
-      </table>`;
-  } catch (e) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No se pudo cargar</div>'; }
-}
-
-// Drill-down de "Ingresos por cajero y día": cajero=null -> todos los cajeros
-// de ese día; dia=null -> todos los días de ese cajero; ambos null -> toda
-// la semana. Reutiliza el mismo panel/mini-stats/tabla que el resto de Admin.
-function drillCajeroDia(cajero, dia) {
-  if (!CAJERO_DIA_LUNES) return;
-  const ops = CAJERO_DIA_ROWS.filter(t => {
-    if (cajero != null && normCajero(t.cajero) !== cajero) return false;
-    if (dia != null) {
-      const fd = new Date(t.fecha_op+'T12:00:00');
-      const idx = Math.round((fd-CAJERO_DIA_LUNES)/86400000);
-      if (idx !== dia) return false;
-    }
-    return true;
-  });
-  const panel = document.getElementById('drill-panel');
-  const parteDia = dia!=null ? DIAS_CD[dia] : 'esta semana';
-  const parteCajero = cajero!=null ? cajero : 'Todos los cajeros';
-  document.getElementById('drill-title').textContent = '👤 '+parteCajero+' · '+parteDia;
-  const elPath = document.getElementById('drill-path');
-  if (elPath) elPath.textContent = 'Inicio → Ingresos por cajero y día → '+parteCajero+' · '+parteDia;
-  renderMiniStatsFor(ops);
-  document.getElementById('drill-content').innerHTML = movimientosTablaHTML(ops);
-  panel.classList.add('open');
-}
 // Usa DATOS.todosDetalle (abiertos + cerrados), NO solo DATOS.operaciones
 // (cerrados) — antes esta tarjeta y "Actividad" (número de tickets por
 // hora, que sí cuenta todo) no reconciliaban: la suma de horas de una
@@ -1977,7 +1891,20 @@ function cerrarParametros() {
   document.getElementById('modal-parametros').classList.remove('open');
 }
 
-// ══ MENÚ ADMIN (Parámetros, Pensiones, Análisis de demanda, Portal) ══
+// ══ TABS (Dashboard / Demanda) ══
+function showTab(id, el) {
+  document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  if (id === 'demanda') {
+    // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
+    const ifr = document.getElementById('iframe-demanda');
+    if (!ifr.src) ifr.src = 'IwolPark_Demanda.html';
+  }
+}
+
+// ══ MENÚ ADMIN (Parámetros, Pensiones, Portal) ══
 function toggleNavMenu(ev) {
   if (ev) ev.stopPropagation();
   document.getElementById('nav-menu-list').classList.toggle('open');
@@ -2371,9 +2298,7 @@ let USUARIO_ACTUAL = null;
   logBitacora('login', { app: 'admin' });
   document.getElementById('filtro-periodo').value = 'hoy';
   cargarDatos();
-  renderCajeroDia();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
-  setInterval(renderCajeroDia, 300000); // esta tabla cambia poco, refresca cada 5 min
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
