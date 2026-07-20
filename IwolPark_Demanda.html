@@ -93,7 +93,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v110</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v111</span>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:12px">
     ← Volver al dashboard
   </a>
@@ -387,7 +387,11 @@ function poblarSelectSemanasCajeroDia() {
   for (let i = 0; i < 12; i++) {
     const lunes = new Date(lunesActual); lunes.setDate(lunes.getDate() - i*7);
     const domingo = new Date(lunes); domingo.setDate(domingo.getDate()+6);
-    const rango = `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`;
+    // Si la semana cruza fin de mes, se nombran ambos meses para no leer
+    // "29 al 5 jul" (el 29 en realidad es del mes anterior).
+    const rango = lunes.getMonth() === domingo.getMonth()
+      ? `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`
+      : `${lunes.getDate()} ${MESES_CORTOS[lunes.getMonth()]} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`;
     const label = i===0 ? `Esta semana (${rango})` : i===1 ? `Semana pasada (${rango})` : `Semana del ${rango}`;
     html += `<option value="${fmtFechaLocal(lunes)}">${label}</option>`;
   }
@@ -398,12 +402,15 @@ function poblarSelectSemanasCajeroDia() {
 // en el combo — independiente del resto de la página (que sigue mostrando
 // siempre la semana actual en Evolución/Desglose).
 async function cargarYRenderCajeroDia() {
-  const lunesStr = document.getElementById('sel-semana-cajero-dia').value;
+  const sel = document.getElementById('sel-semana-cajero-dia');
+  const lunesStr = sel.value;
   const lunes = new Date(lunesStr+'T12:00:00');
   const domingo = new Date(lunes); domingo.setDate(domingo.getDate()+6);
   const hastaStr = fmtFechaLocal(domingo);
-  document.getElementById('cajero-dia-sub').textContent =
-    `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]} · importe cobrado por día`;
+  // Reutiliza el texto ya formateado de la opción elegida (mismo combo que
+  // ya resuelve el caso de semana que cruza fin de mes).
+  const rangoTxt = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
+  document.getElementById('cajero-dia-sub').textContent = `${rangoTxt} · importe cobrado por día`;
   try {
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${lunesStr}&fecha_op=lte.${hastaStr}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
     const rows = await fetchPaginado(base, SB_HEADERS, 8000);
