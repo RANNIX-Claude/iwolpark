@@ -44,7 +44,7 @@ for f in $PAGES; do
   sed -i "s#${QA_KEY}#${PROD2_SUPABASE_KEY}#g" "$target"
   # Aviso visual distinto (morado) para diferenciarlo tanto de QA como del
   # Producción original — es un tercer ambiente, no confundirlo con ninguno.
-  BANNER='<div style="position:fixed;top:0;left:0;right:0;background:#5E3B9C;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;z-index:999999;letter-spacing:1px">PRODUCCIÓN (COPIA PARALELA · SERVIDOR PROPIO)</div>'
+  BANNER='<div style="background:#5E3B9C;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN (COPIA PARALELA · SERVIDOR PROPIO)</div>'
   sed -i "s|<body>|<body>${BANNER}|" "$target"
 done
 

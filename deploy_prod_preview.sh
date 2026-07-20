@@ -44,7 +44,7 @@ for f in $PAGES; do
   sed -i "s#${QA_URL}#${PROD_SUPABASE_URL}#g" "$target"
   sed -i "s#${QA_KEY}#${PROD_SUPABASE_KEY}#g" "$target"
   # Banner distinto al de producción real, para no confundir con el sitio live
-  BANNER='<div style="position:fixed;top:0;left:0;right:0;background:#BA7517;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;z-index:999999;letter-spacing:1px">PRODUCCIÓN · VISTA PREVIA '"${LABEL}"' · NO ES EL SITIO EN VIVO</div>'
+  BANNER='<div style="background:#BA7517;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN · VISTA PREVIA '"${LABEL}"' · NO ES EL SITIO EN VIVO</div>'
   sed -i "s|<body>|<body>${BANNER}|" "$target"
 done
 
