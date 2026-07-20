@@ -97,6 +97,15 @@ tbody tr.fila-total td{font-weight:900;border-top:2px solid var(--border);border
   border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;z-index:9999;
   transform:translateY(60px);opacity:0;transition:all .3s}
 .toast.show{transform:translateY(0);opacity:1}
+
+/* IMPRIMIR / PDF */
+@media print {
+  nav, .toast, .drilldown-box, button { display:none !important; }
+  body { background:#fff; }
+  .container { max-width:100%; padding:0; }
+  .card { box-shadow:none; border:1px solid #ccc; break-inside:avoid; }
+  .grid3, .grid2 { break-inside:avoid; }
+}
 </style>
 </head>
 <body>
@@ -105,8 +114,9 @@ tbody tr.fila-total td{font-weight:900;border-top:2px solid var(--border);border
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">CAJEROS</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v112</span>
-  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" style="margin-left:12px">← Volver al dashboard</a>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v113</span>
+  <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
+  <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" style="margin-left:8px">← Volver al dashboard</a>
 </nav>
 
 <div class="container">

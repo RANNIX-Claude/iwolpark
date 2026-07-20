@@ -235,6 +235,18 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 .iwol-login-box button { width:100%; background:#7B5EA7; color:#fff; border:none; border-radius:8px;
   padding:12px; font-size:14px; font-weight:700; cursor:pointer; }
 .iwol-login-error { color:#D93025; font-size:12px; margin-top:8px; min-height:16px; }
+
+/* IMPRIMIR / PDF — solo se ve la pestaña activa en pantalla (el resto ya
+   está display:none); aquí se oculta además todo lo que no aporta a un
+   reporte impreso (nav, botones, modales, toasts). */
+@media print {
+  nav, .tabs, .toast, .modal-overlay, .drill-panel, #iwol-login-overlay,
+  .nav-menu-list, button, .btn-refresh { display:none !important; }
+  body { background:#fff; }
+  .container { max-width:100%; padding:0; }
+  .card, .chart-card { box-shadow:none; border:1px solid #ccc; break-inside:avoid; }
+  .grid2, .grid3, .charts-grid { break-inside:avoid; }
+}
 </style>
 </head>
 <body>
@@ -258,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v112</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v113</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -273,6 +285,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
     </div>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
+    <button onclick="window.print()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">🖨 Imprimir</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
   </div>
 </nav>
@@ -458,6 +471,18 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           <div style="font-size:11px;color:var(--muted);margin-top:8px">
             Esta liga se convierte en el QR que aparece en el ticket impreso cuando hay un monto a cobrar.
           </div>
+        </div>
+
+        <div class="param-card">
+          <h3>Promociones</h3>
+          <div class="param-row">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;flex:1">
+              <input type="checkbox" id="param-promociones-habilitado" style="width:16px;height:16px" onchange="guardarPromocionesHabilitado()">
+              Módulo de promociones activo
+            </label>
+            <a class="param-btn outline" href="IwolPark_Promo_Admin.html" target="_blank">Abrir Promociones →</a>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px" id="param-promociones-hint"></div>
         </div>
 
         <div class="param-card">
@@ -1923,8 +1948,12 @@ async function cargarParametrosPlaza() {
     // TABLE manual); si el select completo falla por columna faltante, se
     // reintenta con menos columnas para no tumbar la carga de lo que sí existe.
     const COLS_BASE = 'plaza_id,nombre,capacidad_total,tarifa_normal,tarifa_pref,tarifa_perdido,tolerancia_min,empresa_grupo,rfc,ciudad,estado,direccion';
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, { headers: SB_HEADERS_PARAM });
-    let tieneUrlFacturacion = true, tieneHorarios = true;
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre,promociones_habilitado&limit=1`, { headers: SB_HEADERS_PARAM });
+    let tieneUrlFacturacion = true, tieneHorarios = true, tienePromo = true;
+    if (!r.ok) {
+      tienePromo = false;
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, { headers: SB_HEADERS_PARAM });
+    }
     if (!r.ok) {
       tieneHorarios = false;
       r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=${COLS_BASE},url_facturacion&limit=1`, { headers: SB_HEADERS_PARAM });
@@ -1945,6 +1974,11 @@ async function cargarParametrosPlaza() {
       ['hora-apertura','hora-relevo1','hora-relevo2','hora-cierre'].forEach(id => {
         document.getElementById('param-'+id).disabled = !tieneHorarios;
       });
+      document.getElementById('param-promociones-habilitado').checked = tienePromo ? (p.promociones_habilitado !== false) : true;
+      document.getElementById('param-promociones-habilitado').disabled = !tienePromo;
+      document.getElementById('param-promociones-hint').textContent = tienePromo
+        ? 'Si está apagado, la caseta solo imprime el boleto de estacionamiento — nunca busca ni imprime el voucher de promoción, aunque haya una campaña activa configurada.'
+        : 'Falta correr el ALTER TABLE (ver instrucciones) para poder usar este interruptor.';
       if (tieneHorarios) {
         document.getElementById('param-hora-apertura').value = (p.hora_apertura||'').slice(0,5);
         document.getElementById('param-hora-relevo1').value  = (p.hora_relevo_1||'').slice(0,5);
@@ -2001,6 +2035,18 @@ async function guardarUrlFacturacion() {
       method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ url_facturacion: val })
     });
     showToast(r.ok ? 'URL de facturación actualizada' : 'Error al guardar (¿ya corriste el ALTER TABLE?)');
+  } catch (e) { showToast('Error al guardar'); }
+}
+
+async function guardarPromocionesHabilitado() {
+  if (!PARAM_PLAZA_ID) { showToast('Falta cargar la plaza'); return; }
+  const val = document.getElementById('param-promociones-habilitado').checked;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?plaza_id=eq.${PARAM_PLAZA_ID}`, {
+      method: 'PATCH', headers: SB_HEADERS_PARAM, body: JSON.stringify({ promociones_habilitado: val })
+    });
+    showToast(r.ok ? ('Promociones ' + (val ? 'activadas' : 'desactivadas')) : 'Error al guardar (¿ya corriste el ALTER TABLE?)');
+    if (r.ok) logBitacora('promo_toggle', { habilitado: val });
   } catch (e) { showToast('Error al guardar'); }
 }
 
