@@ -37,7 +37,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 
 /* HEATMAP */
 .heatmap-wrap{overflow-x:auto;margin-top:8px}
-.heatmap{display:grid;grid-template-columns:64px repeat(24,1fr);gap:2px;min-width:720px}
+.heatmap{display:grid;grid-template-columns:64px repeat(18,1fr);gap:2px;min-width:560px}
 .hm-cell{border-radius:4px;height:30px;display:flex;align-items:center;
           justify-content:center;font-size:9px;font-weight:700;cursor:pointer;
           transition:transform .1s;position:relative}
@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v115</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v116</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -124,8 +124,8 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
       <option value="12">Último trimestre</option>
     </select>
     <select id="sel-metrica" onchange="render()">
-      <option value="autos">Número de autos</option>
-      <option value="ingresos">Ingresos $</option>
+      <option value="autos">Número de tickets</option>
+      <option value="ingresos">Monto $</option>
     </select>
     <button class="btn" onclick="render()">↻ Actualizar</button>
     <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="hm-selected">
@@ -133,13 +133,10 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
     </span>
   </div>
 
-  <!-- KPIs RÁPIDOS -->
-  <div class="grid3" id="kpis-rapidos"></div>
-
   <!-- HEATMAP -->
   <div class="card">
     <div class="card-title">🔥 Mapa de calor — Demanda por día y hora</div>
-    <div class="card-sub">Cada celda = promedio de autos. Oscuro = alta demanda. Clic para ver detalle.</div>
+    <div class="card-sub" id="heatmap-sub">Cada celda = promedio de autos. Oscuro = alta demanda. Clic para ver detalle.</div>
     <div class="heatmap-wrap">
       <div class="heatmap" id="heatmap"></div>
     </div>
@@ -149,6 +146,9 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
       <span>Alta</span>
     </div>
   </div>
+
+  <!-- KPIs RÁPIDOS -->
+  <div class="grid3" id="kpis-rapidos"></div>
 
   <!-- SEMANAL: evolución vs LW + desglose ticket -->
   <div class="grid2">
@@ -168,7 +168,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div>
-        <div class="card-title">👤 Ingresos por cajero y día</div>
+        <div class="card-title" id="cajero-dia-titulo">👤 Ingresos por cajero y día</div>
         <div class="card-sub" id="cajero-dia-sub">Importe cobrado por día</div>
       </div>
       <select id="sel-semana-cajero-dia" onchange="cargarYRenderCajeroDia()" style="margin-left:auto;border:1.5px solid var(--border);border-radius:7px;padding:7px 12px;font-size:13px;background:#fff;color:var(--text)"></select>
@@ -225,8 +225,12 @@ const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_K
 
 const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const HORAS = Array.from({length:24},(_,i)=>i);
+// Solo para el mapa de calor: fuera de 5:00–22:00 la plaza no opera, esas
+// columnas no aportan información y solo restan espacio útil a la gráfica.
+const HORAS_HEATMAP = Array.from({length:18},(_,i)=>i+5);
 let METRICA = 'autos';
 let DEMANDA = {};
+let TICKETS_RAW = [];
 
 function fmtVal(v) {
   return METRICA==='ingresos' ? ('$'+Math.round(v).toLocaleString('es-MX')) : (Math.round(v)+' autos');
@@ -362,15 +366,19 @@ function renderEvolucionLW(cerrados, lunesActualStr, lunesPasadoStr) {
 }
 
 function renderDesgloseSemana(ticketsSemana) {
-  const total = ticketsSemana.length || 1;
+  const totalOps = ticketsSemana.length || 1;
+  const totalIng = ticketsSemana.reduce((s,o)=>s+(Number(o.importe)||0),0) || 1;
   document.getElementById('desglose-semana').innerHTML = Object.values(DESGLOSE_DEM).map(b => {
     const subset = ticketsSemana.filter(b.filter);
-    const cnt = subset.length, pct = Math.round(cnt/total*100);
+    const cnt = subset.length;
     const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
+    // El % de la barra y el orden de las cifras siguen el combo Tickets/Monto.
+    const pct = METRICA==='ingresos' ? Math.round(ing/totalIng*100) : Math.round(cnt/totalOps*100);
+    const cifras = METRICA==='ingresos' ? `${fmtMoney(ing)} · ${cnt} ops` : `${cnt} ops · ${fmtMoney(ing)}`;
     return `<div>
       <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
         <span style="font-weight:700;color:${b.color}">${b.label}</span>
-        <span style="color:var(--muted)">${cnt} ops · ${fmtMoney(ing)}</span>
+        <span style="color:var(--muted)">${cifras}</span>
         <span style="font-weight:700">${pct}%</span>
       </div>
       <div style="background:#F0EEF8;border-radius:99px;height:10px;overflow:hidden">
@@ -420,7 +428,9 @@ async function cargarYRenderCajeroDia() {
   // Reutiliza el texto ya formateado de la opción elegida (mismo combo que
   // ya resuelve el caso de semana que cruza fin de mes).
   const rangoTxt = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
-  document.getElementById('cajero-dia-sub').textContent = `${rangoTxt} · importe cobrado por día`;
+  const parteMetrica = METRICA==='ingresos' ? 'importe cobrado por día' : 'tickets por día';
+  document.getElementById('cajero-dia-titulo').textContent = METRICA==='ingresos' ? '👤 Ingresos por cajero y día' : '👤 Tickets por cajero y día';
+  document.getElementById('cajero-dia-sub').textContent = `${rangoTxt} · ${parteMetrica}`;
   try {
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${lunesStr}&fecha_op=lte.${hastaStr}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
     const rows = await fetchPaginado(base, SB_HEADERS, 8000);
@@ -435,13 +445,17 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
   const lunes = new Date(lunesActualStr+'T12:00:00');
   CAJERO_DIA_DEM_ROWS = ticketsSemana;
   CAJERO_DIA_DEM_LUNES = lunes;
+  // El combo Tickets/Monto también aplica aquí: en modo tickets se cuenta 1
+  // por operación, en modo monto se suma el importe — mismo criterio que el
+  // resto del tablero.
+  const fmtCelda = v => METRICA==='ingresos' ? fmtMoney(v) : String(Math.round(v));
   const porCajero = {};
   ticketsSemana.forEach(t => {
     const cj = normCajero(t.cajero);
     if (!porCajero[cj]) porCajero[cj] = [0,0,0,0,0,0,0];
     const fd = new Date(t.fecha_op+'T12:00:00');
     const idx = Math.round((fd-lunes)/86400000);
-    if (idx>=0 && idx<7) porCajero[cj][idx] += Number(t.importe)||0;
+    if (idx>=0 && idx<7) porCajero[cj][idx] += METRICA==='ingresos' ? (Number(t.importe)||0) : 1;
   });
   const filas = Object.entries(porCajero).sort((a,b) =>
     b[1].reduce((s,v)=>s+v,0) - a[1].reduce((s,v)=>s+v,0));
@@ -465,16 +479,16 @@ function renderTablaCajeroDia(ticketsSemana, lunesActualStr) {
         const total = vals.reduce((s,v)=>s+v,0);
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:7px;font-weight:700">${cj}</td>
-          ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmtMoney(v):'—'}</td>`).join('')}
-          <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',null)">${fmtMoney(total)}</td>
+          ${vals.map((v,i)=>`<td style="padding:7px;text-align:right;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',${i})"`:''}>${v?fmtCelda(v):'—'}</td>`).join('')}
+          <td style="padding:7px;text-align:right;font-weight:800;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem('${cj.replace(/'/g,"\\'")}',null)">${fmtCelda(total)}</td>
         </tr>`;
       }).join('')}
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--border)">
           <td style="padding:7px;font-weight:800">Total</td>
-          ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem(null,${i})"`:''}>${v?fmtMoney(v):'—'}</td>`).join('')}
-          <td style="padding:7px;text-align:right;font-weight:900;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem(null,null)">${fmtMoney(granTotal)}</td>
+          ${totalesDia.map((v,i)=>`<td style="padding:7px;text-align:right;font-weight:800;color:${v?'var(--text)':'var(--muted)'}${v?';cursor:pointer':''}"${v?` onclick="drillCajeroDiaDem(null,${i})"`:''}>${v?fmtCelda(v):'—'}</td>`).join('')}
+          <td style="padding:7px;text-align:right;font-weight:900;color:var(--purple);cursor:pointer" onclick="drillCajeroDiaDem(null,null)">${fmtCelda(granTotal)}</td>
         </tr>
       </tfoot>
     </table>`;
@@ -566,11 +580,12 @@ async function render() {
   const semanas = isNaN(semanasVal) ? 4 : semanasVal;
   METRICA = document.getElementById('sel-metrica').value || 'autos';
   const tickets = await cargarTicketsDemanda(semanas);
+  TICKETS_RAW = tickets;
   DEMANDA = construirDemanda(tickets, METRICA);
 
   const max = getMax();
   renderKPIs();
-  renderHeatmap(max);
+  renderHeatmap();
   renderBarsHora(max);
   renderBarsDia(max);
   renderFranjas();
@@ -581,13 +596,25 @@ async function render() {
 function renderKPIs() {
   let maxVal=0,maxH=0,maxD='';
   DIAS.forEach(d=>HORAS.forEach(h=>{if(DEMANDA[d][h]>maxVal){maxVal=DEMANDA[d][h];maxH=h;maxD=d;}}));
-  let sum=0,cnt=0;
-  DIAS.forEach(d=>HORAS.forEach(h=>{sum+=DEMANDA[d][h];cnt++;}));
-  const prom=sum/cnt;
   const porDia=DIAS.map(d=>({d,t:HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)})).sort((a,b)=>b.t-a.t)[0];
+  // En modo Monto, "Autos promedio/Ocupación" no tiene equivalente en dinero
+  // (no existe "ocupación en pesos"), así que se sustituye por Ticket
+  // promedio = total cobrado / total de operaciones, sobre los tickets
+  // crudos del período (no sobre el promedio por hora de DEMANDA).
+  let tarjeta2;
+  if (METRICA==='ingresos') {
+    const totalImporte = TICKETS_RAW.reduce((s,t)=>s+(Number(t.importe)||0),0);
+    const totalOps = TICKETS_RAW.length || 1;
+    tarjeta2 = {label:'Ticket promedio', val:fmtMoney(totalImporte/totalOps), sub:`sobre ${TICKETS_RAW.length} operaciones`, color:'var(--purple)'};
+  } else {
+    let sum=0,cnt=0;
+    DIAS.forEach(d=>HORAS.forEach(h=>{sum+=DEMANDA[d][h];cnt++;}));
+    const prom=sum/cnt;
+    tarjeta2 = {label:'Ocupación promedio', val:fmtVal(prom), sub:`${Math.round(prom/40*100)}% de capacidad`, color:'var(--purple)'};
+  }
   document.getElementById('kpis-rapidos').innerHTML=[
     {label:'Hora pico',val:`${maxH}:00`,sub:`${maxD} · ${fmtVal(maxVal)}`,color:'var(--red)'},
-    {label:METRICA==='ingresos'?'Ingreso promedio':'Ocupación promedio',val:fmtVal(prom),sub:METRICA==='ingresos'?'por hora':`${Math.round(prom/40*100)}% de capacidad`,color:'var(--purple)'},
+    tarjeta2,
     {label:'Día más activo',val:porDia.d,sub:`Prom. ${fmtVal(porDia.t/24)}/hora`,color:'var(--blue)'},
   ].map(k=>`<div class="card kpi" style="text-align:center;padding:16px">
     <div class="kpi-val" style="color:${k.color}">${k.val}</div>
@@ -596,13 +623,21 @@ function renderKPIs() {
   </div>`).join('');
 }
 
-function renderHeatmap(max) {
+function renderHeatmap() {
+  // Escala de color propia (no la del resto de gráficas): solo mira las
+  // horas visibles, si no una hora de madrugada casi en cero jala el máximo
+  // hacia abajo y todo se ve más oscuro de lo que debería.
+  let max=0;
+  DIAS.forEach(d=>HORAS_HEATMAP.forEach(h=>{if(DEMANDA[d][h]>max)max=DEMANDA[d][h];}));
   const el=document.getElementById('heatmap');
+  document.getElementById('heatmap-sub').textContent = METRICA==='ingresos'
+    ? 'Cada celda = promedio de $ cobrado. Oscuro = mayor monto. Clic para ver detalle.'
+    : 'Cada celda = promedio de autos. Oscuro = alta demanda. Clic para ver detalle.';
   let html='<div class="hm-cell"></div>';
-  HORAS.forEach(h=>{html+=`<div class="hm-header">${h}</div>`;});
+  HORAS_HEATMAP.forEach(h=>{html+=`<div class="hm-header">${h}</div>`;});
   DIAS.forEach(dia=>{
     html+=`<div class="hm-label">${dia}</div>`;
-    HORAS.forEach(h=>{
+    HORAS_HEATMAP.forEach(h=>{
       const val=DEMANDA[dia][h];
       const {bg,text}=heatColor(val,max);
       const fr=franjaDeHoraDem(h).label;
