@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v131</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v132</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -278,7 +278,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirBitacora();">📜 Bitácora</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirConsultaTickets();">🔎 Consulta de tickets</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirAvisoOperador();">📣 Enviar aviso a operadores</button>
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirAvisoOperador();">💬 Chat con operadores <span id="badge-preguntas-pendientes" style="display:none;background:#D93025;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:6px">0</span></button>
         <a class="nav-menu-item" href="IwolPark_Promo_Admin.html" target="_blank">📢 Promociones</a>
         <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
         <div class="nav-menu-sep"></div>
@@ -711,7 +711,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="modal-overlay" id="modal-aviso-operador">
     <div class="modal-box" style="max-width:480px">
       <div class="modal-head">
-        <span class="modal-title">📣 Enviar aviso a operadores</span>
+        <span class="modal-title">💬 Chat con operadores</span>
         <button class="modal-close" onclick="cerrarAvisoOperador()">✕</button>
       </div>
       <div class="modal-body">
@@ -729,6 +729,12 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
           <div class="param-row" style="margin-top:10px">
             <button class="param-btn" onclick="enviarAvisoOperador()">📣 Enviar aviso</button>
+          </div>
+        </div>
+        <div class="param-card">
+          <h3>Preguntas de los operadores</h3>
+          <div id="preguntas-operadores-lista" style="display:flex;flex-direction:column;gap:10px;max-height:280px;overflow-y:auto">
+            <div style="font-size:12.5px;color:var(--muted)">Cargando...</div>
           </div>
         </div>
       </div>
@@ -1909,6 +1915,90 @@ async function abrirAvisoOperador() {
   } catch (e) {}
   document.getElementById('aviso-mensaje').value = '';
   document.getElementById('modal-aviso-operador').classList.add('open');
+  cargarPreguntasOperadores();
+}
+function _escaparHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+// Bandeja de preguntas que los cajeros mandan desde la tablet (botón
+// "❓ Preguntar" en IwolPark_TABLET.html, origen='cajero'). Al abrir el
+// chat se listan y se marcan como leídas (leido_admin=true) — el badge
+// del menú refleja las que aún no se han abierto aquí.
+async function cargarPreguntasOperadores() {
+  const cont = document.getElementById('preguntas-operadores-lista');
+  cont.innerHTML = '<div style="font-size:12.5px;color:var(--muted)">Cargando...</div>';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador?origen=eq.cajero&select=id,creado_por,mensaje,created_at,leido_admin,hilo_id&order=created_at.desc&limit=30`, { headers: SB_HEADERS_PARAM });
+    const preguntas = r.ok ? await r.json() : [];
+    if (!preguntas.length) {
+      cont.innerHTML = '<div style="font-size:12.5px;color:var(--muted)">Sin preguntas de operadores.</div>';
+    } else {
+      cont.innerHTML = preguntas.map(p => `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-size:12px;font-weight:800">${_escaparHtml(p.creado_por)} <span style="font-weight:400;color:var(--muted);font-size:11px">· ${new Date(p.created_at).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
+          <div style="font-size:13px;margin:6px 0;white-space:pre-line">${_escaparHtml(p.mensaje)}</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" class="responder-input" data-id="${p.id}" data-hilo="${p.hilo_id || p.id}" data-nombre="${_escaparHtml(p.creado_por)}" placeholder="Responder..." style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px">
+            <button class="btn-responder-pregunta" data-id="${p.id}" style="padding:6px 12px;border:none;border-radius:6px;background:#7B5EA7;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Enviar</button>
+          </div>
+        </div>`).join('');
+      cont.querySelectorAll('.btn-responder-pregunta').forEach(btn => {
+        btn.onclick = () => {
+          const input = cont.querySelector(`.responder-input[data-id="${btn.dataset.id}"]`);
+          responderPreguntaOperador(input.dataset.hilo, input.dataset.nombre, input.value, input);
+        };
+      });
+    }
+    // Marca como leídas todas las que llegaron sin leer, para que el badge
+    // baje a 0 — no bloquea el render de la lista si falla.
+    const sinLeer = preguntas.filter(p => !p.leido_admin);
+    if (sinLeer.length) {
+      await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador?id=in.(${sinLeer.map(p => p.id).join(',')})`, {
+        method: 'PATCH', headers: {...SB_HEADERS_PARAM, Prefer: 'return=minimal', 'Content-Type': 'application/json'},
+        body: JSON.stringify({ leido_admin: true })
+      });
+    }
+    actualizarBadgePreguntas();
+  } catch (e) {
+    cont.innerHTML = '<div style="font-size:12.5px;color:var(--muted)">No se pudo cargar (revisa tu conexión).</div>';
+  }
+}
+async function responderPreguntaOperador(hiloId, nombreCajero, texto, inputEl) {
+  texto = (texto || '').trim();
+  if (!texto) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador`, {
+      method: 'POST', headers: {...SB_HEADERS_PARAM, Prefer: 'return=minimal'},
+      body: JSON.stringify({
+        plaza_id: PARAM_PLAZA_ID, destinatario: nombreCajero, mensaje: texto,
+        creado_por: USUARIO_ACTUAL ? (USUARIO_ACTUAL.nombre || USUARIO_ACTUAL.usuario) : 'Admin',
+        origen: 'admin', hilo_id: hiloId, leido_admin: true
+      })
+    });
+    if (inputEl) { inputEl.value = ''; }
+    showToast(`✅ Respuesta enviada a ${nombreCajero}`, '#0D9457');
+  } catch (e) {
+    showToast('⚠ No se pudo enviar la respuesta', '#D93025');
+  }
+}
+// Cuenta las preguntas de cajeros que aún no se han visto en el chat
+// (leido_admin=false) y actualiza el badge rojo del menú — se revisa
+// junto con el resto de datos (cargarDatos) cada 60s.
+async function actualizarBadgePreguntas() {
+  const badge = document.getElementById('badge-preguntas-pendientes');
+  if (!badge) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador?origen=eq.cajero&leido_admin=eq.false&select=id`, { headers: SB_HEADERS_PARAM });
+    const pendientes = r.ok ? await r.json() : [];
+    if (pendientes.length) {
+      badge.textContent = pendientes.length;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (e) {}
 }
 function cerrarAvisoOperador() {
   document.getElementById('modal-aviso-operador').classList.remove('open');
@@ -2534,6 +2624,8 @@ let USUARIO_ACTUAL = null;
   aplicarModoTab();
   cargarDatos();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+  actualizarBadgePreguntas();
+  setInterval(actualizarBadgePreguntas, 60000);
   verificarVersionServidor();
   setInterval(verificarVersionServidor, 60000);
   if ('serviceWorker' in navigator) {
