@@ -9,6 +9,8 @@ set -e
 cd "$(dirname "$0")"
 
 QA_SITE_ID="4aa186ce-8fe5-4a51-9ce3-2b90736d00c8"   # iwolpark-qa
+QA_URL="https://gbciwuprgrzllagtlqij.supabase.co"
+QA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdiY2l3dXByZ3J6bGxhZ3RscWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDMzNzcsImV4cCI6MjEwMDAxOTM3N30.vmFhOv4eI3atO4TmBP5rEN-zz1mpXDLlKbxaaYPsm3o"
 
 CURRENT=$(cat VERSION 2>/dev/null || echo 0)
 NEXT=$((CURRENT + 1))
@@ -24,5 +26,14 @@ git commit -m "Deploy v${NEXT}"
 git push
 
 netlify deploy --prod --dir=. --site="$QA_SITE_ID"
+
+# Registra la nueva versión para que cada app la detecte al iniciar sesión
+# y obligue a actualizar (ver verificarVersionServidor() en cada HTML).
+for app in tablet admin corporativo; do
+  curl -s -X POST "${QA_URL}/rest/v1/versiones_app?on_conflict=app" \
+    -H "apikey: ${QA_KEY}" -H "Authorization: Bearer ${QA_KEY}" \
+    -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" \
+    -d "{\"app\":\"${app}\",\"version\":${NEXT}}" > /dev/null
+done
 
 echo "Deployed v${NEXT} a QA (iwolpark-qa.netlify.app)"

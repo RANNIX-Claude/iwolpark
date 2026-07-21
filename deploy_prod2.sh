@@ -51,4 +51,14 @@ done
 netlify deploy --prod --dir="$BUILD_DIR" --site="$PROD2_SITE_ID"
 
 rm -rf "$BUILD_DIR"
+
+# Registra la nueva versión para que cada app la detecte al iniciar sesión
+# y obligue a actualizar (ver verificarVersionServidor() en cada HTML).
+for app in tablet admin corporativo; do
+  curl -s -X POST "${PROD2_SUPABASE_URL}/rest/v1/versiones_app?on_conflict=app" \
+    -H "apikey: ${PROD2_SUPABASE_KEY}" -H "Authorization: Bearer ${PROD2_SUPABASE_KEY}" \
+    -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" \
+    -d "{\"app\":\"${app}\",\"version\":${NEXT}}" > /dev/null
+done
+
 echo "Producción paralela v${NEXT} desplegada a iwolpark-produccion2.netlify.app"

@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v130</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v131</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -2472,6 +2472,58 @@ function logBitacora(accion, detalle) {
   } catch (e) {}
 }
 
+// Control de versiones: si el servidor ya tiene una versión más nueva que
+// la que trae cargada esta pestaña (grabada por deploy.sh/deploy_prod2.sh
+// en versiones_app), obliga a actualizar antes de seguir usando el
+// sistema — el modal no tiene botón de cancelar, solo se cierra
+// actualizando de verdad.
+let _actualizacionObligatoriaMostrada = false;
+async function verificarVersionServidor() {
+  if (_actualizacionObligatoriaMostrada) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/versiones_app?app=eq.admin&select=version`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!rows.length) return;
+    const versionServidor = rows[0].version;
+    const badge = document.getElementById('app-version');
+    const versionLocal = parseInt((badge && badge.textContent || '').replace(/\D/g, ''), 10) || 0;
+    if (versionServidor > versionLocal) {
+      _actualizacionObligatoriaMostrada = true;
+      mostrarModalActualizacionObligatoria(versionServidor);
+    }
+  } catch (e) { /* sin conexión: se reintenta en la siguiente revisión */ }
+}
+function mostrarModalActualizacionObligatoria(versionServidor) {
+  const div = document.createElement('div');
+  div.className = 'modal-overlay open';
+  div.style.zIndex = '9999';
+  div.innerHTML = `
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-head"><span class="modal-title">🆕 Nueva versión disponible (v${versionServidor})</span></div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--muted);line-height:1.7">Hay una versión más reciente del sistema. Debes actualizar antes de continuar.</div>
+        <button id="btn-actualizar-obligatorio" style="width:100%;padding:12px;border-radius:8px;border:none;background:#0D9457;color:#fff;font-weight:700;font-size:14px;cursor:pointer">⟳ Actualizar ahora</button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  document.getElementById('btn-actualizar-obligatorio').onclick = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(reg => reg.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) {}
+    location.reload();
+  };
+}
+
 // ══ INIT ══
 let USUARIO_ACTUAL = null;
 (async () => {
@@ -2482,6 +2534,8 @@ let USUARIO_ACTUAL = null;
   aplicarModoTab();
   cargarDatos();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
+  verificarVersionServidor();
+  setInterval(verificarVersionServidor, 60000);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
