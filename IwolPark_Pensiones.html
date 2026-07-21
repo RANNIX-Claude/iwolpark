@@ -125,7 +125,7 @@ tr:hover td{background:#FAFAFE}
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <button class="btn-nav" style="background:none;border:1px solid #444" onclick="window.print()">🖨 Imprimir</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v116</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v117</span>
   </div>
 </nav>
 
@@ -257,10 +257,13 @@ tr:hover td{background:#FAFAFE}
 
 </div><!-- /container -->
 
-<!-- MODAL NUEVA PENSIÓN -->
+<!-- MODAL NUEVA / EDITAR PENSIÓN -->
 <div class="modal-overlay" id="modal-pension">
   <div class="modal">
-    <div class="modal-title">Nueva pensión</div>
+    <div class="modal-title" id="modal-pension-titulo">Nueva pensión</div>
+    <input type="hidden" id="p-pension-id">
+    <input type="hidden" id="p-cliente-id">
+    <input type="hidden" id="p-vehiculo-id">
     <div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
       <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">DATOS DEL CLIENTE</div>
       <div class="form-grid" style="margin-bottom:8px">
@@ -349,15 +352,25 @@ tr:hover td{background:#FAFAFE}
           <input class="form-input" id="p-dia-pago" type="number" min="1" max="28" value="1">
         </div>
       </div>
-      <div class="form-group" style="margin-top:8px">
-        <label class="form-label">Notas</label>
-        <input class="form-input" id="p-notas" placeholder="Observaciones adicionales">
+      <div class="form-grid" style="margin-top:8px">
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="p-estado">
+            <option value="activo">Activo</option>
+            <option value="suspendido">Suspendido</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <input class="form-input" id="p-notas" placeholder="Observaciones adicionales">
+        </div>
       </div>
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-outline" onclick="cerrarModal('modal-pension')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarPension()">Registrar pensión</button>
+      <button class="btn btn-primary" onclick="guardarPension()" id="btn-guardar-pension">Registrar pensión</button>
     </div>
   </div>
 </div>
@@ -450,14 +463,17 @@ let PENSIONADOS = [];
 
 async function cargarPensionados() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?select=pension_id,tipo,monto_mensual,dia_pago,fecha_inicio,estado,codigo_acceso,clientes(cliente_id,nombre,telefono,whatsapp,email),vehiculos(vehiculo_id,placas,marca,modelo,anio,color)&order=created_at.desc`, {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?select=pension_id,tipo,monto_mensual,dia_pago,fecha_inicio,estado,codigo_acceso,clientes(cliente_id,nombre,numero_local,telefono,whatsapp,email),vehiculos(vehiculo_id,placas,marca,modelo,anio,color)&order=created_at.desc`, {
       headers: SB_HEADERS
     });
     if (!r.ok) { showToast('⚠ Sin conexión a Supabase · mostrando vacío'); PENSIONADOS = []; return; }
     const rows = await r.json();
     PENSIONADOS = rows.map(p => ({
       id: p.pension_id,
+      cliente_id: p.clientes?.cliente_id || null,
+      vehiculo_id: p.vehiculos?.vehiculo_id || null,
       nombre: p.clientes?.nombre || '—',
+      numero_local: p.clientes?.numero_local || '',
       tel: p.clientes?.telefono || '',
       wa: p.clientes?.whatsapp || '',
       email: p.clientes?.email || '',
@@ -538,9 +554,11 @@ function renderSemaforo(filtro='todos') {
       <td><span class="badge b-morado">${TIPO_LABEL[p.tipo]}</span></td>
       <td><strong>$${p.monto}/mes</strong><br><span style="font-size:11px;color:var(--muted)">Paga día ${p.dia_pago}</span></td>
       <td>Último: ${p.ultimo_pago}</td>
-      <td style="display:flex;gap:4px">
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
         ${p.semaforo==='vencido'?`<button class="btn btn-danger btn-sm" onclick="registrarPago('${p.id}','${p.nombre}',${p.monto})">Registrar pago</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="verDetalle('${p.id}')">Ver</button>
+        <button class="btn btn-outline btn-sm" onclick="abrirModalEditarPension('${p.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarPension('${p.id}','${p.nombre}')">Eliminar</button>
       </td>
     </tr>`).join('');
 }
@@ -614,9 +632,13 @@ function renderPensionados() {
       <td>${p.inicio}</td>
       <td><strong>$${p.monto}/mes</strong></td>
       <td><span class="badge ${p.estado==='activo'?'b-verde':'b-rojo'}">${p.estado}</span></td>
-      <td style="display:flex;gap:4px">
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="verDetalle('${p.id}')">Ver</button>
-        <button class="btn btn-danger btn-sm" onclick="showToast('Pensión suspendida')">Suspender</button>
+        <button class="btn btn-outline btn-sm" onclick="abrirModalEditarPension('${p.id}')">Editar</button>
+        ${p.estado==='activo'
+          ? `<button class="btn btn-danger btn-sm" onclick="cambiarEstadoPension('${p.id}','${p.nombre}','suspendido')">Suspender</button>`
+          : `<button class="btn btn-success btn-sm" onclick="cambiarEstadoPension('${p.id}','${p.nombre}','activo')">Reactivar</button>`}
+        <button class="btn btn-danger btn-sm" onclick="eliminarPension('${p.id}','${p.nombre}')">Eliminar</button>
       </td>
     </tr>`).join('');
 }
@@ -647,8 +669,53 @@ function renderTarifas() {
 // ── MODALES ──
 let _pagoActual = null;
 
+function limpiarFormPension() {
+  ['p-nombre','p-local','p-tel','p-wa','p-email','p-placas','p-color',
+   'p-marca','p-modelo','p-anio','p-serie','p-notas','p-pension-id',
+   'p-cliente-id','p-vehiculo-id'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('p-monto').value = '600';
+  document.getElementById('p-dia-pago').value = '1';
+  document.getElementById('p-tipo').value = 'dia';
+  document.getElementById('p-estado').value = 'activo';
+}
+
 function abrirModalNuevaPension() {
+  limpiarFormPension();
   document.getElementById('p-inicio').value = fmtLocal(new Date());
+  document.getElementById('modal-pension-titulo').textContent = 'Nueva pensión';
+  document.getElementById('btn-guardar-pension').textContent = 'Registrar pensión';
+  document.getElementById('modal-pension').classList.add('open');
+}
+
+// Mantenimiento: cargar los datos de una pensión existente en el mismo
+// formulario de alta, para poder corregir cliente/vehículo/monto/estado sin
+// tener que borrar y volver a capturar todo.
+function abrirModalEditarPension(id) {
+  const p = PENSIONADOS.find(x => x.id === id);
+  if (!p) return;
+  limpiarFormPension();
+  document.getElementById('p-pension-id').value  = p.id;
+  document.getElementById('p-cliente-id').value  = p.cliente_id || '';
+  document.getElementById('p-vehiculo-id').value = p.vehiculo_id || '';
+  document.getElementById('p-nombre').value = p.nombre === '—' ? '' : p.nombre;
+  document.getElementById('p-local').value  = p.numero_local || '';
+  document.getElementById('p-tel').value    = p.tel;
+  document.getElementById('p-wa').value     = p.wa;
+  document.getElementById('p-email').value  = p.email;
+  document.getElementById('p-placas').value = p.placas === '—' ? '' : p.placas;
+  document.getElementById('p-color').value  = p.color;
+  document.getElementById('p-marca').value  = p.marca;
+  document.getElementById('p-modelo').value = p.modelo;
+  document.getElementById('p-anio').value   = p.anio;
+  document.getElementById('p-tipo').value   = p.tipo;
+  document.getElementById('p-monto').value  = p.monto;
+  document.getElementById('p-inicio').value = p.inicio;
+  document.getElementById('p-dia-pago').value = p.dia_pago || 1;
+  document.getElementById('p-estado').value = p.estado || 'activo';
+  document.getElementById('modal-pension-titulo').textContent = 'Editar pensión — ' + p.nombre;
+  document.getElementById('btn-guardar-pension').textContent = 'Guardar cambios';
   document.getElementById('modal-pension').classList.add('open');
 }
 
@@ -658,6 +725,11 @@ function actualizarMonto() {
 }
 
 async function guardarPension() {
+  const pensionId  = document.getElementById('p-pension-id').value;
+  const clienteId  = document.getElementById('p-cliente-id').value;
+  const vehiculoId = document.getElementById('p-vehiculo-id').value;
+  const esEdicion  = !!pensionId;
+
   const nombre = document.getElementById('p-nombre').value.trim();
   const local  = document.getElementById('p-local').value.trim();
   const tel    = document.getElementById('p-tel').value.trim();
@@ -676,6 +748,7 @@ async function guardarPension() {
   // deja vacía, se usa hoy por default en vez de mostrar un error.
   const inicio = document.getElementById('p-inicio').value || fmtLocal(new Date());
   const dia    = parseInt(document.getElementById('p-dia-pago').value)||1;
+  const estado = document.getElementById('p-estado').value;
   const notas  = document.getElementById('p-notas').value.trim();
 
   // Validaciones — solo Nombre y Número de Local son obligatorios; el resto
@@ -691,57 +764,129 @@ async function guardarPension() {
   }
 
   try {
-    // 1) Cliente
-    const rCliente = await fetch(`${SUPABASE_URL}/rest/v1/clientes`, {
-      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
-      body: JSON.stringify({ plaza_id: PLAZA_ID, nombre, numero_local: local, telefono: tel, whatsapp: wa, email: email || null })
-    });
-    if (!rCliente.ok) throw new Error(await rCliente.text());
-    const cliente = (await rCliente.json())[0];
-
-    // 2) Vehículo — opcional, solo si se capturaron sus datos
-    let vehiculoId = null;
-    if (hayDatosVehiculo) {
-      const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
-        method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
-        body: JSON.stringify({ cliente_id: cliente.cliente_id, placas, marca, modelo,
-          anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+    if (esEdicion) {
+      // 1) Cliente — actualizar los datos existentes
+      const rCliente = await fetch(`${SUPABASE_URL}/rest/v1/clientes?cliente_id=eq.${clienteId}`, {
+        method: 'PATCH', headers: SB_HEADERS,
+        body: JSON.stringify({ nombre, numero_local: local, telefono: tel, whatsapp: wa, email: email || null })
       });
-      if (!rVeh.ok) throw new Error(await rVeh.text());
-      vehiculoId = (await rVeh.json())[0].vehiculo_id;
+      if (!rCliente.ok) throw new Error(await rCliente.text());
+
+      // 2) Vehículo — actualizar si ya existía; crearlo si antes no había
+      // datos de vehículo y ahora sí se capturaron; no se toca si se deja vacío.
+      let vehiculoIdFinal = vehiculoId || null;
+      if (hayDatosVehiculo && vehiculoId) {
+        const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos?vehiculo_id=eq.${vehiculoId}`, {
+          method: 'PATCH', headers: SB_HEADERS,
+          body: JSON.stringify({ placas, marca, modelo, anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+        });
+        if (!rVeh.ok) throw new Error(await rVeh.text());
+      } else if (hayDatosVehiculo && !vehiculoId) {
+        const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
+          method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+          body: JSON.stringify({ cliente_id: clienteId, placas, marca, modelo,
+            anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+        });
+        if (!rVeh.ok) throw new Error(await rVeh.text());
+        vehiculoIdFinal = (await rVeh.json())[0].vehiculo_id;
+      }
+
+      // 3) Pensión
+      const rPension = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${pensionId}`, {
+        method: 'PATCH', headers: SB_HEADERS,
+        body: JSON.stringify({
+          vehiculo_id: vehiculoIdFinal, tipo, monto_mensual: monto,
+          fecha_inicio: inicio, dia_pago: dia, estado, notas: notas || null
+        })
+      });
+      if (!rPension.ok) throw new Error(await rPension.text());
+
+      cerrarModal('modal-pension');
+      showToast(`✅ Pensión actualizada · ${nombre}`);
+    } else {
+      // 1) Cliente
+      const rCliente = await fetch(`${SUPABASE_URL}/rest/v1/clientes`, {
+        method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+        body: JSON.stringify({ plaza_id: PLAZA_ID, nombre, numero_local: local, telefono: tel, whatsapp: wa, email: email || null })
+      });
+      if (!rCliente.ok) throw new Error(await rCliente.text());
+      const cliente = (await rCliente.json())[0];
+
+      // 2) Vehículo — opcional, solo si se capturaron sus datos
+      let vehiculoId2 = null;
+      if (hayDatosVehiculo) {
+        const rVeh = await fetch(`${SUPABASE_URL}/rest/v1/vehiculos`, {
+          method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+          body: JSON.stringify({ cliente_id: cliente.cliente_id, placas, marca, modelo,
+            anio: anio ? parseInt(anio) : null, color, num_serie: serie || null })
+        });
+        if (!rVeh.ok) throw new Error(await rVeh.text());
+        vehiculoId2 = (await rVeh.json())[0].vehiculo_id;
+      }
+
+      // 3) Pensión — código de acceso derivado del número de local (antes
+      // usaba las placas, que ahora pueden no existir)
+      const codigo = 'PEN-' + local.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const rPension = await fetch(`${SUPABASE_URL}/rest/v1/pensiones`, {
+        method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
+        body: JSON.stringify({
+          plaza_id: PLAZA_ID, cliente_id: cliente.cliente_id, vehiculo_id: vehiculoId2,
+          tipo, monto_mensual: monto, fecha_inicio: inicio, dia_pago: dia,
+          estado: 'activo', codigo_acceso: codigo, notas: notas || null
+        })
+      });
+      if (!rPension.ok) throw new Error(await rPension.text());
+
+      cerrarModal('modal-pension');
+      showToast(`✅ Pensión registrada · ${nombre} · ${placas} · código ${codigo}`);
     }
 
-    // 3) Pensión — código de acceso derivado del número de local (antes
-    // usaba las placas, que ahora pueden no existir)
-    const codigo = 'PEN-' + local.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    const rPension = await fetch(`${SUPABASE_URL}/rest/v1/pensiones`, {
-      method: 'POST', headers: {...SB_HEADERS, Prefer: 'return=representation'},
-      body: JSON.stringify({
-        plaza_id: PLAZA_ID, cliente_id: cliente.cliente_id, vehiculo_id: vehiculoId,
-        tipo, monto_mensual: monto, fecha_inicio: inicio, dia_pago: dia,
-        estado: 'activo', codigo_acceso: codigo, notas: notas || null
-      })
-    });
-    if (!rPension.ok) throw new Error(await rPension.text());
-
-    // Limpiar formulario
-    ['p-nombre','p-local','p-tel','p-wa','p-email','p-placas','p-color',
-     'p-marca','p-modelo','p-anio','p-serie','p-notas'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    document.getElementById('p-monto').value = '600';
-    document.getElementById('p-dia-pago').value = '1';
-    document.getElementById('p-tipo').value = 'dia';
-
-    cerrarModal('modal-pension');
-    showToast(`✅ Pensión registrada · ${nombre} · ${placas} · código ${codigo}`);
-
+    limpiarFormPension();
     await cargarPensionados();
     renderSemaforo('todos');
     renderPensionados();
     renderCobranza();
   } catch (e) {
     showToast('⚠ Error al guardar en Supabase: ' + e.message);
+  }
+}
+
+// Cambiar estado (activo/suspendido/cancelado) sin abrir el modal completo —
+// antes el botón "Suspender" solo mostraba un toast y nunca tocaba la base.
+async function cambiarEstadoPension(id, nombre, nuevoEstado) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${id}`, {
+      method: 'PATCH', headers: SB_HEADERS,
+      body: JSON.stringify({ estado: nuevoEstado })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(`✅ ${nombre} · estado cambiado a ${nuevoEstado}`);
+    await cargarPensionados();
+    renderSemaforo('todos');
+    renderPensionados();
+    renderCobranza();
+  } catch (e) {
+    showToast('⚠ Error al cambiar estado: ' + e.message);
+  }
+}
+
+// Eliminar por completo el registro de la pensión (no el cliente ni el
+// vehículo, que pueden seguir referenciados por tickets históricos) — se pide
+// confirmación porque es una acción destructiva y no tiene deshacer.
+async function eliminarPension(id, nombre) {
+  if (!confirm(`¿Eliminar la pensión de "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${id}`, {
+      method: 'DELETE', headers: SB_HEADERS
+    });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(`🗑 Pensión de ${nombre} eliminada`);
+    await cargarPensionados();
+    renderSemaforo('todos');
+    renderPensionados();
+    renderCobranza();
+  } catch (e) {
+    showToast('⚠ Error al eliminar: ' + e.message);
   }
 }
 
