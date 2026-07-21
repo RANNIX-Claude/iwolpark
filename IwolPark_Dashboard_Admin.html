@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v132</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v133</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -1922,6 +1922,31 @@ function _escaparHtml(s) {
   d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
 }
+// Convierte URLs sueltas en el texto (http(s)://... o www...) en enlaces
+// clicables — el resto del texto se escapa primero para que un mensaje no
+// pueda inyectar HTML/JS, solo lo que esta función arma a propósito.
+function _linkificar(texto) {
+  const escapado = _escaparHtml(texto);
+  return escapado.replace(/((https?:\/\/|www\.)[^\s<]+)/gi, (m) => {
+    const href = /^https?:\/\//i.test(m) ? m : 'https://' + m;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:#7B5EA7">${m}</a>`;
+  });
+}
+// Aviso sonoro corto (beep) para que una pregunta nueva de un operador
+// llame la atención aunque el dashboard esté en otra pestaña — no
+// depende de ningún archivo de audio, se genera con Web Audio API.
+function _beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880;
+    g.gain.value = 0.15;
+    o.start();
+    setTimeout(() => { o.stop(); ctx.close(); }, 180);
+  } catch (e) {}
+}
 // Bandeja de preguntas que los cajeros mandan desde la tablet (botón
 // "❓ Preguntar" en IwolPark_TABLET.html, origen='cajero'). Al abrir el
 // chat se listan y se marcan como leídas (leido_admin=true) — el badge
@@ -1938,7 +1963,7 @@ async function cargarPreguntasOperadores() {
       cont.innerHTML = preguntas.map(p => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px">
           <div style="font-size:12px;font-weight:800">${_escaparHtml(p.creado_por)} <span style="font-weight:400;color:var(--muted);font-size:11px">· ${new Date(p.created_at).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>
-          <div style="font-size:13px;margin:6px 0;white-space:pre-line">${_escaparHtml(p.mensaje)}</div>
+          <div style="font-size:13px;margin:6px 0;white-space:pre-line">${_linkificar(p.mensaje)}</div>
           <div style="display:flex;gap:6px">
             <input type="text" class="responder-input" data-id="${p.id}" data-hilo="${p.hilo_id || p.id}" data-nombre="${_escaparHtml(p.creado_por)}" placeholder="Responder..." style="flex:1;padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px">
             <button class="btn-responder-pregunta" data-id="${p.id}" style="padding:6px 12px;border:none;border-radius:6px;background:#7B5EA7;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Enviar</button>
@@ -1985,13 +2010,20 @@ async function responderPreguntaOperador(hiloId, nombreCajero, texto, inputEl) {
 }
 // Cuenta las preguntas de cajeros que aún no se han visto en el chat
 // (leido_admin=false) y actualiza el badge rojo del menú — se revisa
-// junto con el resto de datos (cargarDatos) cada 60s.
+// junto con el resto de datos (cargarDatos) cada 60s. Si el conteo subió
+// desde la última revisión (llegó una pregunta nueva), suena un beep para
+// que se note aunque el dashboard esté en otra pestaña.
+let _ultimoConteoPreguntas = null;
 async function actualizarBadgePreguntas() {
   const badge = document.getElementById('badge-preguntas-pendientes');
   if (!badge) return;
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador?origen=eq.cajero&leido_admin=eq.false&select=id`, { headers: SB_HEADERS_PARAM });
     const pendientes = r.ok ? await r.json() : [];
+    if (_ultimoConteoPreguntas !== null && pendientes.length > _ultimoConteoPreguntas) {
+      _beep();
+    }
+    _ultimoConteoPreguntas = pendientes.length;
     if (pendientes.length) {
       badge.textContent = pendientes.length;
       badge.style.display = 'inline-block';
