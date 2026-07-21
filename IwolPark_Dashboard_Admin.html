@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v127</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v128</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -278,6 +278,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirBitacora();">📜 Bitácora</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirConsultaTickets();">🔎 Consulta de tickets</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
+        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirAvisoOperador();">📣 Enviar aviso a operadores</button>
         <a class="nav-menu-item" href="IwolPark_Promo_Admin.html" target="_blank">📢 Promociones</a>
         <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
         <div class="nav-menu-sep"></div>
@@ -702,6 +703,34 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: AVISO A OPERADORES ══ -->
+  <div class="modal-overlay" id="modal-aviso-operador">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-head">
+        <span class="modal-title">📣 Enviar aviso a operadores</span>
+        <button class="modal-close" onclick="cerrarAvisoOperador()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="param-card">
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+            El mensaje aparece la próxima vez que ese operador (o todos) use la tablet — por ejemplo, para pedirles que presionen "Actualizar app" antes de iniciar su turno.
+          </div>
+          <div class="param-row">
+            <select id="aviso-destinatario" style="flex:1">
+              <option value="">Todos los operadores</option>
+            </select>
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <textarea id="aviso-mensaje" placeholder="Ej. Por favor presiona el botón 'Actualizar app' antes de iniciar tu turno de hoy." style="flex:1;min-height:80px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit"></textarea>
+          </div>
+          <div class="param-row" style="margin-top:10px">
+            <button class="param-btn" onclick="enviarAvisoOperador()">📣 Enviar aviso</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1863,6 +1892,45 @@ function abrirGestionManual() {
 }
 function cerrarGestionManual() {
   document.getElementById('modal-gestion-manual').classList.remove('open');
+}
+
+// ══ AVISO A OPERADORES ══ — mensaje que el Admin manda a un operador
+// específico o a todos; se lo muestra la tablet la próxima vez que lo use
+// (ver revisarAvisosOperador() en IwolPark_TABLET.html). Pensado sobre todo
+// para pedirles "presiona Actualizar app" cuando hay una versión nueva,
+// pero sirve para cualquier mensaje corto.
+async function abrirAvisoOperador() {
+  const sel = document.getElementById('aviso-destinatario');
+  sel.innerHTML = '<option value="">Todos los operadores</option>';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/cajeros?select=nombre&activo=eq.true&order=nombre.asc`, { headers: SB_HEADERS_PARAM });
+    const cajeros = r.ok ? await r.json() : [];
+    sel.innerHTML += cajeros.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  } catch (e) {}
+  document.getElementById('aviso-mensaje').value = '';
+  document.getElementById('modal-aviso-operador').classList.add('open');
+}
+function cerrarAvisoOperador() {
+  document.getElementById('modal-aviso-operador').classList.remove('open');
+}
+async function enviarAvisoOperador() {
+  const destinatario = document.getElementById('aviso-destinatario').value || null;
+  const mensaje = document.getElementById('aviso-mensaje').value.trim();
+  if (!mensaje) { showToast('Escribe un mensaje antes de enviar', '#D93025'); return; }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/avisos_operador`, {
+      method: 'POST', headers: {...SB_HEADERS_PARAM, Prefer: 'return=minimal'},
+      body: JSON.stringify({
+        plaza_id: PARAM_PLAZA_ID, destinatario, mensaje,
+        creado_por: USUARIO_ACTUAL ? (USUARIO_ACTUAL.nombre || USUARIO_ACTUAL.usuario) : 'Admin'
+      })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    cerrarAvisoOperador();
+    showToast(`✅ Aviso enviado a ${destinatario || 'todos los operadores'}`, '#0D9457');
+  } catch (e) {
+    showToast('⚠ No se pudo enviar el aviso: ' + e.message, '#D93025');
+  }
 }
 async function buscarTicketParaCancelar() {
   const folio = document.getElementById('gm-folio-buscar').value.trim();
