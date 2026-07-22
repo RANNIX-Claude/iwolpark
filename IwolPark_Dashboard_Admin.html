@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v136</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v137</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -529,7 +529,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
             <input type="text" id="nuevo-empleado-nombre" placeholder="Nombre completo">
             <input type="text" id="nuevo-empleado-puesto" placeholder="Puesto">
             <input type="text" id="nuevo-empleado-area" placeholder="Área">
-            <button class="param-btn" onclick="agregarEmpleado()">+ Agregar</button>
+            <button class="param-btn" id="btn-guardar-empleado" onclick="agregarEmpleado()">+ Agregar</button>
+            <button class="param-btn outline" id="btn-cancelar-edicion-empleado" style="display:none" onclick="cancelarEdicionEmpleado()">Cancelar</button>
           </div>
         </div>
 
@@ -2445,6 +2446,8 @@ function renderEmpleados(empleados) {
       <span style="color:var(--muted)">${escHtmlAttr(e.area) || '—'}</span>
       ${e.activo ? '' : '<span class="estado-inactivo">Inactivo</span>'}
       <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
+              data-id="${e.id}" data-nombre="${escHtmlAttr(e.nombre_completo)}" data-puesto="${escHtmlAttr(e.puesto)}" data-area="${escHtmlAttr(e.area)}" onclick="editarEmpleadoBtn(this)">Editar</button>
+      <button class="param-btn outline" style="padding:4px 10px;font-size:11px"
               data-id="${e.id}" data-activo="${e.activo}" onclick="toggleEmpleadoBtn(this)">${e.activo ? 'Desactivar' : 'Activar'}</button>
       <button class="param-btn outline" style="padding:4px 10px;font-size:11px;color:var(--red);border-color:var(--red)"
               data-id="${e.id}" data-nombre="${escHtmlAttr(e.nombre_completo)}" onclick="eliminarEmpleadoBtn(this)">Eliminar</button>
@@ -2460,11 +2463,51 @@ function eliminarEmpleadoBtn(btn) {
   eliminarEmpleado(btn.dataset.id, btn.dataset.nombre);
 }
 
+// Editar reutiliza el mismo formulario de alta (nombre/puesto/área): al
+// entrar en modo edición se precargan los campos con los datos actuales
+// del empleado y el botón "+ Agregar" pasa a guardar los cambios (PATCH)
+// en vez de crear uno nuevo — evita duplicar un modal aparte solo para 3
+// campos.
+let _empleadoEditandoId = null;
+function editarEmpleadoBtn(btn) {
+  _empleadoEditandoId = btn.dataset.id;
+  document.getElementById('nuevo-empleado-nombre').value = btn.dataset.nombre || '';
+  document.getElementById('nuevo-empleado-puesto').value = btn.dataset.puesto || '';
+  document.getElementById('nuevo-empleado-area').value = btn.dataset.area || '';
+  document.getElementById('btn-guardar-empleado').textContent = '💾 Guardar cambios';
+  document.getElementById('btn-cancelar-edicion-empleado').style.display = '';
+  document.getElementById('nuevo-empleado-nombre').focus();
+}
+function cancelarEdicionEmpleado() {
+  _empleadoEditandoId = null;
+  document.getElementById('nuevo-empleado-nombre').value = '';
+  document.getElementById('nuevo-empleado-puesto').value = '';
+  document.getElementById('nuevo-empleado-area').value = '';
+  document.getElementById('btn-guardar-empleado').textContent = '+ Agregar';
+  document.getElementById('btn-cancelar-edicion-empleado').style.display = 'none';
+}
+
 async function agregarEmpleado() {
   const nombre_completo = document.getElementById('nuevo-empleado-nombre').value.trim();
   const puesto = document.getElementById('nuevo-empleado-puesto').value.trim();
   const area = document.getElementById('nuevo-empleado-area').value.trim();
   if (!nombre_completo) { showToast('Falta el nombre completo'); return; }
+  if (_empleadoEditandoId) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados?id=eq.${_empleadoEditandoId}`, {
+        method: 'PATCH', headers: { ...SB_HEADERS_PARAM, Prefer: 'return=minimal' },
+        body: JSON.stringify({ nombre_completo, puesto: puesto || null, area: area || null })
+      });
+      if (r.ok) {
+        showToast('Empleado actualizado · '+nombre_completo);
+        cancelarEdicionEmpleado();
+        cargarEmpleados();
+      } else {
+        showToast('Error al guardar los cambios');
+      }
+    } catch (e) { showToast('Error al guardar los cambios'); }
+    return;
+  }
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados`, {
       method: 'POST', headers: { ...SB_HEADERS_PARAM, Prefer: 'return=minimal' },
