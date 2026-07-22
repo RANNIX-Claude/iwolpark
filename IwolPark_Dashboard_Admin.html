@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v144</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v145</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -865,6 +865,19 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 
   <div class="filtros" style="margin-bottom:10px">
     <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Rango</label>
+    <select id="filtro-periodo-rapido-mov" onchange="aplicarPeriodoRapidoMovAdmin()">
+      <option value="hoy" selected>Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="lunes">Lunes</option>
+      <option value="martes">Martes</option>
+      <option value="miercoles">Miércoles</option>
+      <option value="jueves">Jueves</option>
+      <option value="viernes">Viernes</option>
+      <option value="sabado">Sábado</option>
+      <option value="domingo">Domingo</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes">Este mes</option>
+    </select>
     <input type="date" id="filtro-desde-mov">
     <input type="date" id="filtro-hasta-mov">
     <button class="btn-filtro" onclick="actualizarMovimientosAdmin()">↻ Buscar</button>
@@ -2446,6 +2459,42 @@ function ticketsAMovimientosAdm(rows) {
     return { tipo: 'salida', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
       importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
   });
+}
+
+// "Hoy"/"Ayer"/día de la semana/"Esta semana"/"Este mes" — mismo criterio
+// que getFechas() del tablero principal (con "Ayer" agregado), para saltar
+// rápido al universo de tiempo sin teclear fechas a mano.
+function getFechasPeriodoRapidoMovAdmin(valor) {
+  const hoy = new Date();
+  const fmt = fmtLocal;
+  if (valor === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (valor === 'ayer') {
+    const d = new Date(hoy); d.setDate(d.getDate() - 1);
+    return { desde: fmt(d), hasta: fmt(d) };
+  }
+  const DIA_IDX = { domingo:0, lunes:1, martes:2, miercoles:3, jueves:4, viernes:5, sabado:6 };
+  if (valor in DIA_IDX) {
+    const diff = (hoy.getDay() - DIA_IDX[valor] + 7) % 7;
+    const d = new Date(hoy); d.setDate(hoy.getDate() - diff);
+    return { desde: fmt(d), hasta: fmt(d) };
+  }
+  if (valor === 'semana') {
+    const ini = new Date(hoy); ini.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    return { desde: fmt(ini), hasta: fmt(hoy) };
+  }
+  if (valor === 'mes') {
+    return { desde: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: fmt(hoy) };
+  }
+  return null;
+}
+
+function aplicarPeriodoRapidoMovAdmin() {
+  const valor = document.getElementById('filtro-periodo-rapido-mov').value;
+  const rango = getFechasPeriodoRapidoMovAdmin(valor);
+  if (!rango) return;
+  document.getElementById('filtro-desde-mov').value = rango.desde;
+  document.getElementById('filtro-hasta-mov').value = rango.hasta;
+  actualizarMovimientosAdmin();
 }
 
 async function cargarMovimientosDBAdmin() {
