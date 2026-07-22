@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v141</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v142</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -1321,10 +1321,11 @@ function renderMix(ops) {
     const pct = Math.round(cnt/total*100);
     const ing = subset.reduce((s,o)=>s+(Number(o.importe)||0),0);
     return `<div onclick="drillTipo('${key}')" style="cursor:pointer">
-      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px">
+      <div style="display:grid;grid-template-columns:1fr 50px 85px 38px;gap:6px;font-size:10px;margin-bottom:2px;align-items:baseline">
         <span style="font-weight:700;color:${b.color}">${b.label}</span>
-        <span style="color:var(--muted)">${cnt} ops · ${fmt$(ing)}</span>
-        <span style="font-weight:700">${pct}%</span>
+        <span style="color:var(--muted);text-align:right">${cnt} ops</span>
+        <span style="color:var(--muted);text-align:right">${fmt$(ing)}</span>
+        <span style="font-weight:700;text-align:right">${pct}%</span>
       </div>
       <div style="background:#F0EEF8;border-radius:99px;height:6px;overflow:hidden">
         <div style="width:${pct}%;height:100%;border-radius:99px;background:${b.color};transition:width .5s"></div>
@@ -1396,6 +1397,17 @@ function getFechasAnterior(desde, hasta) {
   const d1 = new Date(desde+'T12:00:00');
   const d2 = new Date(hasta+'T12:00:00');
   const dias = Math.round((d2-d1)/86400000) + 1;
+  if (dias <= 7) {
+    // Períodos de una semana o menos (Hoy, un día específico, Esta semana):
+    // se compara contra el mismo rango pero exactamente 7 días antes, para
+    // que cada día caiga contra su mismo día de la semana pasada (lunes vs
+    // lunes, martes vs martes) en vez de contra el día inmediato anterior.
+    const iniAnterior = new Date(d1); iniAnterior.setDate(iniAnterior.getDate()-7);
+    const finAnterior = new Date(d2); finAnterior.setDate(finAnterior.getDate()-7);
+    return { desde: fmtLocal(iniAnterior), hasta: fmtLocal(finAnterior) };
+  }
+  // Períodos más largos (mes, personalizado): mismo tamaño, inmediatamente
+  // antes — aquí no aplica una alineación por día de la semana.
   const finAnterior = new Date(d1); finAnterior.setDate(finAnterior.getDate()-1);
   const iniAnterior = new Date(finAnterior); iniAnterior.setDate(iniAnterior.getDate()-(dias-1));
   return { desde: fmtLocal(iniAnterior), hasta: fmtLocal(finAnterior) };
