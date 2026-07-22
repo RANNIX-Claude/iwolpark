@@ -270,13 +270,11 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v145</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v146</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirParametros();">⚙ Parámetros del sistema</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirBitacora();">📜 Bitácora</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirConsultaTickets();">🔎 Consulta de tickets</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
         <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirAvisoOperador();">💬 Chat con operadores <span id="badge-preguntas-pendientes" style="display:none;background:#D93025;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:6px">0</span></button>
         <a class="nav-menu-item" href="IwolPark_Promo_Admin.html" target="_blank">📢 Promociones</a>
@@ -295,6 +293,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="tab active" onclick="showTabModo('seguimiento',this)">📊 Seguimiento</div>
   <div class="tab" onclick="showTabModo('historico',this)">📁 Histórico</div>
   <div class="tab" onclick="showTab('movimientos',this)">🔎 Movimientos</div>
+  <div class="tab" onclick="showTab('bitacora',this)">📜 Bitácora</div>
   <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
 </div>
 
@@ -547,105 +546,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   </div>
 
   <!-- ══ MODAL: BITÁCORA ══ -->
-  <div class="modal-overlay" id="modal-bitacora">
-    <div class="modal-box" style="max-width:1200px">
-      <div class="modal-head">
-        <span class="modal-title">📜 Bitácora de acciones</span>
-        <button class="modal-close" onclick="cerrarBitacora()">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="param-card">
-          <div class="param-row">
-            <label style="font-size:11px;color:var(--muted)">Desde</label>
-            <input type="date" id="bit-desde">
-            <label style="font-size:11px;color:var(--muted)">Hasta</label>
-            <input type="date" id="bit-hasta">
-            <label style="font-size:11px;color:var(--muted)">Hora desde</label>
-            <input type="time" id="bit-hora-desde">
-            <label style="font-size:11px;color:var(--muted)">Hora hasta</label>
-            <input type="time" id="bit-hora-hasta">
-          </div>
-          <div class="param-row" style="margin-top:10px">
-            <input type="text" id="bit-usuario" placeholder="Usuario (nombre o usuario)">
-            <select id="bit-accion">
-              <option value="">Todas las acciones</option>
-              <option value="login">Login</option>
-              <option value="cobro">Cobro</option>
-              <option value="cancelacion">Cancelación</option>
-              <option value="arqueo">Arqueo</option>
-              <option value="relevo">Relevo</option>
-              <option value="cierre_dia">Cierre de día</option>
-              <option value="reimpresion_comprobante">Reimpresión comprobante</option>
-            </select>
-            <button class="param-btn" onclick="buscarBitacora()">🔍 Buscar</button>
-            <button class="param-btn outline" onclick="exportarBitacoraCSV()">⬇ Exportar CSV</button>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--muted);font-weight:700" id="bitacora-count">—</div>
-        <div id="bitacora-tabla"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ MODAL: CONSULTA DE TICKETS (todas las columnas) ══ -->
-  <div class="modal-overlay" id="modal-consulta-tickets">
-    <div class="modal-box" style="max-width:1500px">
-      <div class="modal-head">
-        <span class="modal-title">🔎 Consulta de tickets — todas las columnas</span>
-        <button class="modal-close" onclick="cerrarConsultaTickets()">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="param-card">
-          <div class="param-row">
-            <input type="text" id="ct-folio" placeholder="Folio (parcial)" style="min-width:120px">
-            <label style="font-size:11px;color:var(--muted)">Desde</label>
-            <input type="date" id="ct-desde">
-            <label style="font-size:11px;color:var(--muted)">Hasta</label>
-            <input type="date" id="ct-hasta">
-            <select id="ct-tipo">
-              <option value="">Todos los tipos</option>
-              <option value="normal">Normal</option>
-              <option value="preferencial">Preferencial</option>
-              <option value="pension">Pensión</option>
-              <option value="empleado">Empleado</option>
-              <option value="perdido">Perdido</option>
-            </select>
-            <select id="ct-estatus">
-              <option value="">Todos los estatus</option>
-              <option value="abierto">Abierto</option>
-              <option value="cobrado">Cobrado</option>
-              <option value="cortesia">Cortesía</option>
-              <option value="perdido">Perdido</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-          <div class="param-row" style="margin-top:10px">
-            <input type="text" id="ct-cajero-entrada" placeholder="Cajero entrada (parcial)">
-            <input type="text" id="ct-cajero-salida" placeholder="Cajero salida (parcial)">
-            <label style="font-size:11px;color:var(--muted)">Hora entrada</label>
-            <input type="time" id="ct-hora-entrada-desde">
-            <span style="font-size:11px;color:var(--muted)">a</span>
-            <input type="time" id="ct-hora-entrada-hasta">
-            <label style="font-size:11px;color:var(--muted)">Hora salida</label>
-            <input type="time" id="ct-hora-salida-desde">
-            <span style="font-size:11px;color:var(--muted)">a</span>
-            <input type="time" id="ct-hora-salida-hasta">
-          </div>
-          <div class="param-row" style="margin-top:10px">
-            <label style="font-size:11px;color:var(--muted)">Monto</label>
-            <input type="number" id="ct-monto-desde" placeholder="Desde $" style="max-width:110px">
-            <span style="font-size:11px;color:var(--muted)">a</span>
-            <input type="number" id="ct-monto-hasta" placeholder="Hasta $" style="max-width:110px">
-            <button class="param-btn" onclick="buscarTicketsConsulta()">🔍 Buscar</button>
-            <button class="param-btn outline" onclick="limpiarFiltrosConsulta()">Limpiar filtros</button>
-            <button class="param-btn outline" onclick="exportarTicketsCSV()">⬇ Exportar CSV</button>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--muted);font-weight:700" id="ct-count">—</div>
-        <div id="ct-tabla"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- ══ MODAL: GESTIÓN MANUAL DE TICKETS ══ -->
   <div class="modal-overlay" id="modal-gestion-manual">
@@ -1042,6 +942,41 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       <div id="detalle-mov-adm-contenido" style="font-size:13px;line-height:1.9"></div>
     </div>
   </div>
+</div>
+
+<!-- ══ TAB BITÁCORA: registro de auditoría (login/cobro/cierre/relevo/arqueo)
+     — antes era un modal colgado del ☰ Menú, ahora es una pestaña más del
+     tablero para que el admin la consulte igual de rápido que Movimientos. ══ -->
+<div class="tab-section" id="tab-bitacora">
+  <div class="param-card">
+    <div class="param-row">
+      <label style="font-size:11px;color:var(--muted)">Desde</label>
+      <input type="date" id="bit-desde">
+      <label style="font-size:11px;color:var(--muted)">Hasta</label>
+      <input type="date" id="bit-hasta">
+      <label style="font-size:11px;color:var(--muted)">Hora desde</label>
+      <input type="time" id="bit-hora-desde">
+      <label style="font-size:11px;color:var(--muted)">Hora hasta</label>
+      <input type="time" id="bit-hora-hasta">
+    </div>
+    <div class="param-row" style="margin-top:10px">
+      <input type="text" id="bit-usuario" placeholder="Usuario (nombre o usuario)">
+      <select id="bit-accion">
+        <option value="">Todas las acciones</option>
+        <option value="login">Login</option>
+        <option value="cobro">Cobro</option>
+        <option value="cancelacion">Cancelación</option>
+        <option value="arqueo">Arqueo</option>
+        <option value="relevo">Relevo</option>
+        <option value="cierre_dia">Cierre de día</option>
+        <option value="reimpresion_comprobante">Reimpresión comprobante</option>
+      </select>
+      <button class="param-btn" onclick="buscarBitacora()">🔍 Buscar</button>
+      <button class="param-btn outline" onclick="exportarBitacoraCSV()">⬇ Exportar CSV</button>
+    </div>
+  </div>
+  <div style="font-size:12px;color:var(--muted);font-weight:700;margin-top:10px" id="bitacora-count">—</div>
+  <div id="bitacora-tabla"></div>
 </div>
 
 <!-- ══ TAB DEMANDA (embebida — carga perezosa la primera vez que se abre) ══ -->
@@ -1876,20 +1811,7 @@ function fmtFechaHoraMX(iso) {
     hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
   });
 }
-function abrirBitacora() {
-  document.getElementById('modal-bitacora').classList.add('open');
-  const hoy = fmtLocal(new Date());
-  document.getElementById('bit-desde').value = hoy;
-  document.getElementById('bit-hasta').value = hoy;
-  document.getElementById('bit-hora-desde').value = '';
-  document.getElementById('bit-hora-hasta').value = '';
-  document.getElementById('bit-usuario').value = '';
-  document.getElementById('bit-accion').value = '';
-  buscarBitacora();
-}
-function cerrarBitacora() {
-  document.getElementById('modal-bitacora').classList.remove('open');
-}
+let BIT_ADM_INICIADO = false;
 async function buscarBitacora() {
   const cont = document.getElementById('bitacora-tabla');
   cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Cargando…</div>';
@@ -1969,120 +1891,6 @@ function exportarBitacoraCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'IwolPark_bitacora_'+fmtLocal(new Date())+'.csv';
-  a.click();
-  showToast('CSV exportado · '+rows.length+' registros');
-}
-
-// ══ CONSULTA DE TICKETS (todas las columnas de la tabla, con filtros) ══
-let CT_ACTUAL = [];
-const CT_COLUMNAS = [
-  {k:'id', h:'ID'}, {k:'folio', h:'Folio'}, {k:'tipo', h:'Tipo'}, {k:'estatus', h:'Estatus'},
-  {k:'cajero', h:'Cajero'}, {k:'cajero_entrada', h:'Cajero entrada'}, {k:'cajero_salida', h:'Cajero salida'},
-  {k:'turno_id', h:'Turno'}, {k:'hora_entrada_at', h:'Entrada (registro)'}, {k:'hora_salida_at', h:'Salida (registro)'},
-  {k:'hora_entrada', h:'Hora entrada'}, {k:'hora_salida', h:'Hora salida'},
-  {k:'minutos_estancia', h:'Min. estancia'}, {k:'horas_cobradas', h:'Hrs cobradas'}, {k:'tarifa', h:'Tarifa'},
-  {k:'penalizacion', h:'Penalización'}, {k:'importe', h:'Importe'}, {k:'franja', h:'Franja'},
-  {k:'fecha_op', h:'Fecha op'}, {k:'dia_semana', h:'Día'}, {k:'mes', h:'Mes'}, {k:'anio', h:'Año'},
-  {k:'plaza', h:'Plaza'}, {k:'created_at', h:'Creado'}
-];
-const ESTATUS_COLOR_CT = {abierto:'#0A66C222', cobrado:'#0D945722', cortesia:'#88888822', perdido:'#D9302522', cancelado:'#D9302522'};
-const ESTATUS_COLOR_TXT_CT = {abierto:'#0A66C2', cobrado:'#0D9457', cortesia:'#666', perdido:'#D93025', cancelado:'#D93025'};
-
-function abrirConsultaTickets() {
-  document.getElementById('modal-consulta-tickets').classList.add('open');
-  const hoy = fmtLocal(new Date());
-  document.getElementById('ct-desde').value = hoy;
-  document.getElementById('ct-hasta').value = hoy;
-  buscarTicketsConsulta();
-}
-function cerrarConsultaTickets() {
-  document.getElementById('modal-consulta-tickets').classList.remove('open');
-}
-function limpiarFiltrosConsulta() {
-  ['ct-folio','ct-cajero-entrada','ct-cajero-salida','ct-hora-entrada-desde','ct-hora-entrada-hasta',
-   'ct-hora-salida-desde','ct-hora-salida-hasta','ct-monto-desde','ct-monto-hasta'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('ct-tipo').value = '';
-  document.getElementById('ct-estatus').value = '';
-  const hoy = fmtLocal(new Date());
-  document.getElementById('ct-desde').value = hoy;
-  document.getElementById('ct-hasta').value = hoy;
-  buscarTicketsConsulta();
-}
-async function buscarTicketsConsulta() {
-  const cont = document.getElementById('ct-tabla');
-  cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Cargando…</div>';
-  try {
-    const folio = document.getElementById('ct-folio').value.trim();
-    const desde = document.getElementById('ct-desde').value;
-    const hasta = document.getElementById('ct-hasta').value;
-    const tipo = document.getElementById('ct-tipo').value;
-    const estatus = document.getElementById('ct-estatus').value;
-    const cajeroEntrada = document.getElementById('ct-cajero-entrada').value.trim();
-    const cajeroSalida = document.getElementById('ct-cajero-salida').value.trim();
-    const horaEntDesde = document.getElementById('ct-hora-entrada-desde').value;
-    const horaEntHasta = document.getElementById('ct-hora-entrada-hasta').value;
-    const horaSalDesde = document.getElementById('ct-hora-salida-desde').value;
-    const horaSalHasta = document.getElementById('ct-hora-salida-hasta').value;
-    const montoDesde = document.getElementById('ct-monto-desde').value;
-    const montoHasta = document.getElementById('ct-monto-hasta').value;
-
-    let query = 'order=created_at.desc';
-    if (folio) query += `&folio=ilike.*${encodeURIComponent(folio)}*`;
-    if (desde) query += `&fecha_op=gte.${desde}`;
-    if (hasta) query += `&fecha_op=lte.${hasta}`;
-    if (tipo) query += `&tipo=eq.${tipo}`;
-    if (estatus) query += `&estatus=eq.${estatus}`;
-    if (cajeroEntrada) query += `&cajero_entrada=ilike.*${encodeURIComponent(cajeroEntrada)}*`;
-    if (cajeroSalida) query += `&cajero_salida=ilike.*${encodeURIComponent(cajeroSalida)}*`;
-    if (horaEntDesde) query += `&hora_entrada=gte.${horaEntDesde}`;
-    if (horaEntHasta) query += `&hora_entrada=lte.${horaEntHasta}`;
-    if (horaSalDesde) query += `&hora_salida=gte.${horaSalDesde}`;
-    if (horaSalHasta) query += `&hora_salida=lte.${horaSalHasta}`;
-    if (montoDesde) query += `&importe=gte.${montoDesde}`;
-    if (montoHasta) query += `&importe=lte.${montoHasta}`;
-
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const rows = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 3000);
-    CT_ACTUAL = rows;
-    renderTablaTicketsCompleta(rows);
-  } catch (e) {
-    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">No se pudo cargar</div>';
-  }
-}
-function fmtCeldaTicket(campo, v) {
-  if (v==null || v==='') return '—';
-  if (campo==='hora_entrada_at' || campo==='hora_salida_at' || campo==='created_at') return fmtFechaHoraMX(v);
-  if (campo==='importe' || campo==='tarifa' || campo==='penalizacion') return fmt$(Number(v));
-  if (campo==='estatus') return `<span class="badge" style="background:${ESTATUS_COLOR_CT[v]||'#88888822'};color:${ESTATUS_COLOR_TXT_CT[v]||'#666'}">${escHtmlAttr(v)}</span>`;
-  return escHtmlAttr(v);
-}
-function renderTablaTicketsCompleta(rows) {
-  document.getElementById('ct-count').textContent = rows.length+' registro'+(rows.length===1?'':'s')+(rows.length>=3000?' (límite alcanzado, afina el filtro)':'');
-  const cont = document.getElementById('ct-tabla');
-  if (!rows.length) {
-    cont.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Sin resultados para el filtro seleccionado</div>';
-    return;
-  }
-  cont.innerHTML = `<div class="tabla-wrap"><table style="font-size:11px">
-    <thead><tr>${CT_COLUMNAS.map(c=>`<th style="white-space:nowrap">${c.h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r=>`<tr>${CT_COLUMNAS.map(c=>`<td style="white-space:nowrap">${fmtCeldaTicket(c.k, r[c.k])}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table></div>`;
-}
-function exportarTicketsCSV() {
-  const rows = CT_ACTUAL;
-  if (!rows.length) { showToast('No hay registros para exportar'); return; }
-  const header = CT_COLUMNAS.map(c=>c.h).join(',');
-  const lines = rows.map(r => CT_COLUMNAS.map(c => {
-    const v = r[c.k];
-    if (v==null) return '';
-    if (c.k==='hora_entrada_at'||c.k==='hora_salida_at'||c.k==='created_at') return fmtFechaHoraMX(v);
-    return v;
-  }).map(csvEscapeBitacora).join(','));
-  const csv = '\uFEFF' + [header,...lines].join('\n');
-  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'IwolPark_tickets_'+fmtLocal(new Date())+'.csv';
   a.click();
   showToast('CSV exportado · '+rows.length+' registros');
 }
@@ -2834,6 +2642,13 @@ function showTab(id, el) {
     document.getElementById('filtro-desde-mov').value = hoy;
     document.getElementById('filtro-hasta-mov').value = hoy;
     actualizarMovimientosAdmin();
+  }
+  if (id === 'bitacora' && !BIT_ADM_INICIADO) {
+    BIT_ADM_INICIADO = true;
+    const hoy = fmtLocal(new Date());
+    document.getElementById('bit-desde').value = hoy;
+    document.getElementById('bit-hasta').value = hoy;
+    buscarBitacora();
   }
 }
 
