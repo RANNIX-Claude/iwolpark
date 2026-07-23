@@ -37,7 +37,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 
 /* HEATMAP */
 .heatmap-wrap{overflow-x:auto;margin-top:8px}
-.heatmap{display:grid;grid-template-columns:64px repeat(18,1fr);gap:2px;min-width:560px}
+.heatmap{display:grid;grid-template-columns:64px repeat(18,1fr) 56px;gap:2px;min-width:560px}
 .hm-cell{border-radius:4px;height:30px;display:flex;align-items:center;
           justify-content:center;font-size:9px;font-weight:700;cursor:pointer;
           transition:transform .1s;position:relative}
@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v146</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v147</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -179,39 +179,6 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
     <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
-  <!-- Bloque avanzado: se oculta en la copia embebida de Corporativo (solo
-       resumen ejecutivo) pero se mantiene completo en la de Admin. -->
-  <div id="bloque-avanzado">
-
-  <!-- CURVAS -->
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title">⏰ Demanda promedio por hora</div>
-      <div class="card-sub">Azul=05-10 · Morado=10-17 · Dorado=17-22</div>
-      <div class="bar-chart" id="bars-hora"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">📅 Demanda por día de semana</div>
-      <div class="card-sub">Rojo=fin de semana · Azul=entre semana</div>
-      <div class="bar-chart" id="bars-dia"></div>
-    </div>
-  </div>
-
-  <!-- FRANJAS -->
-  <div class="card">
-    <div class="card-title">🌅 Análisis por franja horaria</div>
-    <div class="card-sub">05:00–10:00 · 10:00–17:00 · 17:00–22:00</div>
-    <div class="grid3" id="franjas-detail" style="margin-top:10px"></div>
-  </div>
-
-  <!-- INSIGHTS -->
-  <div class="card" style="background:linear-gradient(135deg,#F3F0FF,#EFF6FF);border-color:var(--purple)">
-    <div class="card-title" style="color:var(--purple)">💡 Insights automáticos</div>
-    <div class="card-sub">Basado en los patrones del período seleccionado</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px" id="insights"></div>
-  </div>
-
-  </div>
 
 </div>
 
@@ -548,12 +515,6 @@ function construirDemanda(tickets, metrica) {
   return data;
 }
 
-function getMax() {
-  let m=0;
-  DIAS.forEach(d=>HORAS.forEach(h=>{if(DEMANDA[d][h]>m)m=DEMANDA[d][h];}));
-  return m;
-}
-
 function heatColor(val,max) {
   const p=val/max;
   if(p<0.15) return {bg:'#F3F0FF',text:'#9B8EC4'};
@@ -572,13 +533,8 @@ async function render() {
   TICKETS_RAW = tickets;
   DEMANDA = construirDemanda(tickets, METRICA);
 
-  const max = getMax();
   renderKPIs();
   renderHeatmap();
-  renderBarsHora(max);
-  renderBarsDia(max);
-  renderFranjas();
-  renderInsights();
   renderSemanaWidgets();
 }
 
@@ -622,8 +578,17 @@ function renderHeatmap() {
   document.getElementById('heatmap-sub').textContent = METRICA==='ingresos'
     ? 'Cada celda = promedio de $ cobrado. Oscuro = mayor monto. Clic para ver detalle.'
     : 'Cada celda = promedio de autos. Oscuro = alta demanda. Clic para ver detalle.';
+  // Totales: suma de los promedios mostrados en la cuadrícula, por fila
+  // (día) y por columna (hora), más el gran total en la esquina — mismo
+  // criterio en ambos sentidos para que fila y columna cuadren entre sí.
+  const totalFila = dia => HORAS_HEATMAP.reduce((s,h)=>s+DEMANDA[dia][h],0);
+  const totalColumna = h => DIAS.reduce((s,dia)=>s+DEMANDA[dia][h],0);
+  const granTotal = DIAS.reduce((s,dia)=>s+totalFila(dia),0);
+  const totalCellStyle = 'font-weight:800;background:#F0EEF8;color:#4B2D7F';
+
   let html='<div class="hm-cell"></div>';
   HORAS_HEATMAP.forEach(h=>{html+=`<div class="hm-header">${h}</div>`;});
+  html+=`<div class="hm-header" style="font-weight:800">Total</div>`;
   DIAS.forEach(dia=>{
     html+=`<div class="hm-label">${dia}</div>`;
     HORAS_HEATMAP.forEach(h=>{
@@ -635,93 +600,21 @@ function renderHeatmap() {
         onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal(val)} (${fr})')"
         onmouseleave="ht()">${val>4?Math.round(val):''}</div>`;
     });
+    html+=`<div class="hm-cell" style="${totalCellStyle}"
+      onmouseenter="tt(event,'${dia} · total ${fmtVal(totalFila(dia))}')" onmouseleave="ht()">${Math.round(totalFila(dia))}</div>`;
   });
+  html+=`<div class="hm-label" style="font-weight:800">Total</div>`;
+  HORAS_HEATMAP.forEach(h=>{
+    html+=`<div class="hm-cell" style="${totalCellStyle}"
+      onmouseenter="tt(event,'${h}:00 · total ${fmtVal(totalColumna(h))}')" onmouseleave="ht()">${Math.round(totalColumna(h))}</div>`;
+  });
+  html+=`<div class="hm-cell" style="${totalCellStyle}"
+    onmouseenter="tt(event,'Total general: ${fmtVal(granTotal)}')" onmouseleave="ht()">${Math.round(granTotal)}</div>`;
   el.innerHTML=html;
   // Leyenda
   document.getElementById('legend-bar').innerHTML=
     ['#F3F0FF','#C7B8E8','#9B7FD4','#7B5EA7','#4B2D7F']
     .map(c=>`<div class="leg-cell" style="background:${c}"></div>`).join('');
-}
-
-function renderBarsHora(max) {
-  const prom=HORAS.map(h=>{
-    const s=DIAS.reduce((a,d)=>a+DEMANDA[d][h],0);
-    return Math.round(s/DIAS.length);
-  });
-  const mx=Math.max(...prom);
-  const col=h=>franjaDeHoraDem(h).color;
-  document.getElementById('bars-hora').innerHTML=prom.map((v,h)=>`
-    <div class="bar-col" onmouseenter="tt(event,'${h}:00 → prom. ${fmtVal(v)}')" onmouseleave="ht()">
-      <div class="bar-val">${h%4===0?v:''}</div>
-      <div class="bar-fill" style="background:${col(h)};height:${v/mx*100}%"></div>
-      <div class="bar-label">${h%4===0?h+'h':''}</div>
-    </div>`).join('');
-}
-
-function renderBarsDia(max) {
-  const prom=DIAS.map(dia=>{
-    const s=HORAS.reduce((a,h)=>a+DEMANDA[dia][h],0);
-    return Math.round(s/HORAS.length);
-  });
-  const mx=Math.max(...prom);
-  const cols=['#0A66C2','#0A66C2','#0A66C2','#0A66C2','#0A66C2','#D93025','#D93025'];
-  document.getElementById('bars-dia').innerHTML=prom.map((v,i)=>`
-    <div class="bar-col" onmouseenter="tt(event,'${DIAS[i]} → prom. ${fmtVal(v)}/hora')" onmouseleave="ht()">
-      <div class="bar-val">${v}</div>
-      <div class="bar-fill" style="background:${cols[i]};height:${v/mx*100}%"></div>
-      <div class="bar-label" style="color:${cols[i]};font-size:10px;transform:none">${DIAS[i]}</div>
-    </div>`).join('');
-}
-
-function renderFranjas() {
-  const iconos=['🌅','☀','🌇'];
-  const franjas=FRANJAS_DEM.map((f,i)=>({n:iconos[i]+' '+f.label,h:f.horas,c:f.color,bg:f.bg}));
-  document.getElementById('franjas-detail').innerHTML=franjas.map(f=>{
-    const vals=[];
-    DIAS.forEach(d=>f.h.forEach(h=>vals.push(DEMANDA[d][h])));
-    const prom=vals.reduce((s,v)=>s+v,0)/vals.length;
-    const pico=Math.max(...vals);
-    const pct=METRICA==='ingresos' ? null : Math.round(prom/40*100);
-    return `<div class="franja-card" style="background:${f.bg}">
-      <div style="font-size:13px;font-weight:800;color:${f.c};margin-bottom:10px">${f.n}</div>
-      <div class="franja-pct" style="color:${f.c}">${pct!==null?pct+'%':fmtVal(prom)}</div>
-      <div style="font-size:11px;color:var(--muted)">${pct!==null?'ocupación promedio':'ingreso promedio/hora'}</div>
-      <div class="franja-bar-bg">
-        <div class="franja-bar-fill" style="width:${pct!==null?pct:Math.round(prom/(Math.max(pico,1))*100)}%;background:${f.c}"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
-        <div style="background:#fff;border-radius:6px;padding:6px;text-align:center">
-          <div style="font-size:16px;font-weight:900;color:${f.c}">${fmtVal(prom)}</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">${METRICA==='ingresos'?'Prom ingreso':'Prom autos'}</div>
-        </div>
-        <div style="background:#fff;border-radius:6px;padding:6px;text-align:center">
-          <div style="font-size:16px;font-weight:900;color:${f.c}">${fmtVal(pico)}</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase">Pico</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderInsights() {
-  const promHora=HORAS.map(h=>({h,v:Math.round(DIAS.reduce((s,d)=>s+DEMANDA[d][h],0)/DIAS.length)}))
-    .sort((a,b)=>b.v-a.v);
-  const topH=promHora.slice(0,3).map(x=>x.h+':00').join(', ');
-  const bajH=promHora.slice(-3).map(x=>x.h+':00').join(', ');
-  const fsP=Math.round(['Sáb','Dom'].map(d=>HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)/24)
-    .reduce((s,v)=>s+v,0)/2);
-  const wsP=Math.round(['Lun','Mar','Mié','Jue','Vie'].map(d=>HORAS.reduce((s,h)=>s+DEMANDA[d][h],0)/24)
-    .reduce((s,v)=>s+v,0)/5);
-  const dif=Math.round((fsP-wsP)/wsP*100);
-  document.getElementById('insights').innerHTML=[
-    {ico:'🔥',txt:`Las horas de mayor demanda son <strong>${topH}</strong>. Reforzar operación en esos horarios.`,c:'#FEE2E2'},
-    {ico:'😴',txt:`Baja demanda en <strong>${bajH}</strong>. Oportunidad para mantenimiento o descanso.`,c:'#DCFCE7'},
-    {ico:'📅',txt:`Fin de semana tiene <strong>${dif>0?'+':''}${dif}%</strong> ${dif>0?'más':'menos'} ${METRICA==='ingresos'?'ingresos':'autos'} que entre semana (${fmtVal(fsP)} vs ${fmtVal(wsP)} prom/hora).`,c:'#EFF6FF'},
-    {ico:'📈',txt:`El <strong>vespertino</strong> concentra la mayor demanda en fin de semana. Horario crítico de atención.`,c:'#F3F0FF'},
-  ].map(i=>`<div class="insight" style="background:${i.c}">
-    <span class="insight-ico">${i.ico}</span>
-    <span>${i.txt}</span>
-  </div>`).join('');
 }
 
 function tt(e,txt) {
@@ -730,13 +623,6 @@ function tt(e,txt) {
   t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-36)+'px';
 }
 function ht(){document.getElementById('tooltip').style.display='none';}
-
-// La copia embebida en Corporativo (oficina central) es un resumen
-// ejecutivo — las tarjetas de curvas/franjas/insights son detalle
-// operativo que solo necesita Admin, se ocultan vía ?embed=corporativo.
-if (new URLSearchParams(location.search).get('embed') === 'corporativo') {
-  document.getElementById('bloque-avanzado').style.display = 'none';
-}
 
 render();
 setInterval(render, 60000);

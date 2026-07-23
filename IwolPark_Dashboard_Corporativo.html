@@ -183,7 +183,7 @@ tr:hover td{background:#FAFAFE;cursor:pointer}
     <span id="nav-usuario" style="font-size:12px;color:var(--purple);font-weight:700"></span>
     <span class="nav-user">Oficina Central</span>
     <span class="nav-clock" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v146</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v147</span>
     <button onclick="window.print()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer;margin-left:8px">🖨 Imprimir</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid #444;border-radius:6px;padding:5px 12px;font-size:11px;color:#ccc;cursor:pointer">Cerrar sesión</button>
   </div>
@@ -521,11 +521,9 @@ function showTab(id, el) {
   if(id==='admin')     renderAdminTab();
   if(id==='ejecutivo') renderEjecutivo();
   if(id==='demanda') {
-    // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña.
-    // ?embed=corporativo oculta las tarjetas de detalle operativo (curvas/franjas/insights),
-    // que en Oficina Central solo aportan ruido — ese nivel de detalle es para Admin.
+    // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
     const ifr = document.getElementById('iframe-demanda');
-    if (!ifr.src) ifr.src = 'IwolPark_Demanda.html?embed=corporativo';
+    if (!ifr.src) ifr.src = 'IwolPark_Demanda.html';
   }
 }
 
