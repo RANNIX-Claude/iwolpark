@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v149</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v150</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -154,8 +154,8 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <!-- KPIs RÁPIDOS -->
   <div class="grid3" id="kpis-rapidos"></div>
 
-  <!-- SEMANAL: evolución vs LW + desglose ticket -->
-  <div class="grid2">
+  <!-- SEMANAL: evolución vs LW + desglose ticket + histórico mensual -->
+  <div class="grid3">
     <div class="card">
       <div class="card-title">📈 Evolución por día (esta semana vs semana pasada)</div>
       <div class="card-sub">Azul=esta semana · Dorado=semana pasada (LW)</div>
@@ -165,6 +165,14 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
       <div class="card-title">🎫 Desglose Ticket — esta semana</div>
       <div class="card-sub">Lunes a hoy</div>
       <div id="desglose-semana" style="display:flex;flex-direction:column;gap:10px;margin-top:8px"></div>
+    </div>
+    <!-- HISTÓRICO MENSUAL: tabla de hechos (historico_mensual) — años previos
+         al sistema capturados a mano + meses ya cerrados calculados solos +
+         el mes en curso, que se recalcula en vivo cada vez que se abre. -->
+    <div class="card">
+      <div class="card-title">📊 Evolución mensual</div>
+      <div class="card-sub" id="historico-sub">Cargando…</div>
+      <div id="tabla-historico-mensual" style="overflow-x:auto;margin-top:8px"></div>
     </div>
   </div>
 
@@ -177,15 +185,6 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
       </div>
     </div>
     <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
-  </div>
-
-  <!-- HISTÓRICO MENSUAL: tabla de hechos (historico_mensual) — años previos
-       al sistema capturados a mano + meses ya cerrados calculados solos +
-       el mes en curso, que se recalcula en vivo cada vez que se abre. -->
-  <div class="card">
-    <div class="card-title">📊 Evolución mensual</div>
-    <div class="card-sub" id="historico-sub">Cargando…</div>
-    <div id="tabla-historico-mensual" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
 </div>
