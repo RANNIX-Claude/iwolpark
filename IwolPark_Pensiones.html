@@ -125,7 +125,7 @@ tr:hover td{background:#FAFAFE}
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <button class="btn-nav" style="background:none;border:1px solid #444" onclick="window.print()">🖨 Imprimir</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v142</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v143</span>
   </div>
 </nav>
 
@@ -188,13 +188,18 @@ tr:hover td{background:#FAFAFE}
 <!-- ══ COBRANZA ══ -->
 <div class="tab-section" id="tab-cobranza">
   <div class="card">
-    <div class="card-title">Cobranza del mes — <span id="mes-actual"></span></div>
-    <div class="card-sub">Comprobantes por validar y pagos pendientes</div>
-    
-    <!-- Por validar (prioridad) -->
-    <div style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div>
+        <div class="card-title">Cobranza del mes — <span id="mes-actual"></span></div>
+        <div class="card-sub">Cartera generada, pagos pendientes y al corriente</div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="generarCarteraDelMes()">📋 Generar cartera del mes</button>
+    </div>
+
+    <!-- Sin cargo generado -->
+    <div style="margin-bottom:16px;margin-top:16px">
       <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px">
-        ⏳ Por validar comprobante
+        ⏳ Sin cargo generado este mes
       </div>
       <div id="lista-por-validar"></div>
     </div>
@@ -375,15 +380,12 @@ tr:hover td{background:#FAFAFE}
   </div>
 </div>
 
-<!-- MODAL VALIDAR PAGO -->
-<div class="modal-overlay" id="modal-validar">
+<!-- MODAL HISTORIAL DE PAGOS (por pensión) -->
+<div class="modal-overlay" id="modal-historial">
   <div class="modal">
-    <div class="modal-title">Validar pago de pensión</div>
-    <div id="validar-content"></div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-danger" onclick="rechazarPago()">✕ Rechazar</button>
-      <button class="btn btn-success" style="flex:1" onclick="validarPago()">✓ Confirmar — Pago validado</button>
-    </div>
+    <div class="modal-title" id="historial-titulo">Historial de pagos</div>
+    <div id="historial-content"></div>
+    <button class="btn btn-outline" style="margin-top:16px;width:100%" onclick="cerrarModal('modal-historial')">Cerrar</button>
   </div>
 </div>
 
@@ -454,10 +456,70 @@ function fmtLocal(d) {
   return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
 }
 
-// Estado real ('activo'|'suspendido'|'cancelado') → semáforo de la UI.
-// No hay todavía seguimiento real de pagos (pagos_pension no está conectado),
-// así que el semáforo refleja solo el estado de la pensión, no el día de pago.
-const ESTADO_A_SEMAFORO = { activo:'al_corriente', suspendido:'por_vencer', cancelado:'vencido' };
+// ══ CARTERA / COBRANZA MENSUAL (pagos_pension) ══
+// Cada pensión activa debe tener, cada mes, un cargo en pagos_pension
+// (periodo_mes/periodo_año) con fecha_limite = día DIAS_GRACIA_PENSION del
+// mes. Mientras no venza esa fecha y no esté "validado", se ve "por
+// vencer"; si vence sin haberse marcado como pagado, pasa a "vencido" y la
+// pensión misma se suspende automáticamente (revisarVencidosYSuspender) —
+// un admin puede darle más días desde "Extender plazo" o registrar el
+// pago directo, lo que reactiva la pensión.
+const DIAS_GRACIA_PENSION = 10;
+
+function periodoActual() {
+  const hoy = new Date();
+  return { mes: hoy.getMonth()+1, anio: hoy.getFullYear() };
+}
+function fechaLimitePeriodo(mes, anio) {
+  return fmtLocal(new Date(anio, mes-1, DIAS_GRACIA_PENSION));
+}
+
+let PAGOS_MES_ACTUAL = new Map(); // pension_id -> fila de pagos_pension del período actual
+
+async function cargarPagosMesActual() {
+  const {mes, anio} = periodoActual();
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension?periodo_mes=eq.${mes}&periodo_año=eq.${anio}&select=*`, { headers: SB_HEADERS });
+    const rows = r.ok ? await r.json() : [];
+    PAGOS_MES_ACTUAL = new Map(rows.map(p => [p.pension_id, p]));
+  } catch (e) { PAGOS_MES_ACTUAL = new Map(); }
+}
+
+// Semáforo real: se basa en el cargo del mes actual (o en pensiones.estado
+// si ya está suspendida/cancelada), no solo en el estado de la pensión.
+function calcularSemaforo(p) {
+  if (p.estado === 'cancelado') return 'inactiva';
+  if (p.estado === 'suspendido') return 'vencido';
+  const pago = PAGOS_MES_ACTUAL.get(p.id);
+  if (!pago) return 'por_vencer'; // todavía no se genera la cartera de este mes
+  if (pago.estado === 'validado') return 'al_corriente';
+  const hoy = fmtLocal(new Date());
+  if (pago.fecha_limite && pago.fecha_limite < hoy) return 'vencido';
+  return 'por_vencer';
+}
+
+// Corre cada vez que se cargan los pensionados: cualquier cargo pendiente
+// cuya fecha_limite ya pasó suspende la pensión sola, sin que un admin
+// tenga que revisarlo uno por uno.
+async function revisarVencidosYSuspender() {
+  const hoy = fmtLocal(new Date());
+  const aSuspender = PENSIONADOS.filter(p => {
+    if (p.estado !== 'activo') return false;
+    const pago = PAGOS_MES_ACTUAL.get(p.id);
+    return pago && pago.estado !== 'validado' && pago.fecha_limite && pago.fecha_limite < hoy;
+  });
+  if (!aSuspender.length) return;
+  for (const p of aSuspender) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${p.id}`, {
+        method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ estado: 'suspendido' })
+      });
+      p.estado = 'suspendido';
+      p.semaforo = calcularSemaforo(p);
+    } catch (e) {}
+  }
+  showToast(`⚠ ${aSuspender.length} pensión(es) suspendida(s) automáticamente por falta de pago`);
+}
 
 let PENSIONADOS = [];
 
@@ -468,39 +530,40 @@ async function cargarPensionados() {
     });
     if (!r.ok) { showToast('⚠ Sin conexión a Supabase · mostrando vacío'); PENSIONADOS = []; return; }
     const rows = await r.json();
-    PENSIONADOS = rows.map(p => ({
-      id: p.pension_id,
-      cliente_id: p.clientes?.cliente_id || null,
-      vehiculo_id: p.vehiculos?.vehiculo_id || null,
-      nombre: p.clientes?.nombre || '—',
-      numero_local: p.clientes?.numero_local || '',
-      tel: p.clientes?.telefono || '',
-      wa: p.clientes?.whatsapp || '',
-      email: p.clientes?.email || '',
-      placas: p.vehiculos?.placas || '—',
-      marca: p.vehiculos?.marca || '',
-      modelo: p.vehiculos?.modelo || '',
-      anio: p.vehiculos?.anio || '',
-      color: p.vehiculos?.color || '',
-      tipo: p.tipo,
-      monto: Number(p.monto_mensual) || 0,
-      dia_pago: p.dia_pago,
-      inicio: p.fecha_inicio,
-      estado: p.estado,
-      semaforo: ESTADO_A_SEMAFORO[p.estado] || 'inactiva',
-      ultimo_pago: '—',
-      codigo_acceso: p.codigo_acceso
-    }));
+    await cargarPagosMesActual();
+    PENSIONADOS = rows.map(p => {
+      const base = {
+        id: p.pension_id,
+        cliente_id: p.clientes?.cliente_id || null,
+        vehiculo_id: p.vehiculos?.vehiculo_id || null,
+        nombre: p.clientes?.nombre || '—',
+        numero_local: p.clientes?.numero_local || '',
+        tel: p.clientes?.telefono || '',
+        wa: p.clientes?.whatsapp || '',
+        email: p.clientes?.email || '',
+        placas: p.vehiculos?.placas || '—',
+        marca: p.vehiculos?.marca || '',
+        modelo: p.vehiculos?.modelo || '',
+        anio: p.vehiculos?.anio || '',
+        color: p.vehiculos?.color || '',
+        tipo: p.tipo,
+        monto: Number(p.monto_mensual) || 0,
+        dia_pago: p.dia_pago,
+        inicio: p.fecha_inicio,
+        estado: p.estado,
+        codigo_acceso: p.codigo_acceso
+      };
+      const pago = PAGOS_MES_ACTUAL.get(p.pension_id);
+      base.ultimo_pago = pago && pago.fecha_pago ? pago.fecha_pago : '—';
+      base.semaforo = calcularSemaforo(base);
+      return base;
+    });
+    await revisarVencidosYSuspender();
   } catch (e) {
     showToast('⚠ Sin conexión a Supabase · mostrando vacío');
     PENSIONADOS = [];
   }
 }
-
-const PAGOS_POR_VALIDAR = [
-  {pension_id:'P2',nombre:'María Soto García',placas:'ABT-123-C',monto:600,
-   referencia:'SPEI-20240705-ABC123',fecha_pago:'2026-07-04',metodo:'transferencia'},
-];
 
 const TARIFAS_HIST = [
   {concepto:'pension_24h', label:'Pensión 24h', monto:900,  desde:'2026-06-01', hasta:null,     motivo:'Ajuste tarifario 2026'},
@@ -541,7 +604,7 @@ function renderSemaforo(filtro='todos') {
   document.getElementById('cnt-total').textContent   = PENSIONADOS.length;
   const list = filtro==='todos' ? PENSIONADOS : PENSIONADOS.filter(p=>p.semaforo===filtro);
   const titulos={todos:'Todos los pensionados activos',al_corriente:'✅ Al corriente',
-                 por_vencer:'🟡 Por vencer — pagar antes del día '+list[0]?.dia_pago,
+                 por_vencer:'🟡 Por vencer — pagar antes del día '+DIAS_GRACIA_PENSION,
                  vencido:'🔴 Vencidos — requieren atención'};
   document.getElementById('semaforo-titulo').textContent = titulos[filtro]||'Pensionados';
   document.getElementById('tabla-semaforo').innerHTML = list.map(p=>`
@@ -555,7 +618,8 @@ function renderSemaforo(filtro='todos') {
       <td><strong>$${p.monto}/mes</strong><br><span style="font-size:11px;color:var(--muted)">Paga día ${p.dia_pago}</span></td>
       <td>Último: ${p.ultimo_pago}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
-        ${p.semaforo==='vencido'?`<button class="btn btn-danger btn-sm" onclick="registrarPago('${p.id}','${p.nombre}',${p.monto})">Registrar pago</button>`:''}
+        ${p.semaforo==='vencido'||p.semaforo==='por_vencer'?`<button class="btn btn-danger btn-sm" onclick="registrarPago('${p.id}','${p.nombre}',${p.monto})">✓ Ya pagó</button>`:''}
+        ${p.semaforo==='vencido'?`<button class="btn btn-outline btn-sm" onclick="extenderPlazo('${p.id}','${p.nombre}')">🕒 Extender</button>`:''}
         <button class="btn btn-outline btn-sm" onclick="verDetalle('${p.id}')">Ver</button>
         <button class="btn btn-outline btn-sm" onclick="abrirModalEditarPension('${p.id}')">Editar</button>
         <button class="btn btn-danger btn-sm" onclick="eliminarPension('${p.id}','${p.nombre}')">Eliminar</button>
@@ -569,46 +633,49 @@ function filtrarSemaforo(f) { renderSemaforo(f); }
 function renderCobranza() {
   const mes = new Date().toLocaleString('es-MX',{month:'long',year:'numeric'});
   document.getElementById('mes-actual').textContent = mes.charAt(0).toUpperCase()+mes.slice(1);
-  
-  // Por validar
-  document.getElementById('lista-por-validar').innerHTML = PAGOS_POR_VALIDAR.length
-    ? PAGOS_POR_VALIDAR.map(p=>`
-      <div class="concilia-card por-validar" onclick="abrirValidar('${p.pension_id}','${p.nombre}',${p.monto},'${p.referencia}','${p.metodo}')">
+
+  // Sin cargo generado todavía este mes — hay que correr "Generar cartera".
+  const sinCargo = PENSIONADOS.filter(p => p.estado==='activo' && !PAGOS_MES_ACTUAL.has(p.id));
+  const elSinCargo = document.getElementById('lista-por-validar');
+  if (elSinCargo) elSinCargo.innerHTML = sinCargo.length
+    ? sinCargo.map(p=>`
+      <div class="concilia-card">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1">
             <div style="font-weight:700;font-size:13px">${p.nombre}</div>
-            <div style="font-size:11px;color:var(--muted)">${p.placas} · ${p.metodo} · Ref: ${p.referencia}</div>
-            <div style="font-size:11px;color:var(--muted)">Fecha pago: ${p.fecha_pago}</div>
+            <div style="font-size:11px;color:var(--muted)">${p.placas} · $${p.monto}/mes</div>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:18px;font-weight:900;color:var(--amber)">$${p.monto}.00</div>
-            <div style="font-size:10px;color:var(--amber);font-weight:700">CLIC PARA VALIDAR</div>
-          </div>
+          <div style="font-size:11px;color:var(--muted)">Sin cargo generado</div>
         </div>
       </div>`).join('')
-    : '<div style="color:var(--muted);font-size:13px;padding:8px">Sin comprobantes por validar</div>';
+    : '<div style="color:var(--muted);font-size:13px;padding:8px">Ya está generada la cartera de este mes para todas las pensiones activas</div>';
 
-  // Pendientes
+  // Pendientes (por vencer o ya vencido)
   const pendientes = PENSIONADOS.filter(p=>p.semaforo==='vencido'||p.semaforo==='por_vencer');
-  document.getElementById('lista-pendientes').innerHTML = pendientes.map(p=>`
+  document.getElementById('lista-pendientes').innerHTML = pendientes.length
+    ? pendientes.map(p=>`
     <div class="concilia-card">
       <div style="display:flex;align-items:center;gap:10px">
         <span class="dot" style="background:${SEM_DOT[p.semaforo]}"></span>
         <div style="flex:1">
           <div style="font-weight:700;font-size:13px">${p.nombre}</div>
-          <div style="font-size:11px;color:var(--muted)">${p.placas} · Paga día ${p.dia_pago}</div>
+          <div style="font-size:11px;color:var(--muted)">${p.placas} · Límite: ${PAGOS_MES_ACTUAL.get(p.id)?.fecha_limite || '—'}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:18px;font-weight:900;color:var(--red)">$${p.monto}.00</div>
-          <button class="btn btn-outline btn-sm" onclick="registrarPago('${p.id}','${p.nombre}',${p.monto})"
-            style="margin-top:4px">Registrar pago</button>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <button class="btn btn-outline btn-sm" onclick="registrarPago('${p.id}','${p.nombre}',${p.monto})">✓ Ya pagó</button>
+            ${p.semaforo==='vencido'?`<button class="btn btn-outline btn-sm" onclick="extenderPlazo('${p.id}','${p.nombre}')">🕒 Extender</button>`:''}
+          </div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:8px">Nadie pendiente de pago este mes</div>';
 
   // Al corriente
   const corrientes = PENSIONADOS.filter(p=>p.semaforo==='al_corriente');
-  document.getElementById('lista-corriente').innerHTML = corrientes.map(p=>`
+  document.getElementById('lista-corriente').innerHTML = corrientes.length
+    ? corrientes.map(p=>`
     <div class="concilia-card" style="border-color:#BBF7D0">
       <div style="display:flex;align-items:center;gap:10px">
         <span class="dot" style="background:#16A34A"></span>
@@ -616,9 +683,33 @@ function renderCobranza() {
           <div style="font-weight:700;font-size:13px">${p.nombre}</div>
           <div style="font-size:11px;color:var(--muted)">${p.placas}</div>
         </div>
-        <div style="font-size:13px;font-weight:700;color:var(--green)">✓ Pagado</div>
+        <div style="font-size:13px;font-weight:700;color:var(--green)">✓ Pagado ${PAGOS_MES_ACTUAL.get(p.id)?.fecha_pago || ''}</div>
       </div>
-    </div>`).join('');
+    </div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:8px">Nadie al corriente todavía este mes</div>';
+}
+
+// Crea el cargo del mes actual para cada pensión activa que aún no lo
+// tenga — "generar la cartera" es explícito (botón), no automático, para
+// que el admin decida cuándo arranca el cobro de cada mes.
+async function generarCarteraDelMes() {
+  const {mes, anio} = periodoActual();
+  const fechaLimite = fechaLimitePeriodo(mes, anio);
+  const activos = PENSIONADOS.filter(p => p.estado==='activo' && !PAGOS_MES_ACTUAL.has(p.id));
+  if (!activos.length) { showToast('Ya está generada la cartera de este mes'); return; }
+  const nuevos = activos.map(p => ({
+    pension_id: p.id, periodo_mes: mes, periodo_año: anio,
+    monto_tarifa: p.monto, estado: 'pendiente', fecha_limite: fechaLimite
+  }));
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension`, {
+      method: 'POST', headers: SB_HEADERS, body: JSON.stringify(nuevos)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    showToast(`✅ Cartera generada · ${nuevos.length} cobro(s) nuevo(s), vencen el ${fechaLimite}`);
+    await cargarPensionados();
+    renderSemaforo('todos'); renderCobranza();
+  } catch (e) { showToast('⚠ No se pudo generar la cartera: ' + e.message); }
 }
 
 // ── PENSIONADOS ──
@@ -667,8 +758,6 @@ function renderTarifas() {
 }
 
 // ── MODALES ──
-let _pagoActual = null;
-
 function limpiarFormPension() {
   ['p-nombre','p-local','p-tel','p-wa','p-email','p-placas','p-color',
    'p-marca','p-modelo','p-anio','p-serie','p-notas','p-pension-id',
@@ -890,44 +979,112 @@ async function eliminarPension(id, nombre) {
   }
 }
 
-function abrirValidar(id,nombre,monto,ref,metodo) {
-  _pagoActual = {id,nombre,monto,ref,metodo};
-  document.getElementById('validar-content').innerHTML = `
-    <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px">${nombre}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-        <div><span style="color:var(--muted)">Método:</span> <strong>${metodo}</strong></div>
-        <div><span style="color:var(--muted)">Monto:</span> <strong>$${monto}.00</strong></div>
-        <div style="grid-column:span 2"><span style="color:var(--muted)">Referencia:</span> <strong>${ref}</strong></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Nota de conciliación (opcional)</label>
-      <input class="form-input" id="v-nota" placeholder="Coincide con estado de cuenta...">
-    </div>`;
-  document.getElementById('modal-validar').classList.add('open');
+// "Palomear" el pago del mes actual: no captura nada más, solo confirma
+// que ya se recibió (efectivo, entregado en persona) y lo marca validado.
+// Si la pensión estaba suspendida por falta de pago, se reactiva sola.
+async function registrarPago(id, nombre, monto) {
+  if (!confirm(`¿Confirmar que ${nombre} pagó $${monto} (efectivo) el día de hoy?`)) return;
+  const {mes, anio} = periodoActual();
+  const hoy = fmtLocal(new Date());
+  const pago = PAGOS_MES_ACTUAL.get(id);
+  try {
+    if (pago) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension?pago_id=eq.${pago.pago_id}`, {
+        method: 'PATCH', headers: SB_HEADERS,
+        body: JSON.stringify({ estado:'validado', fecha_pago:hoy, monto_pagado:monto, metodo_pago:'efectivo' })
+      });
+      if (!r.ok) throw new Error(await r.text());
+    } else {
+      // Sin cargo generado todavía este mes (no se corrió "Generar
+      // cartera") — se crea directo ya validado, para no bloquear al
+      // cajero por un paso administrativo que no le corresponde.
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension`, {
+        method: 'POST', headers: SB_HEADERS,
+        body: JSON.stringify({ pension_id:id, periodo_mes:mes, periodo_año:anio,
+          monto_tarifa:monto, monto_pagado:monto, estado:'validado', fecha_pago:hoy,
+          fecha_limite: fechaLimitePeriodo(mes,anio), metodo_pago:'efectivo' })
+      });
+      if (!r.ok) throw new Error(await r.text());
+    }
+    const p = PENSIONADOS.find(x=>x.id===id);
+    if (p && p.estado === 'suspendido') {
+      await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${id}`, {
+        method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ estado:'activo' })
+      });
+    }
+    showToast(`✅ Pago registrado · ${nombre} al corriente`);
+    await cargarPensionados();
+    renderSemaforo('todos'); renderCobranza(); renderPensionados();
+  } catch (e) { showToast('⚠ Error al registrar el pago: ' + e.message); }
 }
 
-function validarPago() {
-  cerrarModal('modal-validar');
-  showToast('✅ Pago validado · Estado cambiado a Al corriente');
-  renderCobranza();
+// Da más días de gracia al cargo del mes actual (criterio del admin) — si
+// la pensión ya estaba suspendida por esto, se reactiva al dar el plazo.
+async function extenderPlazo(id, nombre) {
+  const dias = prompt(`Extender plazo de pago de ${nombre}\n¿Cuántos días de gracia adicionales?`, '5');
+  const n = parseInt(dias, 10);
+  if (!n || n <= 0) return;
+  const pago = PAGOS_MES_ACTUAL.get(id);
+  if (!pago) { showToast('No hay un cobro generado este mes para extender'); return; }
+  const base = new Date(pago.fecha_limite+'T12:00:00');
+  base.setDate(base.getDate()+n);
+  const nuevaFecha = fmtLocal(base);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension?pago_id=eq.${pago.pago_id}`, {
+      method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ fecha_limite: nuevaFecha })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const p = PENSIONADOS.find(x=>x.id===id);
+    if (p && p.estado === 'suspendido') {
+      await fetch(`${SUPABASE_URL}/rest/v1/pensiones?pension_id=eq.${id}`, {
+        method: 'PATCH', headers: SB_HEADERS, body: JSON.stringify({ estado:'activo' })
+      });
+    }
+    showToast(`✅ Plazo extendido hasta ${nuevaFecha}`);
+    await cargarPensionados();
+    renderSemaforo('todos'); renderCobranza();
+  } catch (e) { showToast('⚠ Error al extender el plazo: ' + e.message); }
 }
 
-function rechazarPago() {
-  cerrarModal('modal-validar');
-  showToast('❌ Comprobante rechazado · Se notifica al pensionado');
-}
-
-function registrarPago(id,nombre,monto) {
-  const ref = prompt(`Registrar pago de ${nombre}\nMonto: $${monto}\n\nReferencia / número de operación:`);
-  if(ref) showToast('Pago registrado · Por validar comprobante');
-}
-
-function verDetalle(id) {
+// Historial de pagos de una pensión — para consultar los meses ya
+// pagados, no solo el estatus del mes actual.
+const MESES_NOMBRE = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+async function verDetalle(id) {
   const p = PENSIONADOS.find(x=>x.id===id);
-  if(!p) return;
-  alert(`DETALLE PENSIÓN\n${p.nombre}\n${p.placas} · ${p.marca} ${p.modelo}\nTipo: ${TIPO_LABEL[p.tipo]}\nMensualidad: $${p.monto}\nEstado: ${p.semaforo}`);
+  if (!p) return;
+  document.getElementById('historial-titulo').textContent = `Historial de pagos — ${p.nombre}`;
+  const cont = document.getElementById('historial-content');
+  cont.innerHTML = `
+    <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:14px;font-size:12px">
+      <div><strong>${p.placas}</strong> · ${p.marca} ${p.modelo} · ${TIPO_LABEL[p.tipo]}</div>
+      <div style="margin-top:4px">Mensualidad: <strong>$${p.monto}</strong> · Estado actual:
+        <span class="badge ${SEM_BADGE[p.semaforo]}">${SEM_LABEL[p.semaforo]}</span></div>
+    </div>
+    <div id="historial-tabla-wrap" style="color:var(--muted);font-size:12px;padding:8px">Cargando historial...</div>`;
+  document.getElementById('modal-historial').classList.add('open');
+  const wrap = document.getElementById('historial-tabla-wrap');
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/pagos_pension?pension_id=eq.${id}&select=*&order=periodo_año.desc,periodo_mes.desc`, { headers: SB_HEADERS });
+    const pagos = r.ok ? await r.json() : [];
+    const filas = pagos.length ? pagos.map(pg => `
+      <tr>
+        <td>${MESES_NOMBRE[pg.periodo_mes-1]} ${pg.periodo_año}</td>
+        <td>$${Number(pg.monto_tarifa).toFixed(2)}</td>
+        <td><span class="badge ${pg.estado==='validado'?'b-verde':(pg.fecha_limite && pg.fecha_limite < fmtLocal(new Date())?'b-rojo':'b-amarillo')}">${pg.estado==='validado'?'Pagado':(pg.fecha_limite && pg.fecha_limite < fmtLocal(new Date())?'Vencido':'Pendiente')}</span></td>
+        <td>${pg.fecha_pago || '—'}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">Sin cargos registrados todavía</td></tr>';
+    wrap.outerHTML = `
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr><th>Período</th><th>Monto</th><th>Estatus</th><th>Fecha de pago</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    wrap.textContent = 'No se pudo cargar el historial';
+    wrap.style.color = 'var(--red)';
+  }
 }
 
 function abrirModalNuevaTarifa() {
