@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v148</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v149</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -179,6 +179,14 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
     <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
+  <!-- HISTÓRICO MENSUAL: tabla de hechos (historico_mensual) — años previos
+       al sistema capturados a mano + meses ya cerrados calculados solos +
+       el mes en curso, que se recalcula en vivo cada vez que se abre. -->
+  <div class="card">
+    <div class="card-title">📊 Evolución mensual</div>
+    <div class="card-sub" id="historico-sub">Cargando…</div>
+    <div id="tabla-historico-mensual" style="overflow-x:auto;margin-top:8px"></div>
+  </div>
 
 </div>
 
@@ -536,6 +544,131 @@ async function render() {
   renderKPIs();
   renderHeatmap();
   renderSemanaWidgets();
+  cargarHistoricoMensual();
+}
+
+// ══ HISTÓRICO MENSUAL (tabla de hechos historico_mensual) ══
+// Combina 3 fuentes por mes: (1) años previos al sistema, capturados una
+// sola vez a mano (origen='manual', nunca se sobreescriben); (2) meses ya
+// cerrados dentro del sistema, calculados una vez desde 'tickets' y
+// guardados (origen='sistema') para no volver a sumar cada vez que se
+// abre el tablero; (3) el mes en curso, que SIEMPRE se recalcula en vivo
+// (nunca confía en el valor guardado) para que se vea "pintando" mientras
+// avanza el mes, igual que pidió el usuario.
+const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let PLAZA_ID_DEM = null;
+async function obtenerPlazaIdDem() {
+  if (PLAZA_ID_DEM) return PLAZA_ID_DEM;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id&limit=1`, { headers: SB_HEADERS });
+    const rows = r.ok ? await r.json() : [];
+    PLAZA_ID_DEM = rows[0] ? rows[0].plaza_id : null;
+  } catch (e) { PLAZA_ID_DEM = null; }
+  return PLAZA_ID_DEM;
+}
+
+// Suma real de 'tickets' para un mes calendario específico (excluye
+// cancelados, igual que el resto del tablero) — solo se usa para meses que
+// todavía no tienen renglón guardado, o para el mes en curso.
+async function calcularMesDesdeTickets(anio, mes) {
+  const desde = `${anio}-${String(mes).padStart(2,'0')}-01`;
+  const ultimoDia = new Date(anio, mes, 0).getDate();
+  const hasta = `${anio}-${String(mes).padStart(2,'0')}-${String(ultimoDia).padStart(2,'0')}`;
+  const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=importe,estatus`;
+  const rows = await fetchPaginado(base, SB_HEADERS, 20000);
+  const validos = rows.filter(t => t.estatus !== 'cancelado');
+  const monto = validos.reduce((s,t) => s + (Number(t.importe)||0), 0);
+  return { monto, tickets: validos.length };
+}
+
+async function cargarHistoricoMensual() {
+  const cont = document.getElementById('tabla-historico-mensual');
+  const sub = document.getElementById('historico-sub');
+  const plazaId = await obtenerPlazaIdDem();
+  if (!plazaId) { sub.textContent = 'No se pudo determinar la plaza'; return; }
+
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear(), mesActual = hoy.getMonth()+1;
+  const anioAnterior = anioActual - 1;
+  sub.textContent = `${anioAnterior} vs ${anioActual} · importe cobrado por mes`;
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?plaza_id=eq.${plazaId}&anio=in.(${anioAnterior},${anioActual})&select=anio,mes,monto_total,origen`, { headers: SB_HEADERS });
+    const filas = r.ok ? await r.json() : [];
+    const mapa = {}; // mapa[anio][mes] = {monto, origen}
+    filas.forEach(f => { (mapa[f.anio] = mapa[f.anio]||{})[f.mes] = { monto: Number(f.monto_total)||0, origen: f.origen }; });
+
+    // Completa meses del sistema que aún no tienen renglón guardado (nunca
+    // pisa un renglón 'manual') — solo hasta el mes actual de cada año.
+    const porGuardar = [];
+    for (const anio of [anioAnterior, anioActual]) {
+      const tope = anio === anioActual ? mesActual : 12;
+      for (let mes = 1; mes <= tope; mes++) {
+        const existente = mapa[anio] && mapa[anio][mes];
+        const esMesActual = anio === anioActual && mes === mesActual;
+        if (existente && !esMesActual) continue; // ya guardado (manual o sistema) y cerrado
+        const { monto, tickets } = await calcularMesDesdeTickets(anio, mes);
+        (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
+        // El mes en curso no se congela: se muestra en vivo pero solo se
+        // guarda si ya hay algo que guardar (evita renglones en 0 vacíos).
+        if (tickets > 0 || esMesActual) {
+          porGuardar.push({ plaza_id: plazaId, anio, mes, monto_total: monto, tickets_totales: tickets, origen: 'sistema', actualizado_en: new Date().toISOString() });
+        }
+      }
+    }
+    if (porGuardar.length) {
+      fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?on_conflict=plaza_id,anio,mes`, {
+        method: 'POST',
+        headers: { ...SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(porGuardar)
+      }).catch(()=>{});
+    }
+
+    renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual);
+  } catch (e) {
+    cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No se pudo cargar el histórico</div>';
+  }
+}
+
+function renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual) {
+  const val = (anio, mes) => (mapa[anio] && mapa[anio][mes]) ? mapa[anio][mes].monto : 0;
+  const filas = MESES_NOMBRE.map((nombre, i) => {
+    const mes = i+1;
+    const anterior = val(anioAnterior, mes);
+    const actual = mapa[anioActual] && mapa[anioActual][mes] ? val(anioActual, mes) : null; // null = aún no llega ese mes
+    return { mes, nombre, anterior, actual };
+  });
+  const totalAnterior = filas.reduce((s,f)=>s+f.anterior, 0);
+  const totalActual = filas.reduce((s,f)=>s+(f.actual||0), 0);
+  const varPct = (actual, anterior) => {
+    if (actual == null) return null;
+    if (!anterior) return null;
+    return (actual - anterior) / anterior * 100;
+  };
+  const fmtVar = v => v == null ? '—' : `${v>0?'+':''}${v.toFixed(1)}%`;
+  const colorVar = v => v == null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)');
+  const filaHtml = (label, anterior, actual, vPct, esTotal, destacar) => `
+    <tr style="${esTotal?'border-top:2px solid var(--border);font-weight:900':'border-bottom:1px solid var(--border)'}${destacar?';background:#F3F0FF':''}">
+      <td style="padding:7px">${label}</td>
+      <td style="padding:7px;text-align:right">${fmtMoney(anterior)}</td>
+      <td style="padding:7px;text-align:right">${actual==null?'—':fmtMoney(actual)}</td>
+      <td style="padding:7px;text-align:right;font-weight:800;color:${colorVar(vPct)}">${fmtVar(vPct)}</td>
+    </tr>`;
+  const cuerpo = filas.map(f => filaHtml(
+    f.nombre + (f.mes===mesActual ? ' (en curso)' : ''),
+    f.anterior, f.actual, varPct(f.actual, f.anterior), false, f.mes===mesActual
+  )).join('');
+  const totalRow = filaHtml('Total general', totalAnterior, totalActual, varPct(totalActual, totalAnterior), true, false);
+  document.getElementById('tabla-historico-mensual').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:7px">Mes</th>
+        <th style="text-align:right;padding:7px">${anioAnterior}</th>
+        <th style="text-align:right;padding:7px">${anioActual}</th>
+        <th style="text-align:right;padding:7px">Var %</th>
+      </tr></thead>
+      <tbody>${cuerpo}${totalRow}</tbody>
+    </table>`;
 }
 
 function renderKPIs() {
