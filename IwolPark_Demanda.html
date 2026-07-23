@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v150</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v151</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -170,7 +170,11 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
          al sistema capturados a mano + meses ya cerrados calculados solos +
          el mes en curso, que se recalcula en vivo cada vez que se abre. -->
     <div class="card">
-      <div class="card-title">📊 Evolución mensual</div>
+      <div class="card-title" style="display:flex;align-items:center;gap:6px">
+        📊 Evolución mensual
+        <button onclick="abrirEditorHistorico()" title="Corregir un valor histórico capturado a mano"
+          style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️ Editar</button>
+      </div>
       <div class="card-sub" id="historico-sub">Cargando…</div>
       <div id="tabla-historico-mensual" style="overflow-x:auto;margin-top:8px"></div>
     </div>
@@ -187,6 +191,26 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
     <div id="tabla-cajero-dia" style="overflow-x:auto;margin-top:8px"></div>
   </div>
 
+</div>
+
+<!-- EDITOR DE HISTÓRICO MENSUAL: corrección manual por si un valor
+     capturado (típicamente años previos al sistema) tuvo un error de dedo. -->
+<div class="drill-panel" id="modal-editar-historico" onclick="if(event.target===this) cerrarEditorHistorico()">
+  <div class="drill-box" style="max-width:420px">
+    <div class="drill-head">
+      <span class="drill-title">✏️ Editar histórico mensual</span>
+      <button class="drill-close" onclick="cerrarEditorHistorico()">✕</button>
+    </div>
+    <div class="drill-body">
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <label style="font-size:12px;color:var(--muted)">Año</label>
+        <select id="edit-hist-anio" onchange="cargarEditorHistoricoAnio()"
+          style="padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:13px"></select>
+      </div>
+      <div id="edit-hist-meses" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button class="btn" style="margin-top:14px;width:100%" onclick="guardarEditorHistorico()">💾 Guardar</button>
+    </div>
+  </div>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -668,6 +692,63 @@ function renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual) {
       </tr></thead>
       <tbody>${cuerpo}${totalRow}</tbody>
     </table>`;
+}
+
+// ══ EDITOR DE HISTÓRICO MENSUAL ══ — corrección manual (ej. error de dedo
+// al capturar un año previo al sistema). Guardar siempre marca origen
+// 'manual', así el recálculo automático nunca lo vuelve a pisar.
+function abrirEditorHistorico() {
+  const sel = document.getElementById('edit-hist-anio');
+  const hoy = new Date().getFullYear();
+  sel.innerHTML = '';
+  for (let a = hoy; a >= hoy - 5; a--) sel.innerHTML += `<option value="${a}">${a}</option>`;
+  sel.value = hoy - 1;
+  document.getElementById('modal-editar-historico').classList.add('open');
+  cargarEditorHistoricoAnio();
+}
+function cerrarEditorHistorico() {
+  document.getElementById('modal-editar-historico').classList.remove('open');
+}
+async function cargarEditorHistoricoAnio() {
+  const anio = document.getElementById('edit-hist-anio').value;
+  const plazaId = await obtenerPlazaIdDem();
+  const cont = document.getElementById('edit-hist-meses');
+  cont.innerHTML = 'Cargando…';
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?plaza_id=eq.${plazaId}&anio=eq.${anio}&select=mes,monto_total`, { headers: SB_HEADERS });
+  const rows = r.ok ? await r.json() : [];
+  const valores = {};
+  rows.forEach(row => valores[row.mes] = row.monto_total);
+  cont.innerHTML = MESES_NOMBRE.map((nombre,i) => {
+    const mes = i+1;
+    return `<label style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px">
+      <span style="width:90px">${nombre}</span>
+      <input type="number" step="0.01" id="edit-hist-mes-${mes}" value="${valores[mes]!=null?valores[mes]:''}" placeholder="0"
+        style="flex:1;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;text-align:right">
+    </label>`;
+  }).join('');
+}
+async function guardarEditorHistorico() {
+  const anio = parseInt(document.getElementById('edit-hist-anio').value);
+  const plazaId = await obtenerPlazaIdDem();
+  const filas = [];
+  for (let mes = 1; mes <= 12; mes++) {
+    const el = document.getElementById(`edit-hist-mes-${mes}`);
+    const val = el.value.trim();
+    if (val === '') continue;
+    filas.push({ plaza_id: plazaId, anio, mes, monto_total: Number(val), tickets_totales: 0, origen: 'manual', actualizado_en: new Date().toISOString() });
+  }
+  if (!filas.length) { cerrarEditorHistorico(); return; }
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?on_conflict=plaza_id,anio,mes`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(filas)
+    });
+    cerrarEditorHistorico();
+    cargarHistoricoMensual();
+  } catch (e) {
+    alert('No se pudo guardar el histórico');
+  }
 }
 
 function renderKPIs() {
