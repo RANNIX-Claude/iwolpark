@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v143</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v144</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -294,6 +294,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 <div class="tabs">
   <div class="tab active" onclick="showTabModo('seguimiento',this)">📊 Seguimiento</div>
   <div class="tab" onclick="showTabModo('historico',this)">📁 Histórico</div>
+  <div class="tab" onclick="showTab('movimientos',this)">🔎 Movimientos</div>
   <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
 </div>
 
@@ -856,6 +857,179 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   </div>
 
 </div><!-- /tab-section dashboard -->
+
+<!-- ══ TAB MOVIMIENTOS: copia del buscador de la caseta, pero sin límite a
+     "hoy" — el administrador recibe quejas/preguntas de cualquier día y
+     necesita localizar el movimiento rápido con todos los filtros. ══ -->
+<div class="tab-section" id="tab-movimientos">
+
+  <div class="filtros" style="margin-bottom:10px">
+    <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Rango</label>
+    <input type="date" id="filtro-desde-mov">
+    <input type="date" id="filtro-hasta-mov">
+    <button class="btn-filtro" onclick="actualizarMovimientosAdmin()">↻ Buscar</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="mov-fuente-adm"></span>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <input id="filtro-folio-mov" type="text" placeholder="🔍 Folio entrada" oninput="refrescarMovimientosAdmin()"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px;width:130px" />
+    <select id="filtro-tipo-mov" onchange="refrescarMovimientosAdmin()"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
+      <option value="todos">Todos los movimientos</option>
+      <option value="entrada">Entradas normales</option>
+      <option value="preferencial">Entradas preferenciales</option>
+      <option value="salida">Cobros</option>
+      <option value="perdido">Boletos perdidos</option>
+      <option value="cortesia">Cortesías</option>
+      <option value="empleado">Empleados</option>
+      <option value="pension">Pensión</option>
+    </select>
+    <select id="filtro-franja-mov" onchange="refrescarMovimientosAdmin()"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
+      <option value="todas">Todas las franjas</option>
+      <option value="f1">05:00–10:00</option>
+      <option value="f2">10:00–17:00</option>
+      <option value="f3">17:00–22:00</option>
+    </select>
+    <select id="filtro-estatus-mov" onchange="refrescarMovimientosAdmin()"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
+      <option value="todos">Todos los estatus</option>
+      <option value="abierto">Abierto</option>
+      <option value="cerrados">Cerrados (pagados)</option>
+      <option value="cobrado">Cobrado</option>
+      <option value="perdido">Perdido</option>
+      <option value="cortesia">Cortesía</option>
+    </select>
+    <select id="orden-mov-adm" onchange="refrescarMovimientosAdmin()"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
+      <option value="reciente">Más reciente primero</option>
+      <option value="folio">Ordenar por folio</option>
+      <option value="estatus">Ordenar por estatus</option>
+      <option value="tipo">Ordenar por tipo</option>
+      <option value="hora_entrada">Ordenar por hora de entrada</option>
+      <option value="hora_salida">Ordenar por hora de salida</option>
+      <option value="monto">Ordenar por monto (mayor primero)</option>
+      <option value="cajero_entrada">Ordenar por cajero que recibe</option>
+      <option value="cajero_salida">Ordenar por cajero que cobra</option>
+      <option value="empleado">Ordenar por empleado</option>
+      <option value="pension">Ordenar por pensionado</option>
+    </select>
+    <button onclick="toggleFiltrosAvanzadosMovAdmin()" id="btn-toggle-filtros-avanzados-adm"
+      style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:13px;background:#F3F0FF;color:var(--accent);cursor:pointer;font-weight:700">▾ Más filtros</button>
+    <button onclick="limpiarFiltrosMovimientosAdmin()" title="Regresa todos los filtros a su valor por default"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 12px;font-size:13px;background:#fff;color:var(--muted);cursor:pointer;font-weight:700">✕ Limpiar filtros</button>
+  </div>
+
+  <div id="mov-filtros-avanzados-adm" style="display:none;flex-direction:column;gap:8px;padding:8px 0;border-top:1px dashed var(--border);margin-bottom:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;width:100%">Folios y cajeros</span>
+      <input id="filtro-folio-salida-mov" type="text" placeholder="🔍 Folio salida" oninput="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:130px" />
+      <select id="filtro-cajero-entrada-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Cajero que recibe: todos</option>
+      </select>
+      <select id="filtro-cajero-salida-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Cajero que cobra: todos</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;width:100%">Horarios</span>
+      <label style="font-size:12px;color:var(--muted)">Entrada desde
+        <input id="filtro-hora-entrada-desde-mov" type="time" onchange="refrescarMovimientosAdmin()" style="border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px"></label>
+      <label style="font-size:12px;color:var(--muted)">hasta
+        <input id="filtro-hora-entrada-hasta-mov" type="time" onchange="refrescarMovimientosAdmin()" style="border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px"></label>
+      <label style="font-size:12px;color:var(--muted)">Salida desde
+        <input id="filtro-hora-salida-desde-mov" type="time" onchange="refrescarMovimientosAdmin()" style="border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px"></label>
+      <label style="font-size:12px;color:var(--muted)">hasta
+        <input id="filtro-hora-salida-hasta-mov" type="time" onchange="refrescarMovimientosAdmin()" style="border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px"></label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;width:100%">Empleados</span>
+      <select id="filtro-empleado-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Todos los empleados</option>
+      </select>
+      <input id="filtro-empleado-buscar-mov" type="text" placeholder="🔍 Buscar empleado" oninput="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:150px" />
+      <select id="filtro-empleado-area-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Todas las áreas</option>
+      </select>
+      <select id="filtro-empleado-puesto-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Todos los puestos</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;width:100%">Pensiones</span>
+      <select id="filtro-pension-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Todas las pensiones</option>
+      </select>
+      <input id="filtro-pension-id-mov" type="text" placeholder="🔍 Pension ID" oninput="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:130px" />
+      <input id="filtro-pension-cliente-mov" type="text" placeholder="🔍 Cliente" oninput="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:130px" />
+      <select id="filtro-pension-tipo-mov" onchange="refrescarMovimientosAdmin()"
+        style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+        <option value="todos">Todos los tipos</option>
+        <option value="dia">Día</option>
+        <option value="noche">Noche</option>
+        <option value="24h">24 horas</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="mov-resumen-adm" style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 0;font-size:12px"></div>
+
+  <div class="chart-card" style="overflow:auto">
+    <div style="min-width:1550px">
+      <div id="mov-header-adm" style="display:grid;grid-template-columns:22px 100px 100px 85px minmax(160px,1fr) 100px 100px 80px 70px 70px 90px 90px 90px 75px 80px;
+           gap:8px;padding:6px 14px;background:var(--bg);border-radius:6px;
+           font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;position:sticky;top:0">
+        <span></span>
+        <span>Folio entrada</span>
+        <span>Folio salida</span>
+        <span>Tipo</span>
+        <span>Descripción</span>
+        <span>Empleado</span>
+        <span>Pensionado</span>
+        <span>Tipo pensión</span>
+        <span style="text-align:center">Hora entrada</span>
+        <span style="text-align:center">Hora salida</span>
+        <span style="text-align:center">Estancia</span>
+        <span>Cajero entrada</span>
+        <span>Cajero salida</span>
+        <span style="text-align:right">Importe</span>
+        <span>Estatus</span>
+      </div>
+      <div id="mov-lista-adm"></div>
+    </div>
+  </div>
+
+  <div style="padding:14px 0;display:flex;justify-content:flex-end">
+    <button onclick="exportarMovimientosAdminCSV()" style="background:var(--accent);
+            color:#fff;border:none;border-radius:8px;padding:9px 20px;
+            font-size:13px;font-weight:700;cursor:pointer">⬇ Exportar CSV</button>
+  </div>
+
+</div>
+
+<!-- MODAL DETALLE DE MOVIMIENTO (tab Movimientos de Admin) -->
+<div class="modal-overlay" id="modal-detalle-movimiento-adm">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-head">
+      <span class="modal-title">📄 Detalle del movimiento</span>
+      <button class="modal-close" onclick="document.getElementById('modal-detalle-movimiento-adm').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="detalle-mov-adm-contenido" style="font-size:13px;line-height:1.9"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ TAB DEMANDA (embebida — carga perezosa la primera vez que se abre) ══ -->
 <div class="tab-section" id="tab-demanda">
@@ -1777,7 +1951,7 @@ function exportarBitacoraCSV() {
   const lines = rows.map(r => [
     r.id, fmtFechaHoraMX(r.created_at), r.usuario||'', r.accion||'', r.detalle?JSON.stringify(r.detalle):'', r.plaza_id||''
   ].map(csvEscapeBitacora).join(','));
-  const csv = '﻿' + [header,...lines].join('\n');
+  const csv = '\uFEFF' + [header,...lines].join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1891,7 +2065,7 @@ function exportarTicketsCSV() {
     if (c.k==='hora_entrada_at'||c.k==='hora_salida_at'||c.k==='created_at') return fmtFechaHoraMX(v);
     return v;
   }).map(csvEscapeBitacora).join(','));
-  const csv = '﻿' + [header,...lines].join('\n');
+  const csv = '\uFEFF' + [header,...lines].join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2187,6 +2361,413 @@ function cerrarParametros() {
   document.getElementById('modal-parametros').classList.remove('open');
 }
 
+// ══ TAB MOVIMIENTOS: buscador de soporte para el administrador — misma
+// lógica de filtros/columnas que el modal de Movimientos de la caseta
+// (IwolPark_TABLET.html), pero consultando un RANGO de fechas en vez de
+// limitarse al día en curso, porque el admin necesita localizar folios de
+// cualquier día para atender quejas/incidencias. ══
+let MOV_ADM_INICIADO = false;
+let MOVS_ACTUALES_ADM = [];
+let MOV_FILTRADOS_ADM = [];
+
+function _repoblarSelect(sel, opciones, defaultLabel) {
+  if (!sel) return;
+  const actual = sel.value;
+  sel.innerHTML = `<option value="todos">${defaultLabel}</option>` +
+    opciones.map(([valor, label]) => `<option value="${valor}">${label}</option>`).join('');
+  if (opciones.some(([v]) => v === actual)) sel.value = actual;
+}
+
+function formatEstancia(mins) {
+  if (mins == null) return '—';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h}hr ${String(m).padStart(2,'0')}min` : `${m}min`;
+}
+
+function tipoLocalDesdeFolioAdm(folio) {
+  if (folio.startsWith('PEN-')) return 'pension';
+  if (folio.startsWith('EMP-')) return 'empleado';
+  if (folio.startsWith('COR-')) return 'cortesia';
+  return null;
+}
+
+function _camposComunesTicketAdm(t) {
+  return {
+    folio_entrada: t.folio,
+    folio_salida: t.folio_salida || null,
+    cajero_entrada: t.cajero_entrada || t.cajero || '—',
+    cajero_salida: t.cajero_salida || (t.estatus !== 'abierto' ? (t.cajero || '—') : '—'),
+    fecha_op: t.fecha_op || '—',
+    hora_entrada_col: t.hora_entrada || '—',
+    hora_salida_col: t.hora_salida || (t.estatus === 'abierto' ? '—' : (t.hora_salida||'—')),
+    minutos_estancia: t.minutos_estancia != null ? t.minutos_estancia : null,
+    estatus: t.estatus || '—',
+    turno_id: t.turno_id || null,
+    tarifa: t.tarifa || 0,
+    empleado: t.empleados ? {
+      id: t.empleado_id, nombre: t.empleados.nombre_completo,
+      puesto: t.empleados.puesto || '—', area: t.empleados.area || '—'
+    } : null,
+    pension: t.pensiones ? {
+      id: t.pension_id,
+      cliente: (t.pensiones.clientes && t.pensiones.clientes.nombre) || '—',
+      tipo: t.pensiones.tipo || '—',
+      estatus: t.pensiones.estado || '—',
+      vehiculo: t.pensiones.vehiculos
+        ? `${t.pensiones.vehiculos.marca||''} ${t.pensiones.vehiculos.modelo||''} · ${t.pensiones.vehiculos.placas||''}`.trim()
+        : '—'
+    } : null,
+  };
+}
+
+function ticketsAMovimientosAdm(rows) {
+  return rows.map(t => {
+    const hrs = t.horas_cobradas || 0;
+    const comunes = _camposComunesTicketAdm(t);
+    const especial = tipoLocalDesdeFolioAdm(t.folio);
+    if (especial) {
+      const nombres = {pension:'Pensión', empleado:'Empleado', cortesia:'Cortesía'};
+      return { tipo: especial, folio: t.folio, desc: nombres[especial],
+        importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
+    }
+    if (t.estatus === 'abierto') {
+      const esPref = t.tipo === 'preferencial';
+      return { tipo: esPref ? 'preferencial' : 'entrada', folio: t.folio,
+        desc: esPref ? '★ Preferencial' : 'Entrada normal', importe: '—', hora: t.hora_entrada, ...comunes };
+    }
+    if (t.estatus === 'perdido') {
+      return { tipo: 'perdido', folio: t.folio, desc: `Perdido · ${hrs}hr`,
+        importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
+    }
+    if (t.estatus === 'cortesia') {
+      return { tipo: 'cortesia', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+        importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
+    }
+    return { tipo: 'salida', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+      importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
+  });
+}
+
+async function cargarMovimientosDBAdmin() {
+  const desde = document.getElementById('filtro-desde-mov').value || fmtLocal(new Date());
+  const hasta = document.getElementById('filtro-hasta-mov').value || fmtLocal(new Date());
+  try {
+    const select = 'select=*,empleados(nombre_completo,puesto,area),' +
+      'pensiones(tipo,estado,clientes(nombre),vehiculos(placas,marca,modelo))';
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&${select}&order=created_at.desc`;
+    const rows = await fetchPaginado(base, SB_HEADERS_PARAM, 10000);
+    return ticketsAMovimientosAdm(rows);
+  } catch (e) {
+    return null;
+  }
+}
+
+function poblarFiltrosMovimientosAdmin(movs) {
+  const cajerosEntrada = [...new Set(movs.map(m => m.cajero_entrada).filter(c => c && c !== '—'))].sort();
+  const cajerosSalida  = [...new Set(movs.map(m => m.cajero_salida).filter(c => c && c !== '—'))].sort();
+  _repoblarSelect(document.getElementById('filtro-cajero-entrada-mov'), cajerosEntrada.map(c => [c, c]), 'Cajero que recibe: todos');
+  _repoblarSelect(document.getElementById('filtro-cajero-salida-mov'), cajerosSalida.map(c => [c, c]), 'Cajero que cobra: todos');
+
+  const empleados = [...new Map(movs.filter(m => m.empleado).map(m => [m.empleado.nombre, m.empleado])).values()];
+  _repoblarSelect(document.getElementById('filtro-empleado-mov'), empleados.map(e => [e.nombre, e.nombre]).sort((a,b)=>a[1].localeCompare(b[1])), 'Todos los empleados');
+  const areas = [...new Set(empleados.map(e => e.area).filter(a => a && a !== '—'))].sort();
+  _repoblarSelect(document.getElementById('filtro-empleado-area-mov'), areas.map(a => [a, a]), 'Todas las áreas');
+  const puestos = [...new Set(empleados.map(e => e.puesto).filter(p => p && p !== '—'))].sort();
+  _repoblarSelect(document.getElementById('filtro-empleado-puesto-mov'), puestos.map(p => [p, p]), 'Todos los puestos');
+
+  const pensionesMap = new Map();
+  movs.filter(m => m.pension).forEach(m => { if (!pensionesMap.has(m.pension.id)) pensionesMap.set(m.pension.id, m.pension); });
+  _repoblarSelect(document.getElementById('filtro-pension-mov'),
+    [...pensionesMap.entries()]
+      .map(([id, p]) => [id, `${p.cliente} · ${id.slice(0,8)}`])
+      .sort((a,b) => a[1].localeCompare(b[1])),
+    'Todas las pensiones');
+}
+
+async function actualizarMovimientosAdmin() {
+  const badge = document.getElementById('mov-fuente-adm');
+  if (badge) { badge.textContent = 'Consultando base de datos…'; badge.style.color = 'var(--muted)'; }
+  const desdeDB = await cargarMovimientosDBAdmin();
+  MOVS_ACTUALES_ADM = desdeDB || [];
+  if (badge) {
+    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos en el rango`; badge.style.color = 'var(--green)'; }
+    else { badge.textContent = '○ No se pudo consultar'; badge.style.color = 'var(--red)'; }
+  }
+  poblarFiltrosMovimientosAdmin(MOVS_ACTUALES_ADM);
+  refrescarMovimientosAdmin();
+}
+
+function limpiarFiltrosMovimientosAdmin() {
+  document.getElementById('filtro-folio-mov').value = '';
+  document.getElementById('filtro-tipo-mov').value = 'todos';
+  document.getElementById('filtro-franja-mov').value = 'todas';
+  document.getElementById('filtro-estatus-mov').value = 'todos';
+  document.getElementById('orden-mov-adm').value = 'reciente';
+  document.getElementById('filtro-folio-salida-mov').value = '';
+  document.getElementById('filtro-cajero-entrada-mov').value = 'todos';
+  document.getElementById('filtro-cajero-salida-mov').value = 'todos';
+  document.getElementById('filtro-hora-entrada-desde-mov').value = '';
+  document.getElementById('filtro-hora-entrada-hasta-mov').value = '';
+  document.getElementById('filtro-hora-salida-desde-mov').value = '';
+  document.getElementById('filtro-hora-salida-hasta-mov').value = '';
+  document.getElementById('filtro-empleado-mov').value = 'todos';
+  document.getElementById('filtro-empleado-buscar-mov').value = '';
+  document.getElementById('filtro-empleado-area-mov').value = 'todos';
+  document.getElementById('filtro-empleado-puesto-mov').value = 'todos';
+  document.getElementById('filtro-pension-mov').value = 'todos';
+  document.getElementById('filtro-pension-id-mov').value = '';
+  document.getElementById('filtro-pension-cliente-mov').value = '';
+  document.getElementById('filtro-pension-tipo-mov').value = 'todos';
+  refrescarMovimientosAdmin();
+}
+
+function toggleFiltrosAvanzadosMovAdmin() {
+  const cont = document.getElementById('mov-filtros-avanzados-adm');
+  const btn = document.getElementById('btn-toggle-filtros-avanzados-adm');
+  const abierto = cont.style.display !== 'none';
+  cont.style.display = abierto ? 'none' : 'flex';
+  btn.textContent = abierto ? '▾ Más filtros' : '▴ Menos filtros';
+}
+
+function refrescarMovimientosAdmin() {
+  renderMovimientosAdminTab(MOVS_ACTUALES_ADM);
+}
+
+function renderMovimientosAdminTab(movs) {
+  const colorMap = {entrada:'#0A66C2',preferencial:'#7B5EA7',salida:'#0D9457',perdido:'#D93025',cortesia:'#4A4A4A',empleado:'#1D3557',pension:'#0D9457'};
+  const iconMap  = {entrada:'⬇',preferencial:'★',salida:'⬆',perdido:'⚠',cortesia:'🎁',empleado:'🪪',pension:'🅿️'};
+  const tipoLabel = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+                     salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesía',
+                     empleado:'Empleado',pension:'Pensión'};
+
+  const filtro       = document.getElementById('filtro-tipo-mov').value;
+  const franja       = document.getElementById('filtro-franja-mov').value;
+  const folioQuery   = document.getElementById('filtro-folio-mov').value;
+  const orden        = document.getElementById('orden-mov-adm').value;
+  const estatus      = document.getElementById('filtro-estatus-mov').value;
+  const folioSalidaQ = document.getElementById('filtro-folio-salida-mov').value;
+  const cajEntrada   = document.getElementById('filtro-cajero-entrada-mov').value;
+  const cajSalida    = document.getElementById('filtro-cajero-salida-mov').value;
+  const hEntDesde    = document.getElementById('filtro-hora-entrada-desde-mov').value;
+  const hEntHasta    = document.getElementById('filtro-hora-entrada-hasta-mov').value;
+  const hSalDesde    = document.getElementById('filtro-hora-salida-desde-mov').value;
+  const hSalHasta    = document.getElementById('filtro-hora-salida-hasta-mov').value;
+  const empSel       = document.getElementById('filtro-empleado-mov').value;
+  const empBuscar    = document.getElementById('filtro-empleado-buscar-mov').value.trim().toLowerCase();
+  const empArea      = document.getElementById('filtro-empleado-area-mov').value;
+  const empPuesto    = document.getElementById('filtro-empleado-puesto-mov').value;
+  const penSel       = document.getElementById('filtro-pension-mov').value;
+  const penIdBuscar  = document.getElementById('filtro-pension-id-mov').value.trim().toLowerCase();
+  const penCliente   = document.getElementById('filtro-pension-cliente-mov').value.trim().toLowerCase();
+  const penTipo      = document.getElementById('filtro-pension-tipo-mov').value;
+
+  let filtrados = movs.filter(m => {
+    if (filtro !== 'todos' && m.tipo !== filtro) return false;
+    if (folioQuery && !(m.folio_entrada||'').toLowerCase().includes(folioQuery.trim().toLowerCase())) return false;
+    if (folioSalidaQ && !(m.folio_salida||'').toLowerCase().includes(folioSalidaQ.trim().toLowerCase())) return false;
+    if (franja !== 'todas') {
+      const h = parseInt((m.hora||'00').split(':')[0]);
+      const f = FRANJAS_ADMIN.find(f => f.key === franja);
+      if (f && !f.test(h)) return false;
+    }
+    if (cajEntrada !== 'todos' && m.cajero_entrada !== cajEntrada) return false;
+    if (cajSalida !== 'todos' && m.cajero_salida !== cajSalida) return false;
+    if (estatus === 'cerrados') { if (m.estatus === 'abierto') return false; }
+    else if (estatus !== 'todos' && m.estatus !== estatus) return false;
+    if (hEntDesde && (m.hora_entrada_col||'') < hEntDesde) return false;
+    if (hEntHasta && (m.hora_entrada_col||'') > hEntHasta) return false;
+    if (hSalDesde && (m.hora_salida_col||'') < hSalDesde) return false;
+    if (hSalHasta && (m.hora_salida_col||'') > hSalHasta) return false;
+    if (empSel !== 'todos' && (!m.empleado || m.empleado.nombre !== empSel)) return false;
+    if (empBuscar && (!m.empleado || !m.empleado.nombre.toLowerCase().includes(empBuscar))) return false;
+    if (empArea !== 'todos' && (!m.empleado || m.empleado.area !== empArea)) return false;
+    if (empPuesto !== 'todos' && (!m.empleado || m.empleado.puesto !== empPuesto)) return false;
+    if (penSel !== 'todos' && (!m.pension || m.pension.id !== penSel)) return false;
+    if (penIdBuscar && (!m.pension || !m.pension.id.toLowerCase().includes(penIdBuscar))) return false;
+    if (penCliente && (!m.pension || !m.pension.cliente.toLowerCase().includes(penCliente))) return false;
+    if (penTipo !== 'todos' && (!m.pension || m.pension.tipo !== penTipo)) return false;
+    return true;
+  });
+
+  const ordenadores = {
+    folio: (a,b) => (a.folio_entrada||'').localeCompare(b.folio_entrada||'', undefined, {numeric:true}),
+    estatus: (a,b) => (a.estatus||'').localeCompare(b.estatus||''),
+    tipo: (a,b) => (a.tipo||'').localeCompare(b.tipo||''),
+    hora_entrada: (a,b) => (a.hora_entrada_col||'').localeCompare(b.hora_entrada_col||''),
+    hora_salida: (a,b) => (a.hora_salida_col||'').localeCompare(b.hora_salida_col||''),
+    monto: (a,b) => {
+      const na = a.importe && a.importe !== '—' ? parseFloat(String(a.importe).replace('$','')) || 0 : 0;
+      const nb = b.importe && b.importe !== '—' ? parseFloat(String(b.importe).replace('$','')) || 0 : 0;
+      return nb - na;
+    },
+    cajero_entrada: (a,b) => (a.cajero_entrada||'').localeCompare(b.cajero_entrada||''),
+    cajero_salida: (a,b) => (a.cajero_salida||'').localeCompare(b.cajero_salida||''),
+    empleado: (a,b) => ((a.empleado&&a.empleado.nombre)||'').localeCompare((b.empleado&&b.empleado.nombre)||''),
+    pension: (a,b) => ((a.pension&&a.pension.cliente)||'').localeCompare((b.pension&&b.pension.cliente)||''),
+  };
+  if (ordenadores[orden]) {
+    filtrados = [...filtrados].sort(ordenadores[orden]);
+  }
+
+  MOV_FILTRADOS_ADM = filtrados;
+  const lista = document.getElementById('mov-lista-adm');
+  if (!filtrados.length) {
+    lista.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:14px">Sin movimientos en el rango/filtros seleccionados</div>';
+    renderResumenMovimientosAdmin([]);
+    return;
+  }
+
+  const estatusLabel = {abierto:'Abierto', cobrado:'Cobrado', perdido:'Perdido', cortesia:'Cortesía'};
+
+  lista.innerHTML = filtrados.map(m => {
+    const color  = colorMap[m.tipo] || '#888';
+    const icon   = iconMap[m.tipo]  || '·';
+    const label  = tipoLabel[m.tipo] || m.tipo;
+    const imp    = m.importe && m.importe !== '—' ? m.importe : '$0.00';
+    const impCol = m.tipo === 'cortesia' ? '#888' : 'var(--accent)';
+    const desc   = m.tipo === 'perdido'
+      ? (m.desc || 'Boleto perdido')
+      : m.tipo === 'cortesia'
+      ? 'Menos de 15 min'
+      : m.desc || label;
+    const estTxt = estatusLabel[m.estatus] || m.estatus || '—';
+    const cobro = m.estatus !== 'abierto' ? (m.cajero_salida || m.cajero_entrada || '—') : '—';
+    return `<div onclick="abrirDetalleMovimientoAdmin('${(m.folio_entrada||'').replace(/'/g,"\\'")}')"
+         style="display:grid;grid-template-columns:22px 100px 100px 85px minmax(160px,1fr) 100px 100px 80px 70px 70px 90px 90px 90px 75px 80px;gap:8px;
+         padding:9px 14px;border-bottom:1px solid #F0EEF8;align-items:center;font-size:13px;cursor:pointer" onmouseover="this.style.background='#FAFAFF'" onmouseout="this.style.background=''">
+      <span style="color:${color};font-size:15px">${icon}</span>
+      <span style="font-family:monospace;font-weight:700;color:${color}">${m.folio_entrada}</span>
+      <span style="font-family:monospace;font-size:12px;color:#888">${m.folio_salida||'—'}</span>
+      <span style="color:#555;font-size:12px">${label}</span>
+      <span style="color:#555;font-size:12px">${desc}</span>
+      <span style="color:#1D3557;font-size:12px">${m.empleado ? m.empleado.nombre : '—'}</span>
+      <span style="color:#0D9457;font-size:12px">${m.pension ? m.pension.cliente : '—'}</span>
+      <span style="color:#888;font-size:12px">${m.pension ? m.pension.tipo : '—'}</span>
+      <span style="color:#999;font-size:12px;text-align:center">${m.hora_entrada_col||'—'}</span>
+      <span style="color:#999;font-size:12px;text-align:center">${m.hora_salida_col||'—'}</span>
+      <span style="color:#999;font-size:12px;text-align:center">${formatEstancia(m.minutos_estancia)}</span>
+      <span style="color:#555;font-size:12px">${m.cajero_entrada||'—'}</span>
+      <span style="color:#0D9457;font-size:12px;font-weight:700">${cobro}</span>
+      <span style="text-align:right;font-weight:700;color:${impCol}">${imp}</span>
+      <span style="color:#555;font-size:12px">${estTxt}</span>
+    </div>`;
+  }).join('');
+
+  renderResumenMovimientosAdmin(filtrados);
+}
+
+function abrirDetalleMovimientoAdmin(folioEntrada) {
+  const m = MOV_FILTRADOS_ADM.find(x => x.folio_entrada === folioEntrada);
+  if (!m) return;
+  const metodoLabel = {entrada:'Caseta · Entrada normal',preferencial:'Caseta · Entrada preferencial',
+    empleado:'Caseta · Empleado',pension:'Caseta · Pensión',cortesia:'Caseta · Cortesía',
+    perdido:'Caseta · Boleto perdido',salida:'Caseta · Cobro'};
+  const fila = (label, valor) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0">
+      <span style="color:var(--muted)">${label}</span><span style="font-weight:700;text-align:right">${valor}</span></div>`;
+  const seccion = (titulo) => `<div style="font-weight:900;font-size:14px;margin:14px 0 6px;color:var(--accent)">${titulo}</div>`;
+
+  let html = seccion('Información general') +
+    fila('Folio de entrada', m.folio_entrada) +
+    fila('Folio de salida', m.folio_salida || '—') +
+    fila('Descripción', m.desc || '—') +
+    fila('Estatus', m.estatus || '—') +
+    fila('Importe', m.importe && m.importe !== '—' ? m.importe : '$0.00') +
+    fila('Fecha', m.fecha_op || '—');
+
+  html += seccion('Entrada') +
+    fila('Fecha y hora', (m.fecha_op||'—') + ' ' + (m.hora_entrada_col||'—')) +
+    fila('Cajero de entrada', m.cajero_entrada || '—') +
+    fila('Tarifa aplicada', '$' + Number(m.tarifa||0).toFixed(2)) +
+    fila('Método de registro', metodoLabel[m.tipo] || m.tipo || '—');
+
+  html += seccion('Salida') +
+    fila('Fecha y hora', m.hora_salida_col && m.hora_salida_col !== '—' ? (m.fecha_op||'—') + ' ' + m.hora_salida_col : '—') +
+    fila('Cajero de salida', m.estatus !== 'abierto' ? (m.cajero_salida || '—') : '—') +
+    fila('Tiempo de estancia', formatEstancia(m.minutos_estancia)) +
+    fila('Monto cobrado', m.importe && m.importe !== '—' ? m.importe : '$0.00');
+
+  if (m.empleado) {
+    html += seccion('Empleado') +
+      fila('ID', m.empleado.id) +
+      fila('Nombre', m.empleado.nombre) +
+      fila('Puesto', m.empleado.puesto || '—') +
+      fila('Área', m.empleado.area || '—');
+  }
+  if (m.pension) {
+    html += seccion('Pensión') +
+      fila('Pension ID', m.pension.id) +
+      fila('Cliente', m.pension.cliente || '—') +
+      fila('Tipo', m.pension.tipo || '—') +
+      fila('Vehículo', m.pension.vehiculo || '—') +
+      fila('Estatus', m.pension.estatus || '—');
+  }
+
+  document.getElementById('detalle-mov-adm-contenido').innerHTML = html;
+  document.getElementById('modal-detalle-movimiento-adm').classList.add('open');
+}
+
+function renderResumenMovimientosAdmin(filtrados) {
+  const importeNum = m => (m.importe && m.importe !== '—') ? parseFloat(String(m.importe).replace('$','')) || 0 : 0;
+  const pagados  = filtrados.filter(m => m.estatus === 'cobrado');
+  const perdidos = filtrados.filter(m => m.estatus === 'perdido' || m.tipo === 'perdido');
+  const cortesias= filtrados.filter(m => m.estatus === 'cortesia' || m.tipo === 'cortesia');
+  const abiertos = filtrados.filter(m => m.estatus === 'abierto');
+  const totalMonto   = filtrados.reduce((s,m) => s + importeNum(m), 0);
+  const pagadoMonto  = pagados.reduce((s,m) => s + importeNum(m), 0);
+  const perdidoMonto = perdidos.reduce((s,m) => s + importeNum(m), 0);
+  const fmt = n => n.toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+  const chip = (label, valor, color) =>
+    `<div style="background:var(--bg);border-radius:8px;padding:6px 12px;font-weight:700;color:${color||'var(--text)'}">
+       ${label}: ${valor}
+     </div>`;
+  document.getElementById('mov-resumen-adm').innerHTML =
+    chip('Total movimientos', filtrados.length + ' · ' + fmt(totalMonto), 'var(--text)') +
+    chip('Pagados', pagados.length + ' · ' + fmt(pagadoMonto), 'var(--green)') +
+    chip('Perdidos', perdidos.length + ' · ' + fmt(perdidoMonto), 'var(--red)') +
+    chip('Cortesías', String(cortesias.length), 'var(--muted)') +
+    chip('En plaza (abiertos)', String(abiertos.length), 'var(--accent2)');
+}
+
+function exportarMovimientosAdminCSV() {
+  const filtrados = MOV_FILTRADOS_ADM;
+  if (!filtrados.length) { showToast('Sin movimientos para exportar'); return; }
+  const tipoLabelCsv = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+    salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesia',
+    empleado:'Empleado',pension:'Pension'};
+  const estatusLabelCsv = {abierto:'Abierto', cobrado:'Cobrado', perdido:'Perdido', cortesia:'Cortesia'};
+  const csvSafe = s => String(s == null ? '' : s).replace(/,/g,';').replace(/\n/g,' ');
+  const desde = document.getElementById('filtro-desde-mov').value;
+  const hasta = document.getElementById('filtro-hasta-mov').value;
+  const header = 'Folio Entrada,Folio Salida,Tipo,Descripcion,Empleado,Pensionado,Tipo Pension,' +
+    'Hora Entrada,Hora Salida,Tiempo Estancia,Cajero Entrada,Cajero Salida,Importe,Estatus,Plaza';
+  const rows = filtrados.map(m => [
+    csvSafe(m.folio_entrada),
+    csvSafe(m.folio_salida),
+    csvSafe(tipoLabelCsv[m.tipo] || m.tipo),
+    csvSafe(m.desc),
+    csvSafe(m.empleado ? m.empleado.nombre : ''),
+    csvSafe(m.pension ? m.pension.cliente : ''),
+    csvSafe(m.pension ? m.pension.tipo : ''),
+    csvSafe(m.hora_entrada_col),
+    csvSafe(m.hora_salida_col && m.hora_salida_col !== '—' ? m.hora_salida_col : ''),
+    csvSafe(formatEstancia(m.minutos_estancia)),
+    csvSafe(m.cajero_entrada),
+    csvSafe(m.estatus !== 'abierto' ? m.cajero_salida : ''),
+    m.importe && m.importe !== '—' ? m.importe.replace('$','') : '0',
+    csvSafe(estatusLabelCsv[m.estatus] || m.estatus),
+    'Plaza IWOL'
+  ].join(','));
+  const csv  = '\uFEFF' + [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `IwolPark_movimientos_admin_${desde}_a_${hasta}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`CSV exportado · ${filtrados.length} registros`);
+}
+
 // ══ TABS (Dashboard / Demanda) ══
 function showTab(id, el) {
   document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
@@ -2197,6 +2778,13 @@ function showTab(id, el) {
     // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
     const ifr = document.getElementById('iframe-demanda');
     if (!ifr.src) ifr.src = 'IwolPark_Demanda.html';
+  }
+  if (id === 'movimientos' && !MOV_ADM_INICIADO) {
+    MOV_ADM_INICIADO = true;
+    const hoy = fmtLocal(new Date());
+    document.getElementById('filtro-desde-mov').value = hoy;
+    document.getElementById('filtro-hasta-mov').value = hoy;
+    actualizarMovimientosAdmin();
   }
 }
 
