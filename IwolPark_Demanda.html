@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v147</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v148</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -598,7 +598,7 @@ function renderHeatmap() {
       html+=`<div class="hm-cell" style="background:${bg};color:${text}"
         onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${fmtVal(val)} · ${fr}'"
         onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal(val)} (${fr})')"
-        onmouseleave="ht()">${val>4?Math.round(val):''}</div>`;
+        onmouseleave="ht()">${Math.round(val)>0?Math.round(val):''}</div>`;
     });
     html+=`<div class="hm-cell" style="${totalCellStyle}"
       onmouseenter="tt(event,'${dia} · total ${fmtVal(totalFila(dia))}')" onmouseleave="ht()">${Math.round(totalFila(dia))}</div>`;
