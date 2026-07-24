@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v153</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v154</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -968,6 +968,10 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <option value="cierre_dia">Cierre de día</option>
         <option value="reimpresion_comprobante">Reimpresión comprobante</option>
         <option value="atajo_teclado">Atajo de teclado (F2-F8)</option>
+        <option value="folio_leido">Folio leído</option>
+        <option value="seleccion">Selección (pensión/empleado)</option>
+        <option value="impresion">Impresión</option>
+        <option value="vista_pantalla">Vista de pantalla</option>
       </select>
       <button class="param-btn" onclick="buscarBitacora()">🔍 Buscar</button>
       <button class="param-btn outline" onclick="exportarBitacoraCSV()">⬇ Exportar CSV</button>
@@ -1020,6 +1024,7 @@ function showTabModo(modo, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-dashboard').classList.add('active');
   el.classList.add('active');
+  logBitacora('vista_pantalla', { pantalla: modo === 'historico' ? 'Histórico' : 'Seguimiento' });
   aplicarModoTab();
   cargarDatos();
 }
@@ -1799,7 +1804,8 @@ let BITACORA_ACTUAL = [];
 const ACCION_LABELS = {
   login:'🔑 Login', cobro:'💰 Cobro', cancelacion:'❌ Cancelación',
   arqueo:'🧮 Arqueo', relevo:'🔄 Relevo', cierre_dia:'🌙 Cierre de día',
-  reimpresion_comprobante:'🖨 Reimpresión comprobante', atajo_teclado:'⌨️ Atajo de teclado'
+  reimpresion_comprobante:'🖨 Reimpresión comprobante', atajo_teclado:'⌨️ Atajo de teclado',
+  folio_leido:'👁 Folio leído', seleccion:'☑️ Selección', impresion:'🖨 Impresión', vista_pantalla:'🖥 Vista de pantalla'
 };
 function accionLabel(a) { return ACCION_LABELS[a] || a || '—'; }
 function fmtFechaHoraMX(iso) {
@@ -1897,6 +1903,7 @@ function exportarBitacoraCSV() {
 // ══ GESTIÓN MANUAL DE TICKETS (cancelar con motivo + captura manual) ══
 let GM_TICKET_ACTUAL = null;
 function abrirGestionManual() {
+  logBitacora('vista_pantalla', { pantalla: 'Gestión manual de tickets' });
   document.getElementById('modal-gestion-manual').classList.add('open');
   document.getElementById('gm-folio-buscar').value = '';
   document.getElementById('gm-cancelar-detalle').innerHTML = '';
@@ -1913,6 +1920,7 @@ function cerrarGestionManual() {
 // para pedirles "presiona Actualizar app" cuando hay una versión nueva,
 // pero sirve para cualquier mensaje corto.
 async function abrirAvisoOperador() {
+  logBitacora('vista_pantalla', { pantalla: 'Chat con operadores' });
   const sel = document.getElementById('aviso-destinatario');
   sel.innerHTML = '<option value="">Todos los operadores</option>';
   try {
@@ -2174,6 +2182,7 @@ const SB_HEADERS_PARAM = {
 };
 
 async function abrirParametros() {
+  logBitacora('vista_pantalla', { pantalla: 'Parámetros del sistema' });
   document.getElementById('modal-parametros').classList.add('open');
   await Promise.all([cargarParametrosPlaza(), cargarCajeros(), cargarEmpleados()]);
 }
@@ -2630,6 +2639,8 @@ function showTab(id, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
+  const NOMBRE_PANTALLA = { movimientos:'Movimientos', bitacora:'Bitácora', demanda:'Demanda' };
+  if (NOMBRE_PANTALLA[id]) logBitacora('vista_pantalla', { pantalla: NOMBRE_PANTALLA[id] });
   if (id === 'demanda') {
     // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
     const ifr = document.getElementById('iframe-demanda');
@@ -3083,8 +3094,19 @@ document.addEventListener('keydown', e => {
 
 // Bitácora de acciones (Fase E) — registro de auditoría best-effort: nunca
 // bloquea ni interrumpe la operación real si falla o no hay conexión.
-function logBitacora(accion, detalle) {
+let _ipCacheAdm = null;
+async function obtenerIPAdm() {
+  if (_ipCacheAdm) return _ipCacheAdm;
   try {
+    const r = await fetch('https://api.ipify.org?format=json');
+    const j = await r.json();
+    _ipCacheAdm = j.ip || null;
+  } catch (e) { _ipCacheAdm = null; }
+  return _ipCacheAdm;
+}
+async function logBitacora(accion, detalle) {
+  try {
+    const ip = await obtenerIPAdm();
     fetch(`${SUPABASE_URL}/rest/v1/bitacora`, {
       method: 'POST',
       headers: {
@@ -3094,7 +3116,7 @@ function logBitacora(accion, detalle) {
       body: JSON.stringify({
         plaza_id: (typeof PARAM_PLAZA_ID !== 'undefined' && PARAM_PLAZA_ID) || null,
         usuario: USUARIO_ACTUAL ? (USUARIO_ACTUAL.usuario || USUARIO_ACTUAL.nombre) : null,
-        accion, detalle: detalle || null
+        accion, detalle: detalle || null, ip
       })
     }).catch(() => {});
   } catch (e) {}
