@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v152</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v153</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -967,6 +967,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <option value="relevo">Relevo</option>
         <option value="cierre_dia">Cierre de día</option>
         <option value="reimpresion_comprobante">Reimpresión comprobante</option>
+        <option value="atajo_teclado">Atajo de teclado (F2-F8)</option>
       </select>
       <button class="param-btn" onclick="buscarBitacora()">🔍 Buscar</button>
       <button class="param-btn outline" onclick="exportarBitacoraCSV()">⬇ Exportar CSV</button>
@@ -1798,7 +1799,7 @@ let BITACORA_ACTUAL = [];
 const ACCION_LABELS = {
   login:'🔑 Login', cobro:'💰 Cobro', cancelacion:'❌ Cancelación',
   arqueo:'🧮 Arqueo', relevo:'🔄 Relevo', cierre_dia:'🌙 Cierre de día',
-  reimpresion_comprobante:'🖨 Reimpresión comprobante'
+  reimpresion_comprobante:'🖨 Reimpresión comprobante', atajo_teclado:'⌨️ Atajo de teclado'
 };
 function accionLabel(a) { return ACCION_LABELS[a] || a || '—'; }
 function fmtFechaHoraMX(iso) {
@@ -1861,13 +1862,14 @@ function renderBitacora(rows) {
     return;
   }
   cont.innerHTML = `<div class="tabla-wrap"><table>
-    <thead><tr><th>ID</th><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>Plaza</th></tr></thead>
+    <thead><tr><th>ID</th><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th><th>Plaza</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${r.id}</td>
       <td style="white-space:nowrap">${fmtFechaHoraMX(r.created_at)}</td>
       <td>${escHtmlAttr(r.usuario)||'—'}</td>
       <td>${escHtmlAttr(accionLabel(r.accion))}</td>
       <td style="font-family:monospace;font-size:11px;max-width:340px;white-space:pre-wrap">${r.detalle ? escHtmlAttr(JSON.stringify(r.detalle)) : '—'}</td>
+      <td style="font-family:monospace;font-size:11px">${escHtmlAttr(r.ip)||'—'}</td>
       <td>${escHtmlAttr(r.plaza_id)||'—'}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
@@ -1879,9 +1881,9 @@ function csvEscapeBitacora(v) {
 function exportarBitacoraCSV() {
   const rows = BITACORA_ACTUAL;
   if (!rows.length) { showToast('No hay registros para exportar'); return; }
-  const header = ['ID','Fecha y hora (MX)','Usuario','Acción','Detalle','Plaza'].join(',');
+  const header = ['ID','Fecha y hora (MX)','Usuario','Acción','Detalle','IP','Plaza'].join(',');
   const lines = rows.map(r => [
-    r.id, fmtFechaHoraMX(r.created_at), r.usuario||'', r.accion||'', r.detalle?JSON.stringify(r.detalle):'', r.plaza_id||''
+    r.id, fmtFechaHoraMX(r.created_at), r.usuario||'', r.accion||'', r.detalle?JSON.stringify(r.detalle):'', r.ip||'', r.plaza_id||''
   ].map(csvEscapeBitacora).join(','));
   const csv = '\uFEFF' + [header,...lines].join('\n');
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
