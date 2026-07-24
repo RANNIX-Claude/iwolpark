@@ -52,16 +52,16 @@ nav {
   padding:10px; gap:10px;
 }
 
-/* Resumen de operadores del día — franja fija al pie de pantalla. Fuente
-   grande a propósito: se lee de pie, a distancia del monitor. */
+/* Resumen de operadores del día — franja fija al pie de pantalla. Se
+   redujo el tamaño (antes 64px / fuentes grandes) para que quepan varios
+   cajeros a la vez sin desbordar la pantalla. */
 #resumen-operadores {
-  height:64px; flex-shrink:0;
+  height:40px; flex-shrink:0;
   background:#F8F5FF; border-top:2px solid #7B5EA7;
   display:flex; align-items:center;
   padding:0 16px; gap:14px;
-  font-size:24px;
 }
-#resumen-operadores-label { flex-shrink:0; font-weight:900; color:#7B5EA7; text-transform:uppercase; font-size:13px; letter-spacing:.5px; }
+#resumen-operadores-label { flex-shrink:0; font-weight:900; color:#7B5EA7; text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
 #resumen-operadores-body { flex:1; display:flex; overflow-x:auto; height:100%; align-items:center; }
 
 /* TOP: 4x2 botones (Cobrar ocupa 2 columnas) */
@@ -333,7 +333,7 @@ nav {
   <img src="data:image/png;base64,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" class="nav-logo" alt="IWOL">
   <span class="nav-title">IwolPark</span>
   <span class="nav-badge">CAJERO</span>
-  <div class="nav-right"><span id="nav-usuario" style="font-size:12px;color:#7B5EA7;font-weight:700;margin-right:12px"></span><span style="font-size:14px;font-weight:900;color:#000;margin-right:12px">Plaza IWOL</span><span id="clock" style="font-size:13px;color:#555;font-family:monospace">--:--:--</span><span id="app-version" style="font-size:11px;color:#aaa;margin-left:10px">v156</span><button onclick="mostrarInfoFolios()" title="Consulta el folio actual guardado en esta tablet — y desde ahí, si hace falta, resincroniza contra Supabase" style="margin-left:6px;background:none;border:1px solid #D2D2D7;border-radius:6px;padding:3px 10px;font-size:11px;color:#666;cursor:pointer">↺ Folios</button><button onclick="enviarPreguntaOperador()" title="Manda una pregunta o duda al Administrador" style="margin-left:6px;background:none;border:1px solid #D2D2D7;border-radius:6px;padding:3px 10px;font-size:11px;color:#666;cursor:pointer">❓ Preguntar</button><button onclick="forzarActualizacionApp()" title="Borra la versión de esta app guardada en el dispositivo y trae la más reciente del servidor — hazlo al iniciar tu turno" style="margin-left:6px;background:#0D9457;border:1px solid #0D9457;border-radius:6px;padding:3px 10px;font-size:11px;color:#fff;font-weight:700;cursor:pointer">⟳ Actualizar app</button><button onclick="cerrarSesion()" style="margin-left:10px;background:#F2B705;border:1px solid #F2B705;border-radius:6px;padding:3px 10px;font-size:11px;color:#000;font-weight:700;cursor:pointer">Cerrar sesión</button></div>
+  <div class="nav-right"><span id="nav-usuario" style="font-size:12px;color:#7B5EA7;font-weight:700;margin-right:12px"></span><span style="font-size:14px;font-weight:900;color:#000;margin-right:12px">Plaza IWOL</span><span id="clock" style="font-size:13px;color:#555;font-family:monospace">--:--:--</span><span id="app-version" style="font-size:11px;color:#aaa;margin-left:10px">v157</span><button onclick="mostrarInfoFolios()" title="Consulta el folio actual guardado en esta tablet — y desde ahí, si hace falta, resincroniza contra Supabase" style="margin-left:6px;background:none;border:1px solid #D2D2D7;border-radius:6px;padding:3px 10px;font-size:11px;color:#666;cursor:pointer">↺ Folios</button><button onclick="enviarPreguntaOperador()" title="Manda una pregunta o duda al Administrador" style="margin-left:6px;background:none;border:1px solid #D2D2D7;border-radius:6px;padding:3px 10px;font-size:11px;color:#666;cursor:pointer">❓ Preguntar</button><button onclick="forzarActualizacionApp()" title="Borra la versión de esta app guardada en el dispositivo y trae la más reciente del servidor — hazlo al iniciar tu turno" style="margin-left:6px;background:#0D9457;border:1px solid #0D9457;border-radius:6px;padding:3px 10px;font-size:11px;color:#fff;font-weight:700;cursor:pointer">⟳ Actualizar app</button><button onclick="cerrarSesion()" style="margin-left:10px;background:#F2B705;border:1px solid #F2B705;border-radius:6px;padding:3px 10px;font-size:11px;color:#000;font-weight:700;cursor:pointer">Cerrar sesión</button></div>
 </nav>
 
 <div style="background:#fff;border-bottom:2px solid #7B5EA7;padding:6px 16px;
@@ -368,7 +368,7 @@ nav {
   </button>
   <div id="stats-dia" style="margin-left:auto;display:flex;align-items:center;gap:14px;font-size:16px;font-weight:700;color:#444">
     <span onclick="verMovimientosFiltrado('todos')" style="cursor:pointer" title="Ver todos los movimientos de hoy">🎫 <span id="stat-tickets">0</span> tickets hoy</span>
-    <span onclick="verMovimientosFiltrado('cerrados')" style="cursor:pointer" title="Ver movimientos cerrados de hoy">✅ <span id="stat-pagados">0</span> pagados</span>
+    <span onclick="verMovimientosFiltrado('cerrados')" style="cursor:pointer" title="Ver movimientos cerrados de hoy">✅ <span id="stat-pagados">0</span> cobrados</span>
     <span onclick="verMovimientosFiltrado('cerrados')" style="cursor:pointer" title="Ver movimientos que generaron cobro">💰 $<span id="stat-cobrado">0.00</span></span>
     <span onclick="verMovimientosFiltrado('abierto')" style="cursor:pointer" title="Ver autos que siguen dentro de la plaza">🅿️ <span id="stat-ocupados">0</span>/<span id="stat-capacidad">40</span> ocupados</span>
   </div>
@@ -668,11 +668,8 @@ nav {
       <select id="filtro-tipo" onchange="refrescarMovimientos()"
         style="border:1.5px solid #7B5EA7;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;color:#000">
         <option value="todos">Todos los movimientos</option>
-        <option value="entrada">Entradas normales</option>
-        <option value="preferencial">Entradas preferenciales</option>
-        <option value="salida">Cobros</option>
-        <option value="perdido">Boletos perdidos</option>
-        <option value="cortesia">Cortesías</option>
+        <option value="entrada">Normal</option>
+        <option value="preferencial">Preferencial</option>
         <option value="empleado">Empleados</option>
         <option value="pension">Pensión</option>
       </select>
@@ -700,10 +697,11 @@ nav {
         style="border:1.5px solid #7B5EA7;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;color:#000">
         <option value="reciente">Más reciente primero</option>
         <option value="folio">Ordenar por folio</option>
+        <option value="folio_salida">Ordenar por folio de cobro</option>
         <option value="estatus">Ordenar por estatus</option>
         <option value="tipo">Ordenar por tipo</option>
         <option value="hora_entrada">Ordenar por hora de entrada</option>
-        <option value="hora_salida">Ordenar por hora de salida</option>
+        <option value="hora_salida">Ordenar por hora de salida (cobro)</option>
         <option value="monto">Ordenar por monto (mayor primero)</option>
         <option value="cajero_entrada">Ordenar por cajero que recibe</option>
         <option value="cajero_salida">Ordenar por cajero que cobra</option>
@@ -1608,16 +1606,60 @@ async function syncQueue() {
       _syncPendiente = false;
       const cola = JSON.parse(localStorage.getItem('iwol_sync_queue') || '[]');
       if (!cola.length) break;
-      const restante = [];
+      const exitosos = [];
       for (const item of cola) {
-        try { await enviarSupabase(item.tabla, item.data); }
-        catch (e) { restante.push(item); }
+        try { await enviarSupabase(item.tabla, item.data); exitosos.push(item); }
+        catch (e) { /* sigue pendiente, se reintenta en la siguiente vuelta */ }
       }
+      // No sobrescribir con `cola` (foto tomada ANTES del await de red): si
+      // mientras esta vuelta esperaba la respuesta de Supabase otro
+      // encolarSync() agregó un folio nuevo, escribir esa foto vieja lo
+      // borraba de localStorage sin haberlo intentado nunca — así se
+      // perdieron folios UFC-260724027 y 046 el 2026-07-24. Se relee el
+      // estado ACTUAL y solo se quitan los que de verdad se confirmaron.
+      const colaActual = JSON.parse(localStorage.getItem('iwol_sync_queue') || '[]');
+      const exitososStr = new Set(exitosos.map(it => JSON.stringify(it)));
+      const restante = colaActual.filter(it => !exitososStr.has(JSON.stringify(it)));
       localStorage.setItem('iwol_sync_queue', JSON.stringify(restante));
     } while (_syncPendiente);
   } finally {
     _syncEnCurso = false;
   }
+}
+
+// Empleados y pensionados entran/salen libre — no hay proceso de salida real
+// para ellos (a diferencia de F7/Cobrar), así que sus boletos se quedaban
+// abiertos para siempre. Si llevan más de 24h así, se asume que el vehículo
+// ya salió hace tiempo y se cierran solos como cobrado $0, para que no se
+// acumulen indefinidamente en el conteo de "abiertos" (ver conversación del
+// 2026-07-24 sobre la regla Abiertos+Cerrados+Perdidos=100%).
+async function cerrarEmpleadosPensionesVencidos() {
+  if (!ONLINE) return;
+  try {
+    const limite = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&tipo=in.(empleado,pension)&hora_entrada_at=lt.${encodeURIComponent(limite)}&select=folio,tipo,hora_entrada_at`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }
+    );
+    if (!r.ok) return;
+    const vencidos = await r.json();
+    for (const t of vencidos) {
+      const ahora = new Date();
+      const mins = Math.round((ahora - new Date(t.hora_entrada_at)) / 60000);
+      const p2h = n => String(n).padStart(2,'0');
+      await fetch(`${SUPABASE_URL}/rest/v1/tickets?folio=eq.${encodeURIComponent(t.folio)}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body: JSON.stringify({
+          estatus: 'cobrado', importe: '0.00', horas_cobradas: 0, tarifa: '0.00',
+          minutos_estancia: mins, hora_salida_at: ahora.toISOString(),
+          hora_salida: p2h(ahora.getHours())+':'+p2h(ahora.getMinutes()),
+          cajero_salida: 'sistema_auto'
+        })
+      });
+      logBitacora('cierre_automatico', { folio: t.folio, tipo: t.tipo, motivo: 'Empleado/Pensión sin proceso de salida real — cerrado automáticamente tras 24h abierto' });
+    }
+  } catch (e) {}
 }
 
 // Entrada de vehículo → INSERT tickets estatus='abierto'
@@ -1884,12 +1926,12 @@ function renderResumenOperadores(rows) {
   // todos los operadores del día. (Spec: "Especificación funcional — Pie de
   // página Operadores Hoy".)
   const bloqueOperador = (o, esUltimo) => `
-    <span style="display:inline-flex;flex-direction:column;gap:3px;padding:4px 22px;${esUltimo?'':'border-right:1px solid #E5DFF5;'}white-space:nowrap">
-      <span style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.3px">${o.nombre}</span>
-      <span style="display:flex;gap:16px;align-items:baseline">
-        <span style="font-size:15px;color:#0A66C2"><b style="font-size:20px">${o.inCount}</b> Emitidos</span>
-        <span style="font-size:15px;color:#7B5EA7"><b style="font-size:20px">${o.outCount}</b> Cobros</span>
-        <span style="font-size:16px;color:#0D9457;font-weight:800">💰 <b style="font-size:24px">$${o.monto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></span>
+    <span style="display:inline-flex;flex-direction:column;gap:1px;padding:2px 12px;${esUltimo?'':'border-right:1px solid #E5DFF5;'}white-space:nowrap">
+      <span style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.3px">${o.nombre}</span>
+      <span style="display:flex;gap:9px;align-items:baseline">
+        <span style="font-size:11px;color:#0A66C2"><b style="font-size:14px">${o.inCount}</b> Emitidos</span>
+        <span style="font-size:11px;color:#7B5EA7"><b style="font-size:14px">${o.outCount}</b> Cobrados</span>
+        <span style="font-size:12px;color:#0D9457;font-weight:800">💰 <b style="font-size:16px">$${o.monto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></span>
       </span>
     </span>`;
   const filas = operadores.map(o => bloqueOperador(o, false)).join('');
@@ -3950,20 +3992,28 @@ function ticketsAMovimientos(rows) {
       return { tipo: especial, folio: t.folio, desc: nombres[especial],
         importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
+    // La tarifa (normal/preferencial) se conserva SIEMPRE, sin importar si ya
+    // se cobró, se perdió o quedó como cortesía — antes, un boleto
+    // preferencial ya cobrado se reclasificaba como tipo:'salida' y
+    // desaparecía del filtro "Preferencial" (solo mostraba los que seguían
+    // abiertos). El estatus de pago (Abierto/Cobrado/Perdido/Cortesía) ya se
+    // filtra aparte con el combo de Estatus — son dos condiciones
+    // independientes, no una sola.
+    const esPref = t.tipo === 'preferencial';
+    const tipo = esPref ? 'preferencial' : 'entrada';
     if (t.estatus === 'abierto') {
-      const esPref = t.tipo === 'preferencial';
-      return { tipo: esPref ? 'preferencial' : 'entrada', folio: t.folio,
+      return { tipo, folio: t.folio,
         desc: esPref ? '★ Preferencial' : 'Entrada normal', importe: '—', hora: t.hora_entrada, ...comunes };
     }
     if (t.estatus === 'perdido') {
-      return { tipo: 'perdido', folio: t.folio, desc: `Perdido · ${hrs}hr`,
+      return { tipo, folio: t.folio, desc: `Perdido · ${hrs}hr`,
         importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
     if (t.estatus === 'cortesia') {
-      return { tipo: 'cortesia', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+      return { tipo, folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
         importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
-    return { tipo: 'salida', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+    return { tipo, folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
       importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
   });
 }
@@ -4207,7 +4257,7 @@ let MOV_FILTRADOS_ACTUAL = [];
 function renderMovimientosModal(movs) {
   const colorMap = {entrada:'#0A66C2',preferencial:'#7B5EA7',salida:'#0D9457',perdido:'#D93025',cortesia:'#4A4A4A',empleado:'#1D3557',pension:'#0D9457'};
   const iconMap  = {entrada:'⬇',preferencial:'★',salida:'⬆',perdido:'⚠',cortesia:'🎁',empleado:'🪪',pension:'🅿️'};
-  const tipoLabel = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+  const tipoLabel = {entrada:'Normal',preferencial:'Preferencial',
                      salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesía',
                      empleado:'Empleado',pension:'Pensión'};
 
@@ -4264,6 +4314,7 @@ function renderMovimientosModal(movs) {
 
   const ordenadores = {
     folio: (a,b) => (a.folio_entrada||'').localeCompare(b.folio_entrada||'', undefined, {numeric:true}),
+    folio_salida: (a,b) => (a.folio_salida||'').localeCompare(b.folio_salida||'', undefined, {numeric:true}),
     estatus: (a,b) => (a.estatus||'').localeCompare(b.estatus||''),
     tipo: (a,b) => (a.tipo||'').localeCompare(b.tipo||''),
     hora_entrada: (a,b) => (a.hora_entrada_col||'').localeCompare(b.hora_entrada_col||''),
@@ -4299,11 +4350,13 @@ function renderMovimientosModal(movs) {
     const icon   = iconMap[m.tipo]  || '·';
     const label  = tipoLabel[m.tipo] || m.tipo;
     const imp    = m.importe && m.importe !== '—' ? m.importe : '$0.00';
-    const impCol = m.tipo === 'cortesia' ? '#888' : '#7B5EA7';
-    // Descripción limpia
-    const desc   = m.tipo === 'perdido'
+    const impCol = m.estatus === 'cortesia' ? '#888' : '#7B5EA7';
+    // Descripción limpia — se revisa el ESTATUS de pago (no el tipo de
+    // tarifa, que ahora se conserva siempre) para saber si es un perdido o
+    // una cortesía automática por <15min.
+    const desc   = m.estatus === 'perdido'
       ? (m.desc || 'Boleto perdido')
-      : m.tipo === 'cortesia'
+      : (m.estatus === 'cortesia' && m.tipo !== 'cortesia')
       ? 'Menos de 15 min'
       : m.desc || label;
     const estTxt = estatusLabel[m.estatus] || m.estatus || '—';
@@ -4390,26 +4443,41 @@ function abrirDetalleMovimiento(folioEntrada) {
 
 // Resumen de totales del conjunto FILTRADO (respeta los combos de arriba) —
 // sin esto no se ve cuántos hay de cada tipo salvo filtrando uno por uno.
+// Dos reglas (acordadas 2026-07-24, ver conversación):
+// 1) Ciclo de vida = Abierto | Cerrado (cobrado+cortesia, sin importar el
+//    monto — un $0 que pasó por el proceso de cobro SÍ está cerrado) |
+//    Perdido. Son las únicas 3 categorías posibles: si no suman el total
+//    filtrado, hay un folio con estatus inesperado que revisar (chip Cuadre).
+// 2) Dentro de los Cerrados, si hubo pago o no es OTRA dimensión aparte, con
+//    su propio motivo cuando no pagó (tiempo/cortesía especial/empleado/pensión).
 function renderResumenMovimientos(filtrados) {
   const importeNum = m => (m.importe && m.importe !== '—') ? parseFloat(String(m.importe).replace('$','')) || 0 : 0;
-  const pagados  = filtrados.filter(m => m.estatus === 'cobrado');
-  const perdidos = filtrados.filter(m => m.estatus === 'perdido' || m.tipo === 'perdido');
-  const cortesias= filtrados.filter(m => m.estatus === 'cortesia' || m.tipo === 'cortesia');
   const abiertos = filtrados.filter(m => m.estatus === 'abierto');
+  const perdidos = filtrados.filter(m => m.estatus === 'perdido');
+  const cerrados = filtrados.filter(m => m.estatus === 'cobrado' || m.estatus === 'cortesia');
+  const pagaron   = cerrados.filter(m => importeNum(m) > 0);
+  const sinCosto  = cerrados.filter(m => importeNum(m) === 0);
+  const porTiempo    = sinCosto.filter(m => m.tipo !== 'empleado' && m.tipo !== 'pension' && m.tipo !== 'cortesia');
+  const porVoucher    = sinCosto.filter(m => m.tipo === 'cortesia');
+  const porEmpleado  = sinCosto.filter(m => m.tipo === 'empleado');
+  const porPension    = sinCosto.filter(m => m.tipo === 'pension');
   const totalMonto   = filtrados.reduce((s,m) => s + importeNum(m), 0);
-  const pagadoMonto  = pagados.reduce((s,m) => s + importeNum(m), 0);
+  const pagadoMonto  = pagaron.reduce((s,m) => s + importeNum(m), 0);
   const perdidoMonto = perdidos.reduce((s,m) => s + importeNum(m), 0);
   const fmt = n => n.toLocaleString('es-MX',{style:'currency',currency:'MXN'});
   const chip = (label, valor, color) =>
     `<div style="background:#F5F5F7;border-radius:8px;padding:6px 12px;font-weight:700;color:${color||'#1D1D1F'}">
        ${label}: ${valor}
      </div>`;
+  const suma = abiertos.length + cerrados.length + perdidos.length;
+  const cuadreOk = suma === filtrados.length;
   document.getElementById('mov-resumen').innerHTML =
     chip('Total movimientos', filtrados.length + ' · ' + fmt(totalMonto), '#1D1D1F') +
-    chip('Pagados', pagados.length + ' · ' + fmt(pagadoMonto), '#0D9457') +
+    chip('Pagaron', pagaron.length + ' · ' + fmt(pagadoMonto), '#0D9457') +
+    chip('Sin costo', sinCosto.length + ` (⏱${porTiempo.length} tiempo · 🎁${porVoucher.length} cortesía · 🪪${porEmpleado.length} empleado · 🅿️${porPension.length} pensión)`, '#4A4A4A') +
     chip('Perdidos', perdidos.length + ' · ' + fmt(perdidoMonto), '#D93025') +
-    chip('Cortesías', String(cortesias.length), '#4A4A4A') +
-    chip('En plaza (abiertos)', String(abiertos.length), '#0A66C2');
+    chip('En plaza (abiertos)', String(abiertos.length), '#0A66C2') +
+    chip(cuadreOk ? '✓ Cuadre' : '⚠ Cuadre', cuadreOk ? '100%' : `${suma}/${filtrados.length} — revisar`, cuadreOk ? '#0D9457' : '#D93025');
 }
 
 // Exporta EXACTAMENTE el conjunto que esta en pantalla (MOV_FILTRADOS_ACTUAL,
@@ -4418,7 +4486,7 @@ function renderResumenMovimientos(filtrados) {
 function exportarMovimientosCSV() {
   const filtrados = MOV_FILTRADOS_ACTUAL;
   if (!filtrados.length) { showToast('Sin movimientos para exportar', '#D93025'); return; }
-  const tipoLabelCsv = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+  const tipoLabelCsv = {entrada:'Normal',preferencial:'Preferencial',
     salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesia',
     empleado:'Empleado',pension:'Pension'};
   const estatusLabelCsv = {abierto:'Abierto', cobrado:'Cobrado', perdido:'Perdido', cortesia:'Cortesia'};
@@ -4477,9 +4545,11 @@ function setBotonesToActivos(activo) {
   // cierreDia() intacto por si se necesita reactivar más adelante).
   const btnCierre = document.getElementById('btn-cierre');
   if (btnCierre) btnCierre.style.display = 'none';
-  // Inicio turno: ocultar si ya hay turno
+  // Inicio turno: botón oculto a pedido del usuario, ya no se usa (queda el
+  // código de iniciarTurno() intacto por si se necesita reactivar más
+  // adelante, igual que se hizo con Cierre del día).
   const btnInicio = document.querySelector('[onclick="iniciarTurno()"]');
-  if (btnInicio) btnInicio.style.display = activo ? 'none' : 'flex';
+  if (btnInicio) btnInicio.style.display = 'none';
   actualizarBotonesPorHorario();
 }
 
@@ -4815,6 +4885,8 @@ let USUARIO_ACTUAL = null;
   setInterval(actualizarStatsDia, 30000);
   setInterval(actualizarBotonesPorHorario, 60000);
   setInterval(verificarCambioDeDia, 60000);
+  cerrarEmpleadosPensionesVencidos();
+  setInterval(cerrarEmpleadosPensionesVencidos, 3600000);
   revisarAvisosOperador();
   setInterval(revisarAvisosOperador, 60000);
   verificarVersionServidor();

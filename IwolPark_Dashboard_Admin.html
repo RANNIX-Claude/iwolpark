@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v156</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v157</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -787,11 +787,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <select id="filtro-tipo-mov" onchange="refrescarMovimientosAdmin()"
       style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
       <option value="todos">Todos los movimientos</option>
-      <option value="entrada">Entradas normales</option>
-      <option value="preferencial">Entradas preferenciales</option>
-      <option value="salida">Cobros</option>
-      <option value="perdido">Boletos perdidos</option>
-      <option value="cortesia">Cortesías</option>
+      <option value="entrada">Normal</option>
+      <option value="preferencial">Preferencial</option>
       <option value="empleado">Empleados</option>
       <option value="pension">Pensión</option>
     </select>
@@ -815,10 +812,11 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       style="border:1.5px solid var(--accent);border-radius:6px;padding:6px 10px;font-size:13px">
       <option value="reciente">Más reciente primero</option>
       <option value="folio">Ordenar por folio</option>
+      <option value="folio_salida">Ordenar por folio de cobro</option>
       <option value="estatus">Ordenar por estatus</option>
       <option value="tipo">Ordenar por tipo</option>
       <option value="hora_entrada">Ordenar por hora de entrada</option>
-      <option value="hora_salida">Ordenar por hora de salida</option>
+      <option value="hora_salida">Ordenar por hora de salida (cobro)</option>
       <option value="monto">Ordenar por monto (mayor primero)</option>
       <option value="cajero_entrada">Ordenar por cajero que recibe</option>
       <option value="cajero_salida">Ordenar por cajero que cobra</option>
@@ -1805,7 +1803,8 @@ const ACCION_LABELS = {
   login:'🔑 Login', cobro:'💰 Cobro', cancelacion:'❌ Cancelación',
   arqueo:'🧮 Arqueo', relevo:'🔄 Relevo', cierre_dia:'🌙 Cierre de día',
   reimpresion_comprobante:'🖨 Reimpresión comprobante', atajo_teclado:'⌨️ Atajo de teclado',
-  folio_leido:'👁 Folio leído', seleccion:'☑️ Selección', impresion:'🖨 Impresión', vista_pantalla:'🖥 Vista de pantalla'
+  folio_leido:'👁 Folio leído', seleccion:'☑️ Selección', impresion:'🖨 Impresión', vista_pantalla:'🖥 Vista de pantalla',
+  correccion_manual:'🛠 Corrección manual', cierre_automatico:'⏱ Cierre automático'
 };
 function accionLabel(a) { return ACCION_LABELS[a] || a || '—'; }
 function fmtFechaHoraMX(iso) {
@@ -2259,20 +2258,26 @@ function ticketsAMovimientosAdm(rows) {
       return { tipo: especial, folio: t.folio, desc: nombres[especial],
         importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
+    // La tarifa (normal/preferencial) se conserva SIEMPRE, sin importar si ya
+    // se cobró, se perdió o quedó como cortesía — el estatus de pago
+    // (Abierto/Cobrado/Perdido/Cortesía) ya se filtra aparte con el combo de
+    // Estatus. Antes un preferencial ya cobrado se reclasificaba como
+    // tipo:'salida' y desaparecía del filtro "Preferencial".
+    const esPref = t.tipo === 'preferencial';
+    const tipo = esPref ? 'preferencial' : 'entrada';
     if (t.estatus === 'abierto') {
-      const esPref = t.tipo === 'preferencial';
-      return { tipo: esPref ? 'preferencial' : 'entrada', folio: t.folio,
+      return { tipo, folio: t.folio,
         desc: esPref ? '★ Preferencial' : 'Entrada normal', importe: '—', hora: t.hora_entrada, ...comunes };
     }
     if (t.estatus === 'perdido') {
-      return { tipo: 'perdido', folio: t.folio, desc: `Perdido · ${hrs}hr`,
+      return { tipo, folio: t.folio, desc: `Perdido · ${hrs}hr`,
         importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
     if (t.estatus === 'cortesia') {
-      return { tipo: 'cortesia', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+      return { tipo, folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
         importe: '$0.00', hora: t.hora_salida || t.hora_entrada, ...comunes };
     }
-    return { tipo: 'salida', folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
+    return { tipo, folio: t.folio, desc: `${t.tipo} · ${hrs}hr`,
       importe: '$' + Number(t.importe||0).toFixed(2), hora: t.hora_salida || t.hora_entrada, ...comunes };
   });
 }
@@ -2401,7 +2406,7 @@ function refrescarMovimientosAdmin() {
 function renderMovimientosAdminTab(movs) {
   const colorMap = {entrada:'#0A66C2',preferencial:'#7B5EA7',salida:'#0D9457',perdido:'#D93025',cortesia:'#4A4A4A',empleado:'#1D3557',pension:'#0D9457'};
   const iconMap  = {entrada:'⬇',preferencial:'★',salida:'⬆',perdido:'⚠',cortesia:'🎁',empleado:'🪪',pension:'🅿️'};
-  const tipoLabel = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+  const tipoLabel = {entrada:'Normal',preferencial:'Preferencial',
                      salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesía',
                      empleado:'Empleado',pension:'Pensión'};
 
@@ -2456,6 +2461,7 @@ function renderMovimientosAdminTab(movs) {
 
   const ordenadores = {
     folio: (a,b) => (a.folio_entrada||'').localeCompare(b.folio_entrada||'', undefined, {numeric:true}),
+    folio_salida: (a,b) => (a.folio_salida||'').localeCompare(b.folio_salida||'', undefined, {numeric:true}),
     estatus: (a,b) => (a.estatus||'').localeCompare(b.estatus||''),
     tipo: (a,b) => (a.tipo||'').localeCompare(b.tipo||''),
     hora_entrada: (a,b) => (a.hora_entrada_col||'').localeCompare(b.hora_entrada_col||''),
@@ -2489,10 +2495,10 @@ function renderMovimientosAdminTab(movs) {
     const icon   = iconMap[m.tipo]  || '·';
     const label  = tipoLabel[m.tipo] || m.tipo;
     const imp    = m.importe && m.importe !== '—' ? m.importe : '$0.00';
-    const impCol = m.tipo === 'cortesia' ? '#888' : 'var(--accent)';
-    const desc   = m.tipo === 'perdido'
+    const impCol = m.estatus === 'cortesia' ? '#888' : 'var(--accent)';
+    const desc   = m.estatus === 'perdido'
       ? (m.desc || 'Boleto perdido')
-      : m.tipo === 'cortesia'
+      : (m.estatus === 'cortesia' && m.tipo !== 'cortesia')
       ? 'Menos de 15 min'
       : m.desc || label;
     const estTxt = estatusLabel[m.estatus] || m.estatus || '—';
@@ -2571,32 +2577,47 @@ function abrirDetalleMovimientoAdmin(folioEntrada) {
   document.getElementById('modal-detalle-movimiento-adm').classList.add('open');
 }
 
+// Dos reglas (acordadas 2026-07-24, ver conversación):
+// 1) Ciclo de vida = Abierto | Cerrado (cobrado+cortesia, sin importar el
+//    monto — un $0 que pasó por el proceso de cobro SÍ está cerrado) |
+//    Perdido. Son las únicas 3 categorías posibles: si no suman el total
+//    filtrado, hay un folio con estatus inesperado que revisar (chip Cuadre).
+// 2) Dentro de los Cerrados, si hubo pago o no es OTRA dimensión aparte, con
+//    su propio motivo cuando no pagó (tiempo/cortesía especial/empleado/pensión).
 function renderResumenMovimientosAdmin(filtrados) {
   const importeNum = m => (m.importe && m.importe !== '—') ? parseFloat(String(m.importe).replace('$','')) || 0 : 0;
-  const pagados  = filtrados.filter(m => m.estatus === 'cobrado');
-  const perdidos = filtrados.filter(m => m.estatus === 'perdido' || m.tipo === 'perdido');
-  const cortesias= filtrados.filter(m => m.estatus === 'cortesia' || m.tipo === 'cortesia');
   const abiertos = filtrados.filter(m => m.estatus === 'abierto');
+  const perdidos = filtrados.filter(m => m.estatus === 'perdido');
+  const cerrados = filtrados.filter(m => m.estatus === 'cobrado' || m.estatus === 'cortesia');
+  const pagaron   = cerrados.filter(m => importeNum(m) > 0);
+  const sinCosto  = cerrados.filter(m => importeNum(m) === 0);
+  const porTiempo    = sinCosto.filter(m => m.tipo !== 'empleado' && m.tipo !== 'pension' && m.tipo !== 'cortesia');
+  const porVoucher    = sinCosto.filter(m => m.tipo === 'cortesia');
+  const porEmpleado  = sinCosto.filter(m => m.tipo === 'empleado');
+  const porPension    = sinCosto.filter(m => m.tipo === 'pension');
   const totalMonto   = filtrados.reduce((s,m) => s + importeNum(m), 0);
-  const pagadoMonto  = pagados.reduce((s,m) => s + importeNum(m), 0);
+  const pagadoMonto  = pagaron.reduce((s,m) => s + importeNum(m), 0);
   const perdidoMonto = perdidos.reduce((s,m) => s + importeNum(m), 0);
   const fmt = n => n.toLocaleString('es-MX',{style:'currency',currency:'MXN'});
   const chip = (label, valor, color) =>
     `<div style="background:var(--bg);border-radius:8px;padding:6px 12px;font-weight:700;color:${color||'var(--text)'}">
        ${label}: ${valor}
      </div>`;
+  const suma = abiertos.length + cerrados.length + perdidos.length;
+  const cuadreOk = suma === filtrados.length;
   document.getElementById('mov-resumen-adm').innerHTML =
     chip('Total movimientos', filtrados.length + ' · ' + fmt(totalMonto), 'var(--text)') +
-    chip('Pagados', pagados.length + ' · ' + fmt(pagadoMonto), 'var(--green)') +
+    chip('Pagaron', pagaron.length + ' · ' + fmt(pagadoMonto), 'var(--green)') +
+    chip('Sin costo', sinCosto.length + ` (⏱${porTiempo.length} tiempo · 🎁${porVoucher.length} cortesía · 🪪${porEmpleado.length} empleado · 🅿️${porPension.length} pensión)`, 'var(--muted)') +
     chip('Perdidos', perdidos.length + ' · ' + fmt(perdidoMonto), 'var(--red)') +
-    chip('Cortesías', String(cortesias.length), 'var(--muted)') +
-    chip('En plaza (abiertos)', String(abiertos.length), 'var(--accent2)');
+    chip('En plaza (abiertos)', String(abiertos.length), 'var(--accent2)') +
+    chip(cuadreOk ? '✓ Cuadre' : '⚠ Cuadre', cuadreOk ? '100%' : `${suma}/${filtrados.length} — revisar`, cuadreOk ? 'var(--green)' : 'var(--red)');
 }
 
 function exportarMovimientosAdminCSV() {
   const filtrados = MOV_FILTRADOS_ADM;
   if (!filtrados.length) { showToast('Sin movimientos para exportar'); return; }
-  const tipoLabelCsv = {entrada:'Entrada normal',preferencial:'Entrada preferencial',
+  const tipoLabelCsv = {entrada:'Normal',preferencial:'Preferencial',
     salida:'Cobro',perdido:'Boleto perdido',cortesia:'Cortesia',
     empleado:'Empleado',pension:'Pension'};
   const estatusLabelCsv = {abierto:'Abierto', cobrado:'Cobrado', perdido:'Perdido', cortesia:'Cortesia'};
