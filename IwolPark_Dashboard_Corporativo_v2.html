@@ -3403,7 +3403,7 @@ function mostrarModalActualizacionObligatoria(versionServidor) {
 // ══ INIT ══
 let USUARIO_ACTUAL = null;
 (async () => {
-  USUARIO_ACTUAL = await requerirLogin(['admin_plaza','super_admin'], 'Administrador de plaza');
+  USUARIO_ACTUAL = await requerirLogin(['corporativo','admin_plaza','super_admin'], 'Oficina Central');
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
   logBitacora('login', { app: 'admin' });
   document.getElementById('filtro-periodo').value = 'hoy';
