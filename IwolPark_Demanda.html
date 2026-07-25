@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v161</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v162</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -121,12 +121,13 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
 
   <!-- FILTROS -->
   <div class="filtros">
-    <select id="sel-semanas" onchange="render()">
-      <option value="actual">Semana actual</option>
-      <option value="4" selected>Últimas 4 semanas</option>
-      <option value="8">Últimas 8 semanas</option>
-      <option value="12">Último trimestre</option>
+    <select id="sel-semanas" onchange="onCambioPeriodoDemanda()">
+      <option value="actual" selected>Esta semana</option>
+      <option value="mes">Este mes</option>
+      <option value="custom">Personalizado</option>
     </select>
+    <input type="date" id="demanda-desde" style="display:none" onchange="render()">
+    <input type="date" id="demanda-hasta" style="display:none" onchange="render()">
     <select id="sel-metrica" onchange="render()">
       <option value="autos">Número de tickets</option>
       <option value="ingresos">Monto $</option>
@@ -254,16 +255,34 @@ async function fetchPaginado(urlBase, headers, maxTotal) {
   return todas;
 }
 
-// Trae tickets ya cerrados (o abiertos, para contar la entrada) de las últimas N semanas
-async function cargarTicketsDemanda(semanas) {
-  const hasta = new Date();
-  const desde = semanas === 'actual' ? lunesDeSemana(hasta)
-    : (()=>{ const d = new Date(); d.setDate(d.getDate() - semanas*7); return d; })();
-  // Fecha local (no UTC) — toISOString() convierte a UTC y en la noche
-  // (México, UTC-6) "hoy" se recorría al día siguiente.
-  const fmt = d => { const p2=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); };
+// Simplificado a 3 opciones (antes "Últimas N semanas/trimestre", relativo y
+// poco intuitivo): Esta semana / Este mes / Personalizado, mismo estilo que
+// ya se usa en Admin (Histórico) y en Movimientos.
+// Fecha local (no UTC, definida más abajo como fmtFechaLocal) — toISOString()
+// convierte a UTC y en la noche (México, UTC-6) "hoy" se recorría al día siguiente.
+function onCambioPeriodoDemanda() {
+  const esCustom = document.getElementById('sel-semanas').value === 'custom';
+  const dDesde = document.getElementById('demanda-desde'), dHasta = document.getElementById('demanda-hasta');
+  dDesde.style.display = esCustom ? '' : 'none';
+  dHasta.style.display = esCustom ? '' : 'none';
+  if (esCustom) {
+    const hoy = new Date();
+    if (!dDesde.value) dDesde.value = fmtFechaLocal(lunesDeSemana(hoy));
+    if (!dHasta.value) dHasta.value = fmtFechaLocal(hoy);
+  } else {
+    render();
+  }
+}
+async function cargarTicketsDemanda(periodo) {
+  const hoy = new Date();
+  let desde, hasta;
+  if (periodo === 'mes') { desde = fmtFechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1)); hasta = fmtFechaLocal(hoy); }
+  else if (periodo === 'custom') {
+    desde = document.getElementById('demanda-desde').value || fmtFechaLocal(lunesDeSemana(hoy));
+    hasta = document.getElementById('demanda-hasta').value || fmtFechaLocal(hoy);
+  } else { desde = fmtFechaLocal(lunesDeSemana(hoy)); hasta = fmtFechaLocal(hoy); }
   try {
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${fmt(desde)}&fecha_op=lte.${fmt(hasta)}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
     return await fetchPaginado(base, SB_HEADERS, 15000);
   } catch (e) { return []; }
 }
@@ -532,11 +551,9 @@ function heatColor(val,max) {
 }
 
 async function render() {
-  const semanasRaw = document.getElementById('sel-semanas').value;
-  const semanasVal = parseInt(semanasRaw);
-  const semanas = semanasRaw === 'actual' ? 'actual' : (isNaN(semanasVal) ? 4 : semanasVal);
+  const periodo = document.getElementById('sel-semanas').value;
   METRICA = document.getElementById('sel-metrica').value || 'autos';
-  const tickets = await cargarTicketsDemanda(semanas);
+  const tickets = await cargarTicketsDemanda(periodo);
   TICKETS_RAW = tickets;
   DEMANDA = construirDemanda(tickets, METRICA);
 
