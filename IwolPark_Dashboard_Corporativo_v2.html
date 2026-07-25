@@ -271,19 +271,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
     <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v163</span>
-    <div class="nav-menu-wrap">
-      <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
-      <div class="nav-menu-list" id="nav-menu-list">
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirParametros();">⚙ Parámetros del sistema</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirGestionManual();">✍️ Gestión manual de tickets</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirEditorHistoricoAdm();">📊 Captura histórico mensual</button>
-        <button class="nav-menu-item" onclick="cerrarNavMenu(); abrirAvisoOperador();">💬 Chat con operadores <span id="badge-preguntas-pendientes" style="display:none;background:#D93025;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:6px">0</span></button>
-        <a class="nav-menu-item" href="IwolPark_Promo_Admin.html" target="_blank">📢 Promociones</a>
-        <a class="nav-menu-item" href="IwolPark_Pensiones.html" target="_blank">🅿️ Pensiones</a>
-        <div class="nav-menu-sep"></div>
-        <a class="nav-menu-item" href="IwolPark_Index.html">🏠 Portal principal</a>
-      </div>
-    </div>
     <button class="btn-refresh" onclick="cargarDatos()">↻ Actualizar</button>
     <button onclick="window.print()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">🖨 Imprimir</button>
     <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--muted);cursor:pointer">Cerrar sesión</button>
@@ -706,15 +693,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
     </div>
 
-    <!-- Evolución mensual (historico_mensual) — solo visible en Histórico,
-         no en Seguimiento. Solo lectura: la captura/corrección manual vive
-         en el menú (📊 Captura histórico mensual), no aquí. -->
-    <div class="chart-card" id="card-evolucion-mensual" style="display:none">
-      <div class="chart-title">📊 Evolución mensual</div>
-      <div class="chart-sub" id="historico-sub-adm">Cargando…</div>
-      <div id="tabla-historico-mensual-adm" style="overflow-x:auto;margin-top:8px"></div>
-    </div>
-
     <!-- Desglose Ticket -->
     <div class="chart-card">
       <div class="chart-title">Desglose Ticket</div>
@@ -1060,10 +1038,6 @@ function aplicarModoTab() {
   document.getElementById('kpi-card-autos').style.display = esHistorico ? 'none' : '';
   document.getElementById('kpi-card-ocupacion-pct').style.display = esHistorico ? 'none' : '';
   document.getElementById('card-ocupacion-actual').style.display = esHistorico ? 'none' : '';
-  // Evolución mensual solo tiene sentido en Histórico (reemplaza a Ocupación
-  // actual, que se oculta ahí) — charts-row1 siempre muestra 3 tarjetas, no
-  // hace falta cambiar el número de columnas.
-  document.getElementById('card-evolucion-mensual').style.display = esHistorico ? '' : 'none';
   document.getElementById('kpi-grid-main').style.gridTemplateColumns = esHistorico ? 'repeat(4,1fr)' : 'repeat(6,1fr)';
   if (!esHistorico) {
     document.getElementById('filtro-periodo').value = 'hoy';
