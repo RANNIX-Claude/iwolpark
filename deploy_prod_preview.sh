@@ -1,9 +1,12 @@
 #!/bin/bash
-# Despliega una VISTA PREVIA de Producción — mismo código y mismas
-# credenciales reales de Supabase Producción que deploy_prod.sh, pero SIN
-# el flag --prod: Netlify genera una URL única de preview y NO toca el
-# dominio real iwol.click. Así se puede probar contra datos reales de
-# Producción sin arriesgar/reemplazar lo que el cliente está usando ahora.
+# Despliega una VISTA PREVIA sobre el sitio keen-chebakia-9df9bf — mismo
+# código y mismas credenciales reales de Supabase Producción que
+# deploy_prod.sh, pero SIN el flag --prod: Netlify genera una URL única de
+# preview y no toca la URL de producción de ese sitio.
+#
+# OJO (2026-07-25): el dominio real iwol.click ya NO apunta a
+# keen-chebakia-9df9bf — se movió a iwolpark-produccion2 (ver
+# deploy_prod2.sh). Esta vista previa no afecta lo que el cliente ve hoy.
 #
 # Requiere el mismo .env.prod que deploy_prod.sh (PROD_SUPABASE_URL /
 # PROD_SUPABASE_KEY). No modifica .prod_version (no cuenta como release
@@ -21,7 +24,7 @@ if [ -z "$PROD_SUPABASE_URL" ] || [ -z "$PROD_SUPABASE_KEY" ]; then
   exit 1
 fi
 
-PROD_SITE_ID="57993770-172d-45f4-8fdd-8fe43338e736"   # keen-chebakia-9df9bf / iwol.click
+PROD_SITE_ID="57993770-172d-45f4-8fdd-8fe43338e736"   # keen-chebakia-9df9bf (ya NO tiene el dominio iwol.click, ver nota arriba)
 QA_URL="https://gbciwuprgrzllagtlqij.supabase.co"
 QA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdiY2l3dXByZ3J6bGxhZ3RscWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDMzNzcsImV4cCI6MjEwMDAxOTM3N30.vmFhOv4eI3atO4TmBP5rEN-zz1mpXDLlKbxaaYPsm3o"
 
@@ -48,8 +51,8 @@ for f in $PAGES; do
   sed -i "s|<body>|<body>${BANNER}|" "$target"
 done
 
-echo "Desplegando vista previa (sin --prod, no reemplaza iwol.click)..."
+echo "Desplegando vista previa sobre keen-chebakia-9df9bf (sin --prod)..."
 netlify deploy --dir="$BUILD_DIR" --site="$PROD_SITE_ID"
 
 rm -rf "$BUILD_DIR"
-echo "Vista previa ${LABEL} lista — usa la 'Unique deploy URL' de arriba (no la Production URL) para probarla. iwol.click sigue intacto."
+echo "Vista previa ${LABEL} lista — usa la 'Unique deploy URL' de arriba (no la Production URL) para probarla. No afecta iwol.click."

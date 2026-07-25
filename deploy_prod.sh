@@ -1,7 +1,11 @@
 #!/bin/bash
-# Despliega el ambiente de PRODUCCIÓN (iwol.click) — misma app/código que QA,
-# pero con las credenciales de un proyecto Supabase SEPARADO (base de datos
+# Despliega al sitio keen-chebakia-9df9bf — misma app/código que QA, pero
+# con las credenciales de un proyecto Supabase SEPARADO (base de datos
 # propia, limpia de tickets/cortes/bitácora de prueba).
+#
+# OJO (2026-07-25): el dominio real iwol.click ya NO apunta a este sitio —
+# se movió a iwolpark-produccion2 (ver deploy_prod2.sh). Este script solo
+# actualiza la URL .netlify.app de keen-chebakia-9df9bf.
 #
 # No modifica ni commitea los archivos fuente (que se quedan con las
 # credenciales de QA) — genera una copia efímera en una carpeta temporal,
@@ -21,7 +25,7 @@ if [ -z "$PROD_SUPABASE_URL" ] || [ -z "$PROD_SUPABASE_KEY" ]; then
   exit 1
 fi
 
-PROD_SITE_ID="57993770-172d-45f4-8fdd-8fe43338e736"   # keen-chebakia-9df9bf / iwol.click
+PROD_SITE_ID="57993770-172d-45f4-8fdd-8fe43338e736"   # keen-chebakia-9df9bf (ya NO tiene el dominio iwol.click, ver nota arriba)
 QA_URL="https://gbciwuprgrzllagtlqij.supabase.co"
 QA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdiY2l3dXByZ3J6bGxhZ3RscWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDMzNzcsImV4cCI6MjEwMDAxOTM3N30.vmFhOv4eI3atO4TmBP5rEN-zz1mpXDLlKbxaaYPsm3o"
 
@@ -51,4 +55,4 @@ done
 netlify deploy --prod --dir="$BUILD_DIR" --site="$PROD_SITE_ID"
 
 rm -rf "$BUILD_DIR"
-echo "Producción v${NEXT} desplegada a iwol.click"
+echo "Producción v${NEXT} desplegada a keen-chebakia-9df9bf.netlify.app (no es iwol.click)"

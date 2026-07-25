@@ -1,10 +1,12 @@
 #!/bin/bash
-# Despliega la copia PARALELA de Producción (iwolpark-produccion2.netlify.app)
-# — mismo código que Producción/QA, pero con las credenciales de un proyecto
-# Supabase SEPARADO (syryisrelcjgdulxmgro), réplica exacta de la base real.
+# Despliega a iwolpark-produccion2 — mismo código que QA, pero con las
+# credenciales de un proyecto Supabase SEPARADO (syryisrelcjgdulxmgro),
+# réplica exacta de la base real.
 #
-# NO reemplaza iwol.click ni el sitio de Producción original — es un
-# ambiente aparte, en paralelo, mientras se decide el corte de dominio.
+# OJO (2026-07-25): el corte de dominio ya se hizo — iwol.click apunta a
+# ESTE sitio (iwolpark-produccion2), no al de deploy_prod.sh
+# (keen-chebakia-9df9bf). Este script SÍ es lo que ven los clientes reales
+# en iwol.click.
 #
 # No modifica ni commitea los archivos fuente. Requiere .env.prod2 (no
 # versionado) con PROD2_SUPABASE_URL y PROD2_SUPABASE_KEY.
@@ -30,12 +32,17 @@ NEXT=$((CURRENT + 1))
 echo "$NEXT" > .prod2_version
 
 BUILD_DIR=$(mktemp -d)
-PAGES="IwolPark_Index.html IwolPark_TABLET.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html IwolPark_Dashboard_Cajeros.html IwolPark_Promo_Admin.html"
+PAGES="IwolPark_Index.html IwolPark_TABLET.html IwolPark_Dashboard_Admin.html corporativo.html IwolPark_Pensiones.html IwolPark_Demanda.html IwolPark_Dashboard_Cajeros.html IwolPark_Promo_Admin.html"
 EXTRA="manifest_tablet.json manifest_admin.json manifest_corporativo.json sw.js"
 
 for f in $PAGES $EXTRA; do
   [ -f "$f" ] && cp "$f" "$BUILD_DIR/"
 done
+
+# manifest_corporativo.json y sw.js siguen versionados con el nombre viejo
+# (los usan QA/Producción real, que aún sirven IwolPark_Dashboard_Corporativo.html).
+# Solo en esta copia efímera de PROD2 se ajustan al nombre corto.
+sed -i "s/IwolPark_Dashboard_Corporativo\.html/corporativo.html/g" "$BUILD_DIR/manifest_corporativo.json" "$BUILD_DIR/sw.js" "$BUILD_DIR/IwolPark_Index.html"
 
 for f in $PAGES; do
   target="$BUILD_DIR/$f"
