@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v162</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v163</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -282,7 +282,11 @@ async function cargarTicketsDemanda(periodo) {
     hasta = document.getElementById('demanda-hasta').value || fmtFechaLocal(hoy);
   } else { desde = fmtFechaLocal(lunesDeSemana(hoy)); hasta = fmtFechaLocal(hoy); }
   try {
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=fecha_op,hora_entrada,importe&order=fecha_op.asc`;
+    // folio/tipo/cajero/hora_salida/estatus se agregan además de
+    // fecha_op/hora_entrada/importe (lo único que usa el heatmap para
+    // calcular) para poder mostrar el detalle real al hacer clic en una
+    // celda, sin tener que pedirlo aparte.
+    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
     return await fetchPaginado(base, SB_HEADERS, 15000);
   } catch (e) { return []; }
 }
@@ -734,7 +738,7 @@ function renderHeatmap() {
       const {bg,text}=heatColor(val,max);
       const fr=franjaDeHoraDem(h).label;
       html+=`<div class="hm-cell" style="background:${bg};color:${text}"
-        onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${fmtVal(val)} · ${fr}'"
+        onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${fmtVal(val)} · ${fr}';drillHeatmapCelda('${dia}',${h})"
         onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal(val)} (${fr})')"
         onmouseleave="ht()">${Math.round(val)>0?Math.round(val):''}</div>`;
     });
@@ -753,6 +757,36 @@ function renderHeatmap() {
   document.getElementById('legend-bar').innerHTML=
     ['#F3F0FF','#C7B8E8','#9B7FD4','#7B5EA7','#4B2D7F']
     .map(c=>`<div class="leg-cell" style="background:${c}"></div>`).join('');
+}
+
+// Clic en una celda del heatmap: antes solo actualizaba el textito de arriba
+// ("Clic para ver detalle" prometía esto pero nunca abría nada) — ahora abre
+// el mismo panel de detalle que ya usa "Tickets por cajero y día", filtrando
+// TICKETS_RAW (el mismo universo de datos que ya se pidió para el heatmap)
+// por día de la semana + hora de entrada, igual que construirDemanda().
+function drillHeatmapCelda(dia, hora) {
+  const ops = TICKETS_RAW.filter(t => {
+    if (!t.fecha_op || !t.hora_entrada) return false;
+    if (DIAS[fechaADiaIdx(t.fecha_op)] !== dia) return false;
+    return parseInt(String(t.hora_entrada).split(':')[0]) === hora;
+  });
+  const tipoLabel = {normal:'Normal',preferencial:'Preferencial',perdido:'Perdido',cortesia:'Cortesía',empleado:'Empleado',pension:'Pensión'};
+  document.getElementById('drill-title').textContent = `📍 ${dia} ${hora}:00 — ${ops.length} ticket${ops.length===1?'':'s'}`;
+  document.getElementById('drill-content').innerHTML = ops.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:7px">Folio</th><th style="text-align:left;padding:7px">Tipo</th>
+        <th style="text-align:left;padding:7px">Cajero</th><th style="text-align:left;padding:7px">Fecha</th>
+        <th style="text-align:left;padding:7px">Entrada</th><th style="text-align:left;padding:7px">Salida</th>
+        <th style="padding:7px;text-align:right">Importe</th>
+      </tr></thead>
+      <tbody>${ops.map(o=>`<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:7px"><span style="font-family:monospace;font-weight:700">${o.folio||'—'}</span></td>
+        <td style="padding:7px">${tipoLabel[o.tipo]||o.tipo||'—'}</td><td style="padding:7px">${o.cajero||'—'}</td>
+        <td style="padding:7px">${o.fecha_op}</td><td style="padding:7px">${o.hora_entrada||'—'}</td>
+        <td style="padding:7px">${o.hora_salida||'—'}</td>
+        <td style="padding:7px;text-align:right;font-weight:700;color:${o.importe?'var(--gold)':'var(--muted)'}">${fmtMoney(o.importe)}</td>
+      </tr>`).join('')}</tbody></table></div>` : '<div style="padding:20px;color:var(--muted)">Sin operaciones</div>';
+  document.getElementById('drill-panel').classList.add('open');
 }
 
 function tt(e,txt) {
