@@ -270,7 +270,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v160</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v161</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -706,16 +706,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
     </div>
 
-    <!-- Evolución mensual (historico_mensual) — solo visible en Histórico,
-         no en Seguimiento. Antes vivía en Demanda.html (compartido con
-         Corporativo, solo-lectura); el botón de edición no tenía sentido
-         ahí, así que la captura/corrección manual se movió aquí. -->
-    <div class="chart-card" id="card-evolucion-mensual" style="display:none">
-      <div class="chart-title">📊 Evolución mensual</div>
-      <div class="chart-sub" id="historico-sub-adm">Cargando…</div>
-      <div id="tabla-historico-mensual-adm" style="overflow-x:auto;margin-top:8px"></div>
-    </div>
-
     <!-- Desglose Ticket -->
     <div class="chart-card">
       <div class="chart-title">Desglose Ticket</div>
@@ -1061,18 +1051,12 @@ function aplicarModoTab() {
   document.getElementById('kpi-card-autos').style.display = esHistorico ? 'none' : '';
   document.getElementById('kpi-card-ocupacion-pct').style.display = esHistorico ? 'none' : '';
   document.getElementById('card-ocupacion-actual').style.display = esHistorico ? 'none' : '';
-  // Evolución mensual solo tiene sentido en Histórico (captura/corrección de
-  // valores por mes) — reemplaza a Ocupación actual, que se oculta ahí, así
-  // que charts-row1 siempre muestra 3 tarjetas y no hace falta cambiar el
-  // número de columnas.
-  document.getElementById('card-evolucion-mensual').style.display = esHistorico ? '' : 'none';
   document.getElementById('kpi-grid-main').style.gridTemplateColumns = esHistorico ? 'repeat(4,1fr)' : 'repeat(6,1fr)';
+  document.getElementById('charts-row1').style.gridTemplateColumns = esHistorico ? 'repeat(2,1fr)' : 'repeat(3,1fr)';
   if (!esHistorico) {
     document.getElementById('filtro-periodo').value = 'hoy';
     document.getElementById('filtro-desde').style.display = 'none';
     document.getElementById('filtro-hasta').style.display = 'none';
-  } else {
-    cargarHistoricoMensualAdm();
   }
 }
 
@@ -1098,102 +1082,6 @@ async function obtenerPlazaIdHistAdm() {
     PLAZA_ID_HIST_ADM = rows[0] ? rows[0].plaza_id : null;
   } catch (e) { PLAZA_ID_HIST_ADM = null; }
   return PLAZA_ID_HIST_ADM;
-}
-async function calcularMesDesdeTicketsAdm(anio, mes) {
-  const desde = `${anio}-${String(mes).padStart(2,'0')}-01`;
-  const ultimoDia = new Date(anio, mes, 0).getDate();
-  const hasta = `${anio}-${String(mes).padStart(2,'0')}-${String(ultimoDia).padStart(2,'0')}`;
-  const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=importe,estatus`;
-  const rows = await fetchPaginado(base, { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, 20000);
-  const validos = rows.filter(t => t.estatus !== 'cancelado');
-  const monto = validos.reduce((s,t) => s + (Number(t.importe)||0), 0);
-  return { monto, tickets: validos.length };
-}
-async function cargarHistoricoMensualAdm() {
-  const cont = document.getElementById('tabla-historico-mensual-adm');
-  const sub = document.getElementById('historico-sub-adm');
-  const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
-  const plazaId = await obtenerPlazaIdHistAdm();
-  if (!plazaId) { sub.textContent = 'No se pudo determinar la plaza'; return; }
-
-  const hoy = new Date();
-  const anioActual = hoy.getFullYear(), mesActual = hoy.getMonth()+1;
-  const anioAnterior = anioActual - 1;
-  sub.textContent = `${anioAnterior} vs ${anioActual} · importe cobrado por mes`;
-
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?plaza_id=eq.${plazaId}&anio=in.(${anioAnterior},${anioActual})&select=anio,mes,monto_total,origen`, { headers });
-    const filas = r.ok ? await r.json() : [];
-    const mapa = {}; // mapa[anio][mes] = {monto, origen}
-    filas.forEach(f => { (mapa[f.anio] = mapa[f.anio]||{})[f.mes] = { monto: Number(f.monto_total)||0, origen: f.origen }; });
-
-    const porGuardar = [];
-    for (const anio of [anioAnterior, anioActual]) {
-      const tope = anio === anioActual ? mesActual : 12;
-      for (let mes = 1; mes <= tope; mes++) {
-        const existente = mapa[anio] && mapa[anio][mes];
-        const esMesActual = anio === anioActual && mes === mesActual;
-        if (existente && !esMesActual) continue; // ya guardado (manual o sistema) y cerrado
-        const { monto, tickets } = await calcularMesDesdeTicketsAdm(anio, mes);
-        (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
-        if (tickets > 0 || esMesActual) {
-          porGuardar.push({ plaza_id: plazaId, anio, mes, monto_total: monto, tickets_totales: tickets, origen: 'sistema', actualizado_en: new Date().toISOString() });
-        }
-      }
-    }
-    if (porGuardar.length) {
-      fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?on_conflict=plaza_id,anio,mes`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify(porGuardar)
-      }).catch(()=>{});
-    }
-
-    renderHistoricoMensualAdm(mapa, anioAnterior, anioActual, mesActual);
-  } catch (e) {
-    cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">No se pudo cargar el histórico</div>';
-  }
-}
-function renderHistoricoMensualAdm(mapa, anioAnterior, anioActual, mesActual) {
-  const fmt = n => n.toLocaleString('es-MX',{style:'currency',currency:'MXN'});
-  const val = (anio, mes) => (mapa[anio] && mapa[anio][mes]) ? mapa[anio][mes].monto : 0;
-  const filas = MESES_NOMBRE_ADM.map((nombre, i) => {
-    const mes = i+1;
-    const anterior = val(anioAnterior, mes);
-    const actual = mapa[anioActual] && mapa[anioActual][mes] ? val(anioActual, mes) : null;
-    return { mes, nombre, anterior, actual };
-  });
-  const totalAnterior = filas.reduce((s,f)=>s+f.anterior, 0);
-  const totalActual = filas.reduce((s,f)=>s+(f.actual||0), 0);
-  const varPct = (actual, anterior) => {
-    if (actual == null) return null;
-    if (!anterior) return null;
-    return (actual - anterior) / anterior * 100;
-  };
-  const fmtVar = v => v == null ? '—' : `${v>0?'+':''}${v.toFixed(1)}%`;
-  const colorVar = v => v == null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)');
-  const filaHtml = (label, anterior, actual, vPct, esTotal, destacar) => `
-    <tr style="${esTotal?'border-top:2px solid var(--border);font-weight:900':'border-bottom:1px solid var(--border)'}${destacar?';background:#F3F0FF':''}">
-      <td style="padding:7px">${label}</td>
-      <td style="padding:7px;text-align:right">${fmt(anterior)}</td>
-      <td style="padding:7px;text-align:right">${actual==null?'—':fmt(actual)}</td>
-      <td style="padding:7px;text-align:right;font-weight:800;color:${colorVar(vPct)}">${fmtVar(vPct)}</td>
-    </tr>`;
-  const cuerpo = filas.map(f => filaHtml(
-    f.nombre + (f.mes===mesActual ? ' (en curso)' : ''),
-    f.anterior, f.actual, varPct(f.actual, f.anterior), false, f.mes===mesActual
-  )).join('');
-  const totalRow = filaHtml('Total general', totalAnterior, totalActual, varPct(totalActual, totalAnterior), true, false);
-  document.getElementById('tabla-historico-mensual-adm').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="border-bottom:2px solid var(--border)">
-        <th style="text-align:left;padding:7px">Mes</th>
-        <th style="text-align:right;padding:7px">${anioAnterior}</th>
-        <th style="text-align:right;padding:7px">${anioActual}</th>
-        <th style="text-align:right;padding:7px">Var %</th>
-      </tr></thead>
-      <tbody>${cuerpo}${totalRow}</tbody>
-    </table>`;
 }
 // Editor: corrección manual (ej. error de dedo al capturar un año previo al
 // sistema). Guardar siempre marca origen 'manual', así el recálculo
@@ -1252,7 +1140,6 @@ async function guardarEditorHistoricoAdm() {
     });
     if (!r.ok) throw new Error(await r.text());
     cerrarEditorHistoricoAdm();
-    cargarHistoricoMensualAdm();
     showToast('Histórico guardado');
   } catch (e) {
     alert('No se pudo guardar el histórico: ' + e.message);
