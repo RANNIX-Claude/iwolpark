@@ -1054,6 +1054,11 @@ function aplicarModoTab() {
   document.getElementById('kpi-card-ocupacion-pct').style.display = esHistorico ? 'none' : '';
   document.getElementById('card-ocupacion-actual').style.display = esHistorico ? 'none' : '';
   document.getElementById('kpi-grid-main').style.gridTemplateColumns = esHistorico ? 'repeat(4,1fr)' : 'repeat(6,1fr)';
+  // Al ocultar "Ocupación actual" en Histórico, quedan solo 2 tarjetas —
+  // sin este ajuste la fila se queda en 3 columnas fijas y las 2 restantes
+  // se recorren a la izquierda dejando un tercio de espacio muerto a la
+  // derecha, en vez de repartirse la fila a la mitad.
+  document.getElementById('charts-row1').style.gridTemplateColumns = esHistorico ? 'repeat(2,1fr)' : 'repeat(3,1fr)';
   if (!esHistorico) {
     document.getElementById('filtro-periodo').value = 'hoy';
     document.getElementById('filtro-desde').style.display = 'none';
