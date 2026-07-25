@@ -442,6 +442,16 @@ function aplicarModoTabAdm() {
   }
 }
 
+function onFiltroCambioAdm() {
+  const p = document.getElementById('filtro-periodo-adm').value;
+  document.getElementById('filtro-desde-adm').style.display = p==='custom'?'':'none';
+  document.getElementById('filtro-hasta-adm').style.display = p==='custom'?'':'none';
+  if (p !== 'custom') {
+    renderAdminTab();
+    cargarHistoricoMensualCorp();
+  }
+}
+
 // ══ EVOLUCIÓN MENSUAL (historico_mensual) — SOLO LECTURA, solo Histórico ══
 // La captura/corrección manual es exclusiva del menú de Admin — aquí es de
 // solo consulta, igual que en Demanda.html.
@@ -491,8 +501,11 @@ async function cargarHistoricoMensualCorp() {
         const esMesActual = anio === anioActual && mes === mesActual;
         if (existente && !esMesActual) continue;
         const { monto, tickets } = await calcularMesDesdeTicketsCorp(anio, mes);
-        (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
+        // Si el sistema no tiene NINGÚN ticket ese mes (y no es el mes en
+        // curso), NO se guarda ni se muestra $0 — $0 diría "hubo cero
+        // ingresos" cuando la realidad es "no tenemos ese dato". Se deja "—".
         if (tickets > 0 || esMesActual) {
+          (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
           porGuardar.push({ plaza_id: plazaId, anio, mes, monto_total: monto, tickets_totales: tickets, origen: 'sistema', actualizado_en: new Date().toISOString() });
         }
       }
@@ -514,14 +527,14 @@ function renderHistoricoMensualCorp(mapa, anioAnterior, anioActual, mesActual) {
   const val = (anio, mes) => (mapa[anio] && mapa[anio][mes]) ? mapa[anio][mes].monto : 0;
   const filas = MESES_NOMBRE_CORP.map((nombre, i) => {
     const mes = i+1;
-    const anterior = val(anioAnterior, mes);
+    const anterior = mapa[anioAnterior] && mapa[anioAnterior][mes] ? val(anioAnterior, mes) : null;
     const actual = mapa[anioActual] && mapa[anioActual][mes] ? val(anioActual, mes) : null;
     return { mes, nombre, anterior, actual };
   });
-  const totalAnterior = filas.reduce((s,f)=>s+f.anterior, 0);
+  const totalAnterior = filas.reduce((s,f)=>s+(f.anterior||0), 0);
   const totalActual = filas.reduce((s,f)=>s+(f.actual||0), 0);
   const varPct = (actual, anterior) => {
-    if (actual == null) return null;
+    if (actual == null || anterior == null) return null;
     if (!anterior) return null;
     return (actual - anterior) / anterior * 100;
   };
@@ -530,7 +543,7 @@ function renderHistoricoMensualCorp(mapa, anioAnterior, anioActual, mesActual) {
   const filaHtml = (label, anterior, actual, vPct, esTotal, destacar) => `
     <tr style="${esTotal?'border-top:2px solid var(--border);font-weight:900':'border-bottom:1px solid var(--border)'}${destacar?';background:#F3F0FF':''}">
       <td style="padding:7px">${label}</td>
-      <td style="padding:7px;text-align:right">${fmt$(anterior)}</td>
+      <td style="padding:7px;text-align:right">${anterior==null?'—':fmt$(anterior)}</td>
       <td style="padding:7px;text-align:right">${actual==null?'—':fmt$(actual)}</td>
       <td style="padding:7px;text-align:right;font-weight:800;color:${colorVar(vPct)}">${fmtVar(vPct)}</td>
     </tr>`;
@@ -538,7 +551,7 @@ function renderHistoricoMensualCorp(mapa, anioAnterior, anioActual, mesActual) {
     f.nombre + (f.mes===mesActual ? ' (en curso)' : ''),
     f.anterior, f.actual, varPct(f.actual, f.anterior), false, f.mes===mesActual
   )).join('');
-  const totalRow = filaHtml('Total general', totalAnterior, totalActual, varPct(totalActual, totalAnterior), true, false);
+  const totalRow = filaHtml('Total general', totalAnterior||null, totalActual||null, varPct(totalActual, totalAnterior), true, false);
   document.getElementById('tabla-historico-mensual-corp').innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="border-bottom:2px solid var(--border)">

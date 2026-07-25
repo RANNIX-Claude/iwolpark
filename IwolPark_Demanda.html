@@ -620,8 +620,12 @@ async function cargarHistoricoMensual() {
         const esMesActual = anio === anioActual && mes === mesActual;
         if (existente && !esMesActual) continue; // ya guardado (manual o sistema) y cerrado
         const { monto, tickets } = await calcularMesDesdeTickets(anio, mes);
-        (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
+        // Si el sistema no tiene NINGÚN ticket ese mes (y no es el mes en
+        // curso), NO se guarda ni se muestra $0 — $0 diría "hubo cero
+        // ingresos" cuando la realidad es "no tenemos ese dato" (el sistema
+        // solo tiene historial de las últimas semanas). Se deja en "—".
         if (tickets > 0 || esMesActual) {
+          (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
           porGuardar.push({ plaza_id: plazaId, anio, mes, monto_total: monto, tickets_totales: tickets, origen: 'sistema', actualizado_en: new Date().toISOString() });
         }
       }
@@ -643,14 +647,14 @@ function renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual) {
   const val = (anio, mes) => (mapa[anio] && mapa[anio][mes]) ? mapa[anio][mes].monto : 0;
   const filas = MESES_NOMBRE.map((nombre, i) => {
     const mes = i+1;
-    const anterior = val(anioAnterior, mes);
+    const anterior = mapa[anioAnterior] && mapa[anioAnterior][mes] ? val(anioAnterior, mes) : null;
     const actual = mapa[anioActual] && mapa[anioActual][mes] ? val(anioActual, mes) : null;
     return { mes, nombre, anterior, actual };
   });
-  const totalAnterior = filas.reduce((s,f)=>s+f.anterior, 0);
+  const totalAnterior = filas.reduce((s,f)=>s+(f.anterior||0), 0);
   const totalActual = filas.reduce((s,f)=>s+(f.actual||0), 0);
   const varPct = (actual, anterior) => {
-    if (actual == null) return null;
+    if (actual == null || anterior == null) return null;
     if (!anterior) return null;
     return (actual - anterior) / anterior * 100;
   };
@@ -659,7 +663,7 @@ function renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual) {
   const filaHtml = (label, anterior, actual, vPct, esTotal, destacar) => `
     <tr style="${esTotal?'border-top:2px solid var(--border);font-weight:900':'border-bottom:1px solid var(--border)'}${destacar?';background:#F3F0FF':''}">
       <td style="padding:7px">${label}</td>
-      <td style="padding:7px;text-align:right">${fmtMoney(anterior)}</td>
+      <td style="padding:7px;text-align:right">${anterior==null?'—':fmtMoney(anterior)}</td>
       <td style="padding:7px;text-align:right">${actual==null?'—':fmtMoney(actual)}</td>
       <td style="padding:7px;text-align:right;font-weight:800;color:${colorVar(vPct)}">${fmtVar(vPct)}</td>
     </tr>`;
@@ -667,7 +671,7 @@ function renderHistoricoMensual(mapa, anioAnterior, anioActual, mesActual) {
     f.nombre + (f.mes===mesActual ? ' (en curso)' : ''),
     f.anterior, f.actual, varPct(f.actual, f.anterior), false, f.mes===mesActual
   )).join('');
-  const totalRow = filaHtml('Total general', totalAnterior, totalActual, varPct(totalActual, totalAnterior), true, false);
+  const totalRow = filaHtml('Total general', totalAnterior||null, totalActual||null, varPct(totalActual, totalAnterior), true, false);
   document.getElementById('tabla-historico-mensual').innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="border-bottom:2px solid var(--border)">
@@ -737,9 +741,9 @@ function renderHeatmap() {
       const val=DEMANDA[dia][h];
       const {bg,text}=heatColor(val,max);
       const fr=franjaDeHoraDem(h).label;
-      html+=`<div class="hm-cell" style="background:${bg};color:${text}"
-        onclick="document.getElementById('hm-selected').textContent='${dia} ${h}:00 → ${fmtVal(val)} · ${fr}';drillHeatmapCelda('${dia}',${h})"
-        onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal(val)} (${fr})')"
+      const fmtVal_str=fmtVal(val);
+      html+=`<div class="hm-cell" style="background:${bg};color:${text}" data-dia="${dia}" data-hora="${h}"
+        onmouseenter="tt(event,'${dia} ${h}:00 — ${fmtVal_str} (${fr})')"
         onmouseleave="ht()">${Math.round(val)>0?Math.round(val):''}</div>`;
     });
     html+=`<div class="hm-cell" style="${totalCellStyle}"
@@ -753,6 +757,19 @@ function renderHeatmap() {
   html+=`<div class="hm-cell" style="${totalCellStyle}"
     onmouseenter="tt(event,'Total general: ${fmtVal(granTotal)}')" onmouseleave="ht()">${Math.round(granTotal)}</div>`;
   el.innerHTML=html;
+  // Event listener para clic en celdas del heatmap
+  document.querySelectorAll('.heatmap .hm-cell[data-dia]').forEach(cell => {
+    cell.addEventListener('click', function() {
+      const dia = this.getAttribute('data-dia');
+      const hora = parseInt(this.getAttribute('data-hora'));
+      if (dia && !isNaN(hora)) {
+        const val = DEMANDA[dia][hora];
+        const fr = franjaDeHoraDem(hora).label;
+        document.getElementById('hm-selected').textContent = dia + ' ' + hora + ':00 - ' + fmtVal(val) + ' - ' + fr;
+        drillHeatmapCelda(dia, hora);
+      }
+    });
+  });
   // Leyenda
   document.getElementById('legend-bar').innerHTML=
     ['#F3F0FF','#C7B8E8','#9B7FD4','#7B5EA7','#4B2D7F']
