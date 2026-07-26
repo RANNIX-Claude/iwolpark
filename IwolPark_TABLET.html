@@ -2582,14 +2582,26 @@ function crearTicketSinCosto(prefijo, tipoCobroLocal, labelResultado, colorFolio
 }
 
 
+// Con wifi totalmente apagado (no solo un servidor que no responde), fetch()
+// puede tardar 30-60+ segundos en darse por vencido esperando DNS/conexión
+// antes de rechazar la promesa — sin límite, "Cargando empleados/pensiones…"
+// se sentía pegado todo ese rato en vez de caer al catálogo local casi de
+// inmediato. Con esto, a los `ms` se aborta y se cae al catálogo sin esperar
+// el timeout nativo del navegador.
+function fetchConTimeout(url, options, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 // ── ENTRADA EMPLEADOS (entrada y salida libres) ──
 // Trae empleados activos de Supabase y, si lo logra, refresca la copia
 // local (IndexedDB) — mismo patrón que fetchPensionadosActivos, para poder
 // seguir dando entrada a empleados aunque se caiga el wifi a media operación.
 async function fetchEmpleadosActivos() {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/empleados?activo=eq.true&select=id,nombre_completo,puesto,area&order=nombre_completo.asc`, {
+  const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/empleados?activo=eq.true&select=id,nombre_completo,puesto,area&order=nombre_completo.asc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-  });
+  }, 4000);
   if (!r.ok) throw new Error('Supabase respondió ' + r.status);
   const data = await r.json();
   dbSet('store', 'empleados_cache', JSON.stringify({ data, ts: Date.now() })).catch(()=>{});
@@ -2605,9 +2617,9 @@ async function fetchEmpleadosActivos() {
 // (ej. se le podían dar 2 accesos al mismo empleado sin que nadie lo notara).
 async function fetchEmpleadoIdsOcupados() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&empleado_id=not.is.null&select=empleado_id`, {
+    const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&empleado_id=not.is.null&select=empleado_id`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    });
+    }, 4000);
     if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
     const ids = rows.map(row => row.empleado_id);
@@ -2671,9 +2683,9 @@ async function registrarEntradaEmpleado() {
 // (IndexedDB) para poder seguir dando entrada a pensionados aunque se caiga
 // el wifi a media operación.
 async function fetchPensionadosActivos() {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/pensiones?estado=eq.activo&select=pension_id,tipo,monto_mensual,fecha_inicio,vehiculos(placas,marca,modelo,color),clientes(nombre)&order=created_at.desc`, {
+  const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/pensiones?estado=eq.activo&select=pension_id,tipo,monto_mensual,fecha_inicio,vehiculos(placas,marca,modelo,color),clientes(nombre)&order=created_at.desc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-  });
+  }, 4000);
   if (!r.ok) throw new Error('Supabase respondió ' + r.status);
   const data = await r.json();
   dbSet('store', 'pensiones_cache', JSON.stringify({ data, ts: Date.now() })).catch(()=>{});
@@ -2687,9 +2699,9 @@ async function fetchPensionadosActivos() {
 // y se usa como respaldo sin conexión en vez de devolver [] (nadie ocupado).
 async function fetchPensionIdsOcupadas() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&pension_id=not.is.null&select=pension_id`, {
+    const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&pension_id=not.is.null&select=pension_id`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    });
+    }, 4000);
     if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
     const ids = rows.map(row => row.pension_id);
