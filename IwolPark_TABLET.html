@@ -1438,16 +1438,34 @@ let URL_FACTURACION = '';
 // Horarios configurados en Parámetros (Admin) — se usan para habilitar los
 // botones de Inicio de turno/Relevo/Cierre solo dentro de su ventana (Fase C).
 let HORARIOS_PLAZA = { apertura: null, relevo1: null, relevo2: null, cierre: null };
+// Tarifas/tolerancia configuradas en Parámetros (Admin) — antes estaban
+// hardcodeadas en confirmarCobro/calcularManual/etc. y cambiarlas en Admin
+// no tenía ningún efecto real en la caseta. Los defaults de abajo son los
+// mismos valores que estaban fijos en el código, para que si el fetch falla
+// (sin conexión) o falta el ALTER TABLE, el comportamiento sea idéntico al
+// de antes.
+let TARIFAS_PLAZA = {
+  tarifa_normal: 15, tarifa_pref: 6, tarifa_perdido: 150, tolerancia_min: 15,
+  tolerancia_redondeo_habilitado: false, tolerancia_redondeo_min: 5
+};
 
 async function cargarParametrosPlaza() {
   try {
-    // hora_* y url_facturacion pueden no existir todavía (requieren ALTER
-    // TABLE manuales) — si el select completo falla por columna faltante,
-    // se reintenta quitando primero horarios y luego también facturación,
-    // para que capacidad/plaza_id siempre carguen aunque falte alguna.
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, {
+    // hora_*, url_facturacion y los campos de tarifa/redondeo pueden no
+    // existir todavía (requieren ALTER TABLE manuales) — si el select
+    // completo falla por columna faltante, se reintenta progresivamente
+    // quitando primero tarifas/redondeo, luego horarios y luego también
+    // facturación, para que capacidad/plaza_id siempre carguen aunque
+    // falte alguna columna nueva.
+    const COLS_TARIFAS = 'tarifa_normal,tarifa_pref,tarifa_perdido,tolerancia_min,tolerancia_redondeo_habilitado,tolerancia_redondeo_min';
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre,${COLS_TARIFAS}&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
+    if (!r.ok) {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion,hora_apertura,hora_relevo_1,hora_relevo_2,hora_cierre&limit=1`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      });
+    }
     if (!r.ok) {
       r = await fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=plaza_id,capacidad_total,url_facturacion&limit=1`, {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -1471,7 +1489,31 @@ async function cargarParametrosPlaza() {
       relevo2:  p.hora_relevo_2 ? p.hora_relevo_2.slice(0,5) : null,
       cierre:   p.hora_cierre ? p.hora_cierre.slice(0,5) : null,
     };
+    TARIFAS_PLAZA = {
+      tarifa_normal: p.tarifa_normal ?? TARIFAS_PLAZA.tarifa_normal,
+      tarifa_pref:   p.tarifa_pref   ?? TARIFAS_PLAZA.tarifa_pref,
+      tarifa_perdido: p.tarifa_perdido ?? TARIFAS_PLAZA.tarifa_perdido,
+      tolerancia_min: p.tolerancia_min ?? TARIFAS_PLAZA.tolerancia_min,
+      tolerancia_redondeo_habilitado: p.tolerancia_redondeo_habilitado ?? false,
+      tolerancia_redondeo_min: p.tolerancia_redondeo_min ?? TARIFAS_PLAZA.tolerancia_redondeo_min,
+    };
   } catch (e) {}
+}
+
+// Convierte minutos de estancia en horas a cobrar, aplicando la tolerancia
+// de cortesía inicial (gratis del todo) y, si está activada, la tolerancia
+// de redondeo por hora (no cobra la hora siguiente completa si el excedente
+// es de pocos minutos) — una sola función para que las 3 pantallas que
+// cobran (cobro normal, captura manual, cobro por otro cajero) calculen
+// exactamente igual.
+function calcularHorasACobrar(mins) {
+  const horasCompletas = Math.floor(mins/60);
+  const resto = mins % 60;
+  if (resto === 0) return horasCompletas;
+  if (TARIFAS_PLAZA.tolerancia_redondeo_habilitado && horasCompletas >= 1 && resto <= TARIFAS_PLAZA.tolerancia_redondeo_min) {
+    return horasCompletas;
+  }
+  return horasCompletas + 1;
 }
 
 // Se relee de Supabase en cada entrada (no se cachea) porque la caseta se
@@ -2933,14 +2975,14 @@ function buscarFolioModal(v, esFinal) {
 
   const ahora=new Date();
   const mins=Math.max(1,Math.round((ahora-new Date(t.entrada_at))/60000));
-  const TOLERANCIA = 15; // minutos gratis de cortesía
+  const TOLERANCIA = TARIFAS_PLAZA.tolerancia_min; // minutos gratis de cortesía
   // Pensión/Empleados/Cortesía manual nunca cobran, sin importar el tiempo.
   const sinCosto = ['pension','empleado','cortesia'].includes(t.tipo_cobro);
   const esPref=t.tipo_cobro==='preferencial';
-  const tarifa=esPref?6:15;
+  const tarifa=esPref?TARIFAS_PLAZA.tarifa_pref:TARIFAS_PLAZA.tarifa_normal;
   // Si está dentro de tolerancia, o es un tipo sin costo → $0
   const enTolerancia = sinCosto || mins <= TOLERANCIA;
-  const hrsC = enTolerancia ? 0 : Math.ceil(mins/60);
+  const hrsC = enTolerancia ? 0 : calcularHorasACobrar(mins);
   const hrsR=Math.floor(mins/60); const minsR=mins%60;
   const total = enTolerancia ? 0 : hrsC*tarifa;
   const tiempoTxt=hrsR===0?mins+' min':minsR===0?hrsR+' hr':hrsR+' hr '+minsR+' min';
@@ -3118,8 +3160,8 @@ function calcularPerdidoModal() {
   const [h,m]=val.split(':').map(Number);
   const entrada=new Date(); entrada.setHours(h,m,0,0);
   const mins=Math.max(1,Math.round((new Date()-entrada)/60000));
-  const horas=Math.ceil(mins/60);
-  const tiempo=horas*15; const total=150+tiempo;
+  const horas=calcularHorasACobrar(mins);
+  const tiempo=horas*TARIFAS_PLAZA.tarifa_normal; const total=TARIFAS_PLAZA.tarifa_perdido+tiempo;
   const hrsR=Math.floor(mins/60),minsR=mins%60;
   document.getElementById('mp-tiempo').textContent=hrsR>0?hrsR+' hr '+(minsR?minsR+' min':''):mins+' min';
   document.getElementById('mp-total').textContent='$'+total.toFixed(2);
@@ -3153,7 +3195,7 @@ function confirmarPerdido() {
   addLog('perdido','PERDIDO','Perdido · '+horas+'hr · '+ref,'$'+total.toFixed(2),hora);save();
   syncOperacion({
     folio: 'PERDIDO-'+Date.now(), tipo:'perdido', estatus:'perdido',
-    importe: total, minutos: mins, horas, tarifa: 15, penalizacion: 150,
+    importe: total, minutos: mins, horas, tarifa: TARIFAS_PLAZA.tarifa_normal, penalizacion: TARIFAS_PLAZA.tarifa_perdido,
     cajero: USUARIO_ACTUAL ? USUARIO_ACTUAL.nombre : 'Sin usuario',
     hora_entrada_at: new Date(ahora.getTime() - mins*60000).toISOString(),
     hora_salida_at: ahora.toISOString(),
@@ -3181,11 +3223,11 @@ function calcularManual() {
   const [h,m]=val.split(':').map(Number);
   const entrada=new Date(); entrada.setHours(h,m,0,0);
   const mins=Math.max(1,Math.round((new Date()-entrada)/60000));
-  const TOLERANCIA=15;
+  const TOLERANCIA=TARIFAS_PLAZA.tolerancia_min;
   const enTolerancia=mins<=TOLERANCIA;
-  const hrsC=enTolerancia?0:Math.ceil(mins/60);
+  const hrsC=enTolerancia?0:calcularHorasACobrar(mins);
   const hrsR=Math.floor(mins/60); const minsR=mins%60;
-  const tarifa=15;
+  const tarifa=TARIFAS_PLAZA.tarifa_normal;
   const total=enTolerancia?0:hrsC*tarifa;
   const tiempoTxt=hrsR===0?mins+' min':minsR===0?hrsR+' hr':hrsR+' hr '+minsR+' min';
 
@@ -3823,11 +3865,11 @@ async function cerrarTicketPorReconciliacion(folio) {
   const entradaAt = new Date(it.hora_entrada_at);
   const mins = Math.max(1, Math.round((ahora - entradaAt) / 60000));
   const sinCosto = ['pension','empleado','cortesia'].includes(it.tipo);
-  const TOLERANCIA = 15;
+  const TOLERANCIA = TARIFAS_PLAZA.tolerancia_min;
   const esPref = it.tipo === 'preferencial';
-  const tarifa = esPref ? 6 : 15;
+  const tarifa = esPref ? TARIFAS_PLAZA.tarifa_pref : TARIFAS_PLAZA.tarifa_normal;
   const enTolerancia = sinCosto || mins <= TOLERANCIA;
-  const hrsC = enTolerancia ? 0 : Math.ceil(mins/60);
+  const hrsC = enTolerancia ? 0 : calcularHorasACobrar(mins);
   const total = enTolerancia ? 0 : hrsC*tarifa;
   const tipoFinal = sinCosto ? it.tipo : (esPref ? 'preferencial' : 'normal');
   syncOperacion({
