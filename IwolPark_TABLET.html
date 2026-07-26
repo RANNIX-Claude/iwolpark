@@ -501,6 +501,15 @@ nav {
         <option value="preferencial">Preferencial</option>
       </select>
       <div id="manual-info" style="display:none;font-size:13px;color:#555;font-weight:600"></div>
+      <!-- A diferencia del resto de este modal (bloqueado a propósito, ver
+           comentario más abajo de F10/F11), aquí SÍ hace falta un botón de
+           salida: si el folio de verdad no existe o no hay boleto físico a
+           la mano, obligar a inventar una captura manual solo para poder
+           cerrar la pantalla es peor que dejarlo cancelar e intentar de
+           nuevo. Solo aparece en este estado — con un folio real ya
+           encontrado, el bloqueo de F10/F11 sigue igual que antes. -->
+      <button type="button" class="modal-btn" style="background:#4A4A4A;color:#fff"
+        onclick="cerrarModal('modal-cobro')">✕ Cancelar</button>
     </div>
 
     <!-- Info aparece inmediatamente al leer folio -->
@@ -2590,17 +2599,27 @@ async function fetchEmpleadosActivos() {
 // Empleados cuyo último ticket sigue abierto (no ha registrado su salida)
 // — no deben volver a aparecer en el combo de entrada mientras eso siga
 // así, mismo criterio ya usado para pensiones (fetchPensionIdsOcupadas).
-// Si falla la consulta (sin conexión) no se bloquea nada — mejor dejar
-// pasar una entrada ocasional duplicada que impedir operar sin wifi.
+// Igual que el catálogo, esto se guarda en IndexedDB y se usa como
+// respaldo sin conexión — antes, sin wifi, se devolvía [] (nadie ocupado)
+// y el combo mostraba disponible a alguien que ya tenía boleto activo
+// (ej. se le podían dar 2 accesos al mismo empleado sin que nadie lo notara).
 async function fetchEmpleadoIdsOcupados() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&empleado_id=not.is.null&select=empleado_id`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
-    if (!r.ok) return [];
+    if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
-    return rows.map(row => row.empleado_id);
-  } catch (e) { return []; }
+    const ids = rows.map(row => row.empleado_id);
+    dbSet('store', 'empleados_ocupados_cache', JSON.stringify({ data: ids, ts: Date.now() })).catch(()=>{});
+    return ids;
+  } catch (e) {
+    try {
+      const raw = await dbGet('store', 'empleados_ocupados_cache');
+      if (raw) return JSON.parse(raw).data || [];
+    } catch (e2) {}
+    return [];
+  }
 }
 
 async function registrarEntradaEmpleado() {
@@ -2664,18 +2683,25 @@ async function fetchPensionadosActivos() {
 // Pensiones cuyo último ticket sigue abierto (el vehículo no ha registrado
 // su salida) — no deben volver a aparecer en el combo de entrada mientras
 // eso siga así, para no imprimir dos boletos activos de la misma pensión al
-// mismo tiempo. Si falla la consulta (sin conexión) no se bloquea nada —
-// mejor dejar pasar una entrada ocasional duplicada que impedir operar sin
-// wifi, igual que el resto de catálogos de este módulo.
+// mismo tiempo. Igual que fetchEmpleadoIdsOcupados, se guarda en IndexedDB
+// y se usa como respaldo sin conexión en vez de devolver [] (nadie ocupado).
 async function fetchPensionIdsOcupadas() {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&pension_id=not.is.null&select=pension_id`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
-    if (!r.ok) return [];
+    if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
-    return rows.map(row => row.pension_id);
-  } catch (e) { return []; }
+    const ids = rows.map(row => row.pension_id);
+    dbSet('store', 'pensiones_ocupados_cache', JSON.stringify({ data: ids, ts: Date.now() })).catch(()=>{});
+    return ids;
+  } catch (e) {
+    try {
+      const raw = await dbGet('store', 'pensiones_ocupados_cache');
+      if (raw) return JSON.parse(raw).data || [];
+    } catch (e2) {}
+    return [];
+  }
 }
 
 async function registrarEntradaPension() {
@@ -4949,9 +4975,13 @@ let USUARIO_ACTUAL = null;
   // el catálogo local quedaba vacío y parecía "no hay empleados".
   fetchPensionadosActivos().catch(()=>{});
   fetchEmpleadosActivos().catch(()=>{});
+  fetchPensionIdsOcupadas().catch(()=>{});
+  fetchEmpleadoIdsOcupados().catch(()=>{});
   setInterval(() => {
     fetchPensionadosActivos().catch(()=>{});
     fetchEmpleadosActivos().catch(()=>{});
+    fetchPensionIdsOcupadas().catch(()=>{});
+    fetchEmpleadoIdsOcupados().catch(()=>{});
   }, 5*60000);
   actualizarStatsDia();
   setInterval(actualizarStatsDia, 30000);
