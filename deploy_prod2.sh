@@ -51,8 +51,13 @@ for f in $PAGES; do
   sed -i "s#${QA_KEY}#${PROD2_SUPABASE_KEY}#g" "$target"
   # Aviso visual distinto (morado) para diferenciarlo tanto de QA como del
   # Producción original — es un tercer ambiente, no confundirlo con ninguno.
-  BANNER='<div style="background:#5E3B9C;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN (COPIA PARALELA · SERVIDOR PROPIO)</div>'
-  sed -i "s|<body>|<body>${BANNER}|" "$target"
+  # IwolPark_Demanda.html no lo lleva: nunca se abre sola, siempre va
+  # embebida en un <iframe> dentro de Admin/Corporativo, que ya trae su
+  # propio banner — si también le ponemos uno aquí, se ve duplicado.
+  if [ "$f" != "IwolPark_Demanda.html" ]; then
+    BANNER='<div style="background:#5E3B9C;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN (COPIA PARALELA · SERVIDOR PROPIO)</div>'
+    sed -i "s|<body>|<body>${BANNER}|" "$target"
+  fi
 done
 
 netlify deploy --prod --dir="$BUILD_DIR" --site="$PROD2_SITE_ID"

@@ -47,9 +47,13 @@ for f in $PAGES; do
   sed -i -E "s/(id=\"app-version\"[^>]*>)v[0-9]+</\1v${NEXT}</" "$target"
   sed -i "s#${QA_URL}#${PROD_SUPABASE_URL}#g" "$target"
   sed -i "s#${QA_KEY}#${PROD_SUPABASE_KEY}#g" "$target"
-  # Aviso visual permanente para nunca confundir el ambiente
-  BANNER='<div style="background:#D93025;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN</div>'
-  sed -i "s|<body>|<body>${BANNER}|" "$target"
+  # Aviso visual permanente para nunca confundir el ambiente. Demanda.html
+  # no lo lleva: siempre va embebida en un <iframe> dentro de Admin, que ya
+  # trae su propio banner — si también le ponemos uno aquí, se ve duplicado.
+  if [ "$f" != "IwolPark_Demanda.html" ]; then
+    BANNER='<div style="background:#D93025;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN</div>'
+    sed -i "s|<body>|<body>${BANNER}|" "$target"
+  fi
 done
 
 netlify deploy --prod --dir="$BUILD_DIR" --site="$PROD_SITE_ID"

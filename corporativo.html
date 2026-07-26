@@ -281,7 +281,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 <div class="tabs">
   <div class="tab active" onclick="showTabModo('seguimiento',this)">📊 Seguimiento</div>
   <div class="tab" onclick="showTabModo('historico',this)">📁 Histórico</div>
-  <div class="tab" onclick="showTab('cierre-admin',this)">⚠️ Cierre administrativo</div>
   <div class="tab" onclick="showTab('demanda',this)">📈 Demanda</div>
 </div>
 
@@ -957,25 +956,6 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="modal-body">
       <div id="detalle-mov-adm-contenido" style="font-size:13px;line-height:1.9"></div>
     </div>
-  </div>
-</div>
-
-<!-- ══ TAB CIERRE ADMINISTRATIVO: reconciliación diaria de boletos que se
-     quedaron abiertos (pago conjunto, cliente que no pagó, evasión, boleto
-     perdido sin folio original) — la meta es que al final de cada día no
-     quede ningún boleto abierto sin resolver. ══ -->
-<div class="tab-section" id="tab-cierre-admin">
-  <div class="chart-card">
-    <div class="chart-title">⚠️ Cierre administrativo</div>
-    <div class="chart-sub">Boletos abiertos pendientes de cerrar, agrupados por día. Un día sin filas aquí es un día ya cuadrado.</div>
-    <div id="cierre-admin-dias" style="margin-top:10px"></div>
-  </div>
-  <div class="chart-card" id="cierre-admin-detalle-card" style="display:none;margin-top:14px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-      <button class="param-btn outline" onclick="cerrarDetalleCierreAdmin()">← Volver a los días</button>
-      <div class="chart-title" style="margin:0" id="cierre-admin-detalle-titulo"></div>
-    </div>
-    <div id="cierre-admin-detalle-tabla" style="margin-top:8px"></div>
   </div>
 </div>
 
@@ -2263,176 +2243,6 @@ async function confirmarCancelarTicket() {
   } catch (e) { showToast('No se pudo cancelar', '#D93025'); }
 }
 
-// ══ CIERRE ADMINISTRATIVO (reconciliación diaria de boletos abiertos) ══
-// Catálogo abierto: no hay CHECK constraint en incidencia_tipo, así que se
-// pueden agregar causas nuevas aquí sin tocar la base.
-const CIERRE_ADMIN_CAUSAS = [
-  { value: 'cobrado_en_otro_folio', label: 'Cobrado en otro folio (pago conjunto / boleto perdido)' },
-  { value: 'cliente_no_quiso_pagar', label: 'Cliente identificado que se negó a pagar' },
-  { value: 'evasion_no_detectada', label: 'Evasión — se coló sin pagar' },
-  { value: 'otro', label: 'Otro (especificar en el motivo)' },
-];
-let _cierreAdminFechaActual = null;
-let _cierreAdminTicketsCache = {};
-
-function horasTranscurridas(horaEntrada) {
-  if (!horaEntrada) return null;
-  const [h,m] = horaEntrada.split(':').map(Number);
-  const ahora = new Date();
-  let mins = (ahora.getHours()*60+ahora.getMinutes()) - (h*60+m);
-  if (mins < 0) mins += 24*60;
-  return mins/60;
-}
-
-async function cargarCierreAdminDias() {
-  const cont = document.getElementById('cierre-admin-dias');
-  cont.innerHTML = '<div style="font-size:12px;color:var(--muted)">Cargando…</div>';
-  try {
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&select=fecha_op&order=fecha_op.desc`, {headers});
-    if (!r.ok) throw new Error('http '+r.status);
-    const rows = await r.json();
-    const porDia = {};
-    rows.forEach(t => { porDia[t.fecha_op] = (porDia[t.fecha_op]||0) + 1; });
-    const dias = Object.keys(porDia).sort().reverse();
-    if (!dias.length) {
-      cont.innerHTML = '<div style="font-size:13px;color:var(--green);font-weight:700;padding:10px 0">✓ No hay boletos abiertos pendientes — todos los días están cuadrados.</div>';
-      return;
-    }
-    cont.innerHTML = dias.map(fecha => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer" onclick="abrirCierreAdminDia('${fecha}')">
-        <span style="font-weight:700">${fecha}</span>
-        <span style="background:#FDECEA;color:#D93025;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:800">${porDia[fecha]} pendiente${porDia[fecha]===1?'':'s'}</span>
-      </div>`).join('');
-  } catch (e) { cont.innerHTML = '<div style="color:var(--red);font-size:12px">No se pudo cargar (¿ya corriste el ALTER TABLE?)</div>'; }
-}
-
-async function abrirCierreAdminDia(fecha) {
-  _cierreAdminFechaActual = fecha;
-  document.getElementById('cierre-admin-detalle-card').style.display = '';
-  document.getElementById('cierre-admin-detalle-titulo').textContent = 'Pendientes del ' + fecha;
-  const cont = document.getElementById('cierre-admin-detalle-tabla');
-  cont.innerHTML = '<div style="font-size:12px;color:var(--muted)">Cargando…</div>';
-  try {
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${fecha}&select=*&order=hora_entrada.asc`, {headers});
-    if (!r.ok) throw new Error('http '+r.status);
-    const rows = await r.json();
-    renderCierreAdminTabla(rows);
-  } catch (e) { cont.innerHTML = '<div style="color:var(--red);font-size:12px">Error al cargar</div>'; }
-}
-
-function cerrarDetalleCierreAdmin() {
-  document.getElementById('cierre-admin-detalle-card').style.display = 'none';
-  _cierreAdminFechaActual = null;
-}
-
-function renderCierreAdminTabla(rows) {
-  const cont = document.getElementById('cierre-admin-detalle-tabla');
-  _cierreAdminTicketsCache = {};
-  rows.forEach(t => { _cierreAdminTicketsCache[t.folio] = t; });
-  if (!rows.length) {
-    cont.innerHTML = '<div style="font-size:13px;color:var(--green);font-weight:700;padding:10px 0">✓ Ya no quedan pendientes este día.</div>';
-    return;
-  }
-  cont.innerHTML = rows.map(t => {
-    const hrs = horasTranscurridas(t.hora_entrada);
-    const alerta = hrs !== null && hrs >= 4;
-    return `
-    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div style="font-size:13px">
-          <b style="font-family:monospace">${escHtmlAttr(t.folio)}</b> · ${escHtmlAttr(t.tipo)} ·
-          entrada ${t.hora_entrada||'—'} (${escHtmlAttr(t.cajero_entrada)||'—'})
-          ${hrs!==null ? ` · <span style="color:${alerta?'var(--red)':'var(--muted)'};font-weight:${alerta?800:400}">${hrs.toFixed(1)}h abierto</span>` : ''}
-        </div>
-        <button class="param-btn outline" onclick="toggleResolverCaso('${escHtmlAttr(t.folio)}')">Resolver</button>
-      </div>
-      <div id="resolver-${escHtmlAttr(t.folio)}" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px"></div>
-    </div>`;
-  }).join('');
-}
-
-function toggleResolverCaso(folio) {
-  const el = document.getElementById('resolver-'+folio);
-  if (!el) return;
-  const yaAbierto = el.style.display !== 'none';
-  document.querySelectorAll('[id^="resolver-"]').forEach(e => e.style.display = 'none');
-  if (yaAbierto) return;
-  el.style.display = '';
-  el.innerHTML = `
-    <select id="causa-${folio}" onchange="onCambioCausaCierre('${folio}')" style="border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;margin-bottom:8px;width:100%;box-sizing:border-box">
-      <option value="">Selecciona la causa…</option>
-      ${CIERRE_ADMIN_CAUSAS.map(c=>`<option value="${c.value}">${c.label}</option>`).join('')}
-    </select>
-    <div id="folio-relacionado-${folio}" style="display:none;margin-bottom:8px"></div>
-    <textarea id="motivo-${folio}" placeholder="Motivo / nota (obligatorio)" style="width:100%;min-height:44px;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box"></textarea>
-    <button class="param-btn" style="background:var(--red)" onclick="confirmarCierreAdminCaso('${folio}')">Cerrar folio</button>
-  `;
-}
-
-async function onCambioCausaCierre(folio) {
-  const causa = document.getElementById('causa-'+folio).value;
-  const cont = document.getElementById('folio-relacionado-'+folio);
-  if (causa !== 'cobrado_en_otro_folio') { cont.style.display = 'none'; cont.innerHTML = ''; return; }
-  cont.style.display = '';
-  cont.innerHTML = '<div style="font-size:12px;color:var(--muted)">Buscando folios candidatos…</div>';
-  const t = _cierreAdminTicketsCache[folio];
-  try {
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
-    // Candidatos: folios del mismo día que sí se cobraron (perdido o
-    // cobrado) con hora de entrada cercana (±20 min) — puede haber
-    // ambigüedad si dos autos entraron casi juntos, por eso se muestran
-    // varias sugerencias y el admin elige, en vez de forzar una
-    // coincidencia automática.
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=eq.${t.fecha_op}&estatus=in.(perdido,cobrado)&select=folio,tipo,estatus,hora_entrada,importe&order=hora_entrada.asc`, {headers});
-    const rows = r.ok ? await r.json() : [];
-    const [th,tm] = (t.hora_entrada||'00:00').split(':').map(Number);
-    const tMin = th*60+tm;
-    const cercanos = rows.filter(o => {
-      const [oh,om] = (o.hora_entrada||'00:00').split(':').map(Number);
-      return Math.abs((oh*60+om) - tMin) <= 20;
-    });
-    cont.innerHTML = `
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Folio relacionado (el que sí se cobró) — sugerencias por hora cercana, o escribe el folio a mano:</div>
-      ${cercanos.length ? cercanos.map(o=>`
-        <div style="display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 10px;margin:2px;cursor:pointer;font-size:12px" onclick="document.getElementById('folio-rel-input-${folio}').value='${escHtmlAttr(o.folio)}'">
-          ${escHtmlAttr(o.folio)} · ${o.hora_entrada||'—'} · ${escHtmlAttr(o.estatus)} · ${fmt$(Number(o.importe)||0)}
-        </div>`).join('') : '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Sin sugerencias cercanas — escribe el folio a mano.</div>'}
-      <input type="text" id="folio-rel-input-${folio}" placeholder="Folio relacionado" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;margin-top:6px;box-sizing:border-box">
-    `;
-  } catch (e) { cont.innerHTML = '<div style="color:var(--red);font-size:12px">Error al buscar candidatos</div>'; }
-}
-
-async function confirmarCierreAdminCaso(folio) {
-  const causa = document.getElementById('causa-'+folio).value;
-  const motivo = (document.getElementById('motivo-'+folio).value || '').trim();
-  const folioRelInput = document.getElementById('folio-rel-input-'+folio);
-  const folioRelacionado = folioRelInput ? folioRelInput.value.trim() : '';
-  if (!causa) { showToast('Selecciona una causa', '#D93025'); return; }
-  if (!motivo) { showToast('El motivo es obligatorio', '#D93025'); return; }
-  if (causa === 'cobrado_en_otro_folio' && !folioRelacionado) { showToast('Indica el folio relacionado', '#D93025'); return; }
-  if (!confirm('¿Cerrar el folio '+folio+' con esta resolución? No se puede deshacer desde aquí.')) return;
-  try {
-    const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal'};
-    const body = {
-      estatus: 'cerrado_admin', importe: 0,
-      cierre_administrativo: true, incidencia_tipo: causa, motivo_cierre: motivo,
-      folio_relacionado: causa === 'cobrado_en_otro_folio' ? folioRelacionado : null,
-      cerrado_por: USUARIO_ACTUAL ? (USUARIO_ACTUAL.usuario||USUARIO_ACTUAL.nombre) : null,
-      cerrado_en: new Date().toISOString(),
-    };
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?folio=eq.${encodeURIComponent(folio)}`, {
-      method: 'PATCH', headers, body: JSON.stringify(body)
-    });
-    if (!r.ok) throw new Error('http '+r.status);
-    logBitacora('cierre_administrativo', { folio, incidencia_tipo: causa, motivo, folio_relacionado: body.folio_relacionado });
-    showToast('Folio '+folio+' cerrado');
-    abrirCierreAdminDia(_cierreAdminFechaActual);
-    cargarCierreAdminDias();
-  } catch (e) { showToast('No se pudo cerrar (¿ya corriste el ALTER TABLE?)', '#D93025'); }
-}
-
 async function guardarCapturaManual() {
   const folio = document.getElementById('gm-folio').value.trim();
   const tipo = document.getElementById('gm-tipo').value;
@@ -2979,16 +2789,12 @@ function showTab(id, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
-  const NOMBRE_PANTALLA = { movimientos:'Movimientos', bitacora:'Bitácora', demanda:'Demanda', 'cierre-admin':'Cierre administrativo' };
+  const NOMBRE_PANTALLA = { movimientos:'Movimientos', bitacora:'Bitácora', demanda:'Demanda' };
   if (NOMBRE_PANTALLA[id]) logBitacora('vista_pantalla', { pantalla: NOMBRE_PANTALLA[id] });
   if (id === 'demanda') {
     // Carga perezosa: solo pide IwolPark_Demanda.html la primera vez que se abre la pestaña
     const ifr = document.getElementById('iframe-demanda');
     if (!ifr.src) ifr.src = 'IwolPark_Demanda.html';
-  }
-  if (id === 'cierre-admin') {
-    cerrarDetalleCierreAdmin();
-    cargarCierreAdminDias();
   }
   if (id === 'movimientos' && !MOV_ADM_INICIADO) {
     MOV_ADM_INICIADO = true;

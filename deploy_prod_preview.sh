@@ -46,9 +46,14 @@ for f in $PAGES; do
   sed -i -E "s/(id=\"app-version\"[^>]*>)v[0-9]+</\1${LABEL}</" "$target"
   sed -i "s#${QA_URL}#${PROD_SUPABASE_URL}#g" "$target"
   sed -i "s#${QA_KEY}#${PROD_SUPABASE_KEY}#g" "$target"
-  # Banner distinto al de producción real, para no confundir con el sitio live
-  BANNER='<div style="background:#BA7517;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN · VISTA PREVIA '"${LABEL}"' · NO ES EL SITIO EN VIVO</div>'
-  sed -i "s|<body>|<body>${BANNER}|" "$target"
+  # Banner distinto al de producción real, para no confundir con el sitio
+  # live. Demanda.html no lo lleva: siempre va embebida en un <iframe>
+  # dentro de Admin, que ya trae su propio banner — si también le ponemos
+  # uno aquí, se ve duplicado.
+  if [ "$f" != "IwolPark_Demanda.html" ]; then
+    BANNER='<div style="background:#BA7517;color:#fff;text-align:center;font-size:11px;font-weight:800;padding:3px;letter-spacing:1px">PRODUCCIÓN · VISTA PREVIA '"${LABEL}"' · NO ES EL SITIO EN VIVO</div>'
+    sed -i "s|<body>|<body>${BANNER}|" "$target"
+  fi
 done
 
 echo "Desplegando vista previa sobre keen-chebakia-9df9bf (sin --prod)..."
