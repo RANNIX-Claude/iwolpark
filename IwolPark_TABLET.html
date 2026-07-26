@@ -491,6 +491,15 @@ nav {
         style="width:100%;background:#fff;border:1.5px solid #FFD60A;border-radius:8px;
                color:#000;font-size:22px;font-weight:700;padding:8px 12px;outline:none"
         oninput="calcularManual()">
+      <div style="font-size:12px;font-weight:700;color:#7D5A00">
+        Tipo (revisa la tarifa impresa en el boleto físico):
+      </div>
+      <select id="manual-tipo" onchange="calcularManual()"
+        style="width:100%;background:#fff;border:1.5px solid #FFD60A;border-radius:8px;
+               color:#000;font-size:16px;font-weight:700;padding:8px 12px;outline:none">
+        <option value="normal">Normal</option>
+        <option value="preferencial">Preferencial</option>
+      </select>
       <div id="manual-info" style="display:none;font-size:13px;color:#555;font-weight:600"></div>
     </div>
 
@@ -3083,7 +3092,8 @@ async function buscarFolioEnServidor(v, digitos) {
     const digitosActuales = input ? input.value.trim().toUpperCase().replace(/^[A-Z]+-/, '') : null;
     if (!input || digitosActuales !== digitosBuscados) return;
     document.getElementById('manual-folio-msg').innerHTML =
-      '⚠ Sin conexión — no se pudo verificar el folio <span id="manual-folio-label">'+v+'</span> contra el sistema.<br>Si tienes el boleto físico, ingresa la hora de entrada para calcular el cobro:';
+      '⚠ Sin conexión — no se pudo verificar el folio <span id="manual-folio-label">'+v+'</span> contra el sistema.<br>Si tienes el boleto físico, ingresa la hora de entrada y el tipo (revisa la tarifa impresa) para calcular el cobro:';
+    document.getElementById('manual-tipo').value = 'normal';
     document.getElementById('cobro-manual').style.display='flex';
   }
 }
@@ -3220,6 +3230,13 @@ function calcularManual() {
   const v = /^\d+$/.test(folio) ? 'UFC-'+folio : folio;
   const val = document.getElementById('manual-hora').value;
   if(!val) return;
+  // Sin conexión no hay forma de leer el tipo real del folio (Supabase no
+  // respondió y por eso llegamos aquí) — se lo pregunta al cajero, que sí
+  // tiene el boleto físico con la tarifa impresa en la mano. Antes esto
+  // siempre asumía "normal" sin poder corregirlo, cobrando de más en los
+  // preferenciales cuando la red fallaba justo al momento de cobrar.
+  const tipoSel = document.getElementById('manual-tipo').value;
+  const esPref = tipoSel === 'preferencial';
   const [h,m]=val.split(':').map(Number);
   const entrada=new Date(); entrada.setHours(h,m,0,0);
   const mins=Math.max(1,Math.round((new Date()-entrada)/60000));
@@ -3227,19 +3244,19 @@ function calcularManual() {
   const enTolerancia=mins<=TOLERANCIA;
   const hrsC=enTolerancia?0:calcularHorasACobrar(mins);
   const hrsR=Math.floor(mins/60); const minsR=mins%60;
-  const tarifa=TARIFAS_PLAZA.tarifa_normal;
+  const tarifa=esPref?TARIFAS_PLAZA.tarifa_pref:TARIFAS_PLAZA.tarifa_normal;
   const total=enTolerancia?0:hrsC*tarifa;
   const tiempoTxt=hrsR===0?mins+' min':minsR===0?hrsR+' hr':hrsR+' hr '+minsR+' min';
 
   // Registrar ticket en STATE para poder cobrarlo
   const horaStr=val;
-  STATE.tickets[v]={folio:v, entrada_at:entrada.toISOString(), hora:horaStr, tipo_cobro:'normal', ocupado:true, slot:null};
-  COBRO={folio:v,horas:hrsC,mins,tarifa,tipo:'normal',total,hora_entrada:horaStr};
+  STATE.tickets[v]={folio:v, entrada_at:entrada.toISOString(), hora:horaStr, tipo_cobro:tipoSel, ocupado:true, slot:null};
+  COBRO={folio:v,horas:hrsC,mins,tarifa,tipo:tipoSel,total,hora_entrada:horaStr};
 
   document.getElementById('manual-info').style.display='block';
   document.getElementById('manual-info').textContent=tiempoTxt+' → '+hrsC+' hr · Total: $'+total.toFixed(2);
   document.getElementById('mi-folio').textContent=v;
-  document.getElementById('mi-tarifa').textContent='$15/hr';
+  document.getElementById('mi-tarifa').textContent='$'+tarifa+'/hr';
   document.getElementById('mi-entrada').textContent=horaStr;
   const tiempoLabel = enTolerancia
     ? tiempoTxt + ' ← CORTESÍA (≤15 min)'
@@ -4922,7 +4939,20 @@ let USUARIO_ACTUAL = null;
   const hayTurno = !!(STATE.turno_id && TURNO_ACTUAL);
   setBotonesToActivos(hayTurno);
   checkOnline();
-  fetchPensionadosActivos().catch(()=>{}); // precarga silenciosa para uso sin conexión
+  // Precarga silenciosa para uso sin conexión — pensiones y empleados
+  // cambian poco (un contrato de pensión dura meses, la plantilla de
+  // empleados casi no rota), así que basta con tenerlos a la mano en
+  // IndexedDB y refrescarlos cada rato en vez de ir a la red en cada
+  // consulta. Antes solo pensiones se precargaba aquí; empleados solo se
+  // guardaba en cache la primera vez que alguien abría esa pantalla
+  // estando en línea — si esa primera vez coincidía con un corte de wifi,
+  // el catálogo local quedaba vacío y parecía "no hay empleados".
+  fetchPensionadosActivos().catch(()=>{});
+  fetchEmpleadosActivos().catch(()=>{});
+  setInterval(() => {
+    fetchPensionadosActivos().catch(()=>{});
+    fetchEmpleadosActivos().catch(()=>{});
+  }, 5*60000);
   actualizarStatsDia();
   setInterval(actualizarStatsDia, 30000);
   setInterval(actualizarBotonesPorHorario, 60000);
