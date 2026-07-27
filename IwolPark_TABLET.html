@@ -2641,23 +2641,29 @@ async function fetchEmpleadoIdsOcupados() {
 }
 
 async function registrarEntradaEmpleado() {
+  console.log('[F4] inicio');
   logBitacora('atajo_teclado', { tecla:'F4', accion:'Empleados' });
   showToast('Cargando empleados…', '#0A66C2');
   let empleados = [];
   let desdeCache = false;
   try {
     empleados = await fetchEmpleadosActivos();
+    console.log('[F4] catalogo desde red, count=', empleados.length);
   } catch (e) {
+    console.log('[F4] catalogo desde red FALLO:', e && e.message);
     try {
       const raw = await dbGet('store', 'empleados_cache');
       if (raw) { empleados = JSON.parse(raw).data || []; desdeCache = true; }
-    } catch (e2) {}
+      console.log('[F4] catalogo desde cache, count=', empleados.length, 'raw existe=', !!raw);
+    } catch (e2) { console.log('[F4] dbGet empleados_cache FALLO:', e2 && e2.message); }
   }
 
-  if (!empleados.length) { showToast('⚠ No hay empleados registrados en el catálogo (Admin → Parámetros)', '#D93025'); return; }
+  if (!empleados.length) { console.log('[F4] catalogo vacio, se detiene aqui'); showToast('⚠ No hay empleados registrados en el catálogo (Admin → Parámetros)', '#D93025'); return; }
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
+  console.log('[F4] antes de fetchEmpleadoIdsOcupados');
   const idsOcupados = await fetchEmpleadoIdsOcupados();
+  console.log('[F4] idsOcupados=', idsOcupados);
   // Se suman los empleados con boleto abierto en ESTA sesión (STATE.tickets)
   // — si dos entradas seguidas al mismo empleado pasan sin conexión, la de
   // Supabase/caché todavía no se entera de la primera, pero STATE sí.
@@ -2666,16 +2672,19 @@ async function registrarEntradaEmpleado() {
     .map(t => t.empleado_id);
   const idsOcupadosTotal = new Set([...idsOcupados, ...idsOcupadosLocal]);
   const disponibles = empleados.filter(e => !idsOcupadosTotal.has(e.id));
+  console.log('[F4] disponibles=', disponibles.length, 'de', empleados.length);
   // Mensaje literal pedido en el documento de requerimientos (punto 13) —
   // aquí nunca se llega a elegir un empleado ocupado (el combo ya los
   // excluye), pero el texto se mantiene igual para cuando aplica.
-  if (!disponibles.length) { showToast('El empleado seleccionado ya cuenta con un ticket activo y no es posible asignarle un nuevo acceso hasta que registre su salida.', '#D93025'); return; }
+  if (!disponibles.length) { console.log('[F4] nadie disponible, se detiene aqui'); showToast('El empleado seleccionado ya cuenta con un ticket activo y no es posible asignarle un nuevo acceso hasta que registre su salida.', '#D93025'); return; }
 
   const opciones = disponibles.map(e => ({
     value: e.id,
     label: `${e.nombre_completo}${e.puesto ? ' · '+e.puesto : ''}`
   }));
+  console.log('[F4] abriendo mostrarSelectModal con', opciones.length, 'opciones');
   const elegidoId = await mostrarSelectModal('🪪 Entrada Empleado', 'Empleado', opciones);
+  console.log('[F4] elegidoId=', elegidoId);
   if (!elegidoId) return;
   const emp = disponibles.find(x => String(x.id) === String(elegidoId));
   logBitacora('seleccion', { tipo:'empleado', empleado_id: elegidoId, nombre: emp.nombre_completo });
@@ -2730,25 +2739,31 @@ async function fetchPensionIdsOcupadas() {
 }
 
 async function registrarEntradaPension() {
+  console.log('[F5] inicio');
   logBitacora('atajo_teclado', { tecla:'F5', accion:'Pensión' });
   showToast('Cargando pensionados…', '#0A66C2');
   let pensionados = [];
   let desdeCache = false;
   try {
     pensionados = await fetchPensionadosActivos();
+    console.log('[F5] catalogo desde red, count=', pensionados.length);
   } catch (e) {
     // Sin conexión (o error de red): usar el último catálogo guardado
     // localmente la última vez que sí hubo internet.
+    console.log('[F5] catalogo desde red FALLO:', e && e.message);
     try {
       const raw = await dbGet('store', 'pensiones_cache');
       if (raw) { pensionados = JSON.parse(raw).data || []; desdeCache = true; }
-    } catch (e2) {}
+      console.log('[F5] catalogo desde cache, count=', pensionados.length, 'raw existe=', !!raw);
+    } catch (e2) { console.log('[F5] dbGet pensiones_cache FALLO:', e2 && e2.message); }
   }
 
-  if (!pensionados.length) { showToast('⚠ No hay pensionados activos registrados', '#D93025'); return; }
+  if (!pensionados.length) { console.log('[F5] catalogo vacio, se detiene aqui'); showToast('⚠ No hay pensionados activos registrados', '#D93025'); return; }
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
+  console.log('[F5] antes de fetchPensionIdsOcupadas');
   const idsOcupados = await fetchPensionIdsOcupadas();
+  console.log('[F5] idsOcupados=', idsOcupados);
   // Se suman las pensiones con boleto abierto en ESTA sesión (STATE.tickets)
   // — mismo motivo que en empleados: dos entradas seguidas a la misma
   // pensión sin conexión no se detectaban entre sí.
@@ -2757,13 +2772,16 @@ async function registrarEntradaPension() {
     .map(t => t.pension_id);
   const idsOcupadosTotal = new Set([...idsOcupados, ...idsOcupadosLocal]);
   const disponibles = pensionados.filter(p => !idsOcupadosTotal.has(p.pension_id));
-  if (!disponibles.length) { showToast('⚠ Todas las pensiones ya tienen un vehículo dentro de la plaza', '#D93025'); return; }
+  console.log('[F5] disponibles=', disponibles.length, 'de', pensionados.length);
+  if (!disponibles.length) { console.log('[F5] nadie disponible, se detiene aqui'); showToast('⚠ Todas las pensiones ya tienen un vehículo dentro de la plaza', '#D93025'); return; }
 
   const opciones = disponibles.map(p => ({
     value: p.pension_id,
     label: `${p.clientes ? p.clientes.nombre : '—'} · ${p.vehiculos ? p.vehiculos.placas : '—'}`
   }));
+  console.log('[F5] abriendo mostrarSelectModal con', opciones.length, 'opciones');
   const elegidoId = await mostrarSelectModal('🅿️ Entrada Pensión', 'Cliente pensionado', opciones);
+  console.log('[F5] elegidoId=', elegidoId);
   if (!elegidoId) return;
   const p = disponibles.find(x => x.pension_id === elegidoId);
   const nombreCliente = p.clientes ? p.clientes.nombre : '';
