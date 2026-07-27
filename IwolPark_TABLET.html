@@ -2558,7 +2558,13 @@ function crearTicketSinCosto(prefijo, tipoCobroLocal, labelResultado, colorFolio
   const p2h=n=>String(n).padStart(2,'0'); const hora=p2h(now.getHours())+':'+p2h(now.getMinutes());
   let slot=null; for(let i=1;i<=STATE.espacios_total;i++){if(!ocupados.has(i)){slot=i;break;}}
   ocupados.add(slot);
-  STATE.tickets[folio]={folio,entrada_at:now.toISOString(),hora,ocupado:true,slot,tipo_cobro:tipoCobroLocal,...(datosExtra||{})};
+  // pension_id/empleado_id se guardan también aquí (no solo se mandan a
+  // syncEntrada) para poder excluir del combo a quien ya tiene un boleto
+  // de ESTA MISMA sesión sin conexión — el caché de "ocupados" en
+  // IndexedDB solo se actualiza contra el servidor, así que sin internet
+  // dos entradas seguidas al mismo empleado/pensión no se detectaban entre
+  // sí (ver caso real: Fernando con 2 boletos abiertos el mismo turno).
+  STATE.tickets[folio]={folio,entrada_at:now.toISOString(),hora,ocupado:true,slot,tipo_cobro:tipoCobroLocal,pension_id:pensionId||null,empleado_id:empleadoId||null,...(datosExtra||{})};
   STATE.autos_en_plaza++; ultimoFolioRegistrado=folio;
 
   document.getElementById('r-entrada-label').textContent=labelResultado;
@@ -2652,7 +2658,14 @@ async function registrarEntradaEmpleado() {
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
   const idsOcupados = await fetchEmpleadoIdsOcupados();
-  const disponibles = empleados.filter(e => !idsOcupados.includes(e.id));
+  // Se suman los empleados con boleto abierto en ESTA sesión (STATE.tickets)
+  // — si dos entradas seguidas al mismo empleado pasan sin conexión, la de
+  // Supabase/caché todavía no se entera de la primera, pero STATE sí.
+  const idsOcupadosLocal = Object.values(STATE.tickets)
+    .filter(t => t.ocupado && t.empleado_id != null)
+    .map(t => t.empleado_id);
+  const idsOcupadosTotal = new Set([...idsOcupados, ...idsOcupadosLocal]);
+  const disponibles = empleados.filter(e => !idsOcupadosTotal.has(e.id));
   // Mensaje literal pedido en el documento de requerimientos (punto 13) —
   // aquí nunca se llega a elegir un empleado ocupado (el combo ya los
   // excluye), pero el texto se mantiene igual para cuando aplica.
@@ -2736,7 +2749,14 @@ async function registrarEntradaPension() {
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
   const idsOcupados = await fetchPensionIdsOcupadas();
-  const disponibles = pensionados.filter(p => !idsOcupados.includes(p.pension_id));
+  // Se suman las pensiones con boleto abierto en ESTA sesión (STATE.tickets)
+  // — mismo motivo que en empleados: dos entradas seguidas a la misma
+  // pensión sin conexión no se detectaban entre sí.
+  const idsOcupadosLocal = Object.values(STATE.tickets)
+    .filter(t => t.ocupado && t.pension_id != null)
+    .map(t => t.pension_id);
+  const idsOcupadosTotal = new Set([...idsOcupados, ...idsOcupadosLocal]);
+  const disponibles = pensionados.filter(p => !idsOcupadosTotal.has(p.pension_id));
   if (!disponibles.length) { showToast('⚠ Todas las pensiones ya tienen un vehículo dentro de la plaza', '#D93025'); return; }
 
   const opciones = disponibles.map(p => ({
