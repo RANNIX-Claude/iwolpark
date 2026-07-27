@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8934"],
       "port": 8934
+    },
+    {
+      "name": "rac-cv",
+      "runtimeExecutable": "C:\\Users\\asus\\OneDrive\\work\\RAC\\web\\version_27072026\\web_Netlify\\start-dev.cmd",
+      "runtimeArgs": [],
+      "port": 8888
     }
   ]
 }
