@@ -3408,6 +3408,16 @@ function imprimirBoleto(notaPref) {
     <div class="tp-dashed"></div>
     <div class="tp-center" style="font-size:10pt;font-weight:900">CONSERVE SU BOLETO</div>
     <div class="tp-center" style="font-size:10pt;font-weight:900">GRACIAS</div>
+    <!-- Espacio en blanco antes del corte — un cliente reportó que la
+         impresora térmica cortaba encima de "GRACIAS"/el código de barras
+         del boleto siguiente. Se agregan líneas en blanco reales (con
+         contenido &nbsp;, no solo un div vacío con altura fija) porque
+         algunos drivers de impresora térmica ignoran la altura de un div
+         sin contenido — así el corte cae sobre papel realmente en blanco.
+    -->
+    <div class="tp-center">&nbsp;</div>
+    <div class="tp-center">&nbsp;</div>
+    <div class="tp-center">&nbsp;</div>
     <div style="height:20mm"></div>
   </div>`;
   setTimeout(()=>{ window.print(); }, 300);
@@ -3481,6 +3491,12 @@ function imprimirComprobante(folio,horas,total,tipo,nota,horaEntrada,horaSalida,
     ${qrHtml}
     <div class="tp-center" style="font-size:10pt;font-weight:900">GRACIAS POR TU VISITA</div>
     <div class="tp-center" style="font-size:10pt;font-weight:900">TE ESPERAMOS PRONTO</div>
+    <!-- Ver nota en imprimirBoleto(): líneas en blanco reales, no solo un
+         div vacío con altura fija, para que el corte de la impresora
+         térmica no caiga sobre texto real. -->
+    <div class="tp-center">&nbsp;</div>
+    <div class="tp-center">&nbsp;</div>
+    <div class="tp-center">&nbsp;</div>
     <div style="height:20mm"></div>
   </div>`;
   setTimeout(()=>{ window.print(); }, 300);
@@ -3553,6 +3569,9 @@ function imprimirComprobanteRelevo(turnoSaliente, cajeroEntranteOrNull, resumen)
       : '')+
     '<div class="tp-dashed"></div>'+
     '<div class="tp-center" style="font-size:9pt;font-weight:700">CONSERVAR PARA ACLARACIONES</div>'+
+    '<div class="tp-center">&nbsp;</div>'+
+    '<div class="tp-center">&nbsp;</div>'+
+    '<div class="tp-center">&nbsp;</div>'+
     '<div style="height:20mm"></div>'+
     '</div>';
   setTimeout(function(){ window.print(); }, 300);
