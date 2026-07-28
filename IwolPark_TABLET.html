@@ -1902,9 +1902,13 @@ window.addEventListener('offline', () => { ONLINE = false; });
 // turno activo en esta computadora.
 async function actualizarStatsDia() {
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=eq.${fechaOp(new Date())}&select=folio,estatus,importe,cajero_entrada,cajero_salida,cajero,hora_entrada`, {
+    // Con red lenta (no caída del todo) un fetch sin límite puede tardar
+    // mucho más que el ciclo de 30s con el que se repite esta función,
+    // sintiéndose como que el contador de tickets/monto/ocupados "se
+    // detiene" — con el límite, cae rápido al último valor mostrado.
+    const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=eq.${fechaOp(new Date())}&select=folio,estatus,importe,cajero_entrada,cajero_salida,cajero,hora_entrada`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    });
+    }, 4000);
     if (!r.ok) return;
     // Cancelado = boleto erróneo corregido con motivo (bitácora) — no cuenta
     // como ticket del día, ni como ocupado, ni como ingreso.
@@ -3134,9 +3138,13 @@ async function buscarFolioEnServidor(v, digitos) {
     // cualquier select con una columna que no existe, así que ESTA consulta
     // fallaba siempre (código 42703) sin importar el folio, cayendo directo
     // al bloque de "sin conexión" aunque sí hubiera internet.
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/tickets?${filtro}&select=folio,estatus,hora_entrada_at,hora_entrada,tipo&limit=1`, {
+    // Con red lenta (no caída), sin un límite esto podía tardar mucho más
+    // que el timeout nativo del navegador antes de caer al modo "sin
+    // conexión / captura manual" — el cajero se quedaba viendo el folio
+    // sin respuesta en vez de poder resolverlo a mano de inmediato.
+    const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?${filtro}&select=folio,estatus,hora_entrada_at,hora_entrada,tipo&limit=1`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    });
+    }, 4000);
     if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
     const row = rows[0];
@@ -4970,11 +4978,14 @@ async function iwolIntentarLogin() {
     // login_cajero() es una función en la base (RPC) que compara el hash
     // internamente y solo regresa los datos públicos si coincide — nunca
     // expone password_hash al cliente, a diferencia de leer la tabla directo.
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
+    // Límite de 4s: con red lenta (no caída), sin esto el cajero se queda
+    // viendo "Entrar" sin respuesta en vez de caer rápido al login offline
+    // (ver buscarLoginOffline más abajo).
+    const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_usuario: usuario, p_password_hash: hash })
-    });
+    }, 4000);
     if (!r.ok) throw new Error('http ' + r.status);
     const rows = await r.json();
     cajero = rows[0] || null;
@@ -5031,10 +5042,29 @@ let USUARIO_ACTUAL = null;
       if (t && t.estado === 'activo') TURNO_ACTUAL = t;
     } catch (e) {}
   }
+  if (!(STATE.turno_id && TURNO_ACTUAL)) {
+    // El botón "Inicio turno" está oculto a petición del usuario (ya no se
+    // quiere ese paso manual) — pero setBotonesToActivos() sigue exigiendo
+    // un turno activo para desbloquear F2-F7, y sin el botón que lo crea,
+    // los botones se quedaban grises/bloqueados con el mouse para siempre
+    // (solo los atajos de teclado seguían respondiendo, porque no revisan
+    // este candado). Se crea uno transparente con fondo inicial $0 para
+    // que la operación nunca dependa de un paso manual que ya no está en
+    // pantalla.
+    TURNO_ACTUAL = {
+      id: 'T' + Date.now(), cajero: USUARIO_ACTUAL ? USUARIO_ACTUAL.nombre : 'Sin usuario',
+      fondo_inicial: 0, inicio: new Date().toISOString(), estado: 'activo'
+    };
+    try { await dbPut('turnos', TURNO_ACTUAL); } catch (e) {}
+    STATE.turno_id = TURNO_ACTUAL.id;
+    STATE.turno_cajero = TURNO_ACTUAL.cajero;
+    STATE.turno_fondo = 0;
+    await save();
+    syncTurno(TURNO_ACTUAL);
+  }
   renderLog();
   renderTurnoStatus();
-  const hayTurno = !!(STATE.turno_id && TURNO_ACTUAL);
-  setBotonesToActivos(hayTurno);
+  setBotonesToActivos(true);
   checkOnline();
   // Precarga silenciosa para uso sin conexión — pensiones y empleados
   // cambian poco (un contrato de pensión dura meses, la plantilla de
