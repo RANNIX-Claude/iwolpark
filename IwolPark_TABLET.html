@@ -367,6 +367,7 @@ nav {
     🔍 Consultar (F8)
   </button>
   <div id="stats-dia" style="margin-left:auto;display:flex;align-items:center;gap:14px;font-size:16px;font-weight:700;color:#444">
+    <span id="stats-fuente" style="display:none;font-size:11px;font-weight:700;color:#D93025" title="Sin conexión con el servidor: estos números son un cálculo local de esta caseta desde el último relevo/cierre, no el total del día en todas las cajas">○ local</span>
     <span onclick="verMovimientosFiltrado('todos')" style="cursor:pointer" title="Ver todos los movimientos de hoy">🎫 <span id="stat-tickets">0</span> tickets hoy</span>
     <span onclick="verMovimientosFiltrado('cerrados')" style="cursor:pointer" title="Ver movimientos cerrados de hoy">✅ <span id="stat-pagados">0</span> cobrados</span>
     <span onclick="verMovimientosFiltrado('cerrados')" style="cursor:pointer" title="Ver movimientos que generaron cobro">💰 $<span id="stat-cobrado">0.00</span></span>
@@ -1901,15 +1902,16 @@ window.addEventListener('offline', () => { ONLINE = false; });
 // que Movimientos, es del DÍA completo (todas las cajas/turnos), no solo del
 // turno activo en esta computadora.
 async function actualizarStatsDia() {
+  const badge = document.getElementById('stats-fuente');
   try {
     // Con red lenta (no caída del todo) un fetch sin límite puede tardar
     // mucho más que el ciclo de 30s con el que se repite esta función,
     // sintiéndose como que el contador de tickets/monto/ocupados "se
-    // detiene" — con el límite, cae rápido al último valor mostrado.
+    // detiene" — con el límite, cae rápido al fallback local de abajo.
     const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=eq.${fechaOp(new Date())}&select=folio,estatus,importe,cajero_entrada,cajero_salida,cajero,hora_entrada`, {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }, 4000);
-    if (!r.ok) return;
+    if (!r.ok) throw new Error('http ' + r.status);
     // Cancelado = boleto erróneo corregido con motivo (bitácora) — no cuenta
     // como ticket del día, ni como ocupado, ni como ingreso.
     const rows = (await r.json()).filter(t => t.estatus !== 'cancelado');
@@ -1929,7 +1931,32 @@ async function actualizarStatsDia() {
     document.getElementById('stat-ocupados').textContent = ocupados;
     document.getElementById('stat-capacidad').textContent = capacidad;
     renderResumenOperadores(rows);
-  } catch (e) { /* sin conexión: se deja el último valor mostrado */ }
+    if (badge) badge.style.display = 'none';
+  } catch (e) {
+    // Sin conexión: antes se dejaba el último valor mostrado sin más (podía
+    // quedar congelado horas). Ahora se recalcula con datos 100% locales de
+    // esta caseta (STATE.movimientos/ocupados) para que los números sigan
+    // moviéndose — con la limitación real de que STATE.movimientos se
+    // reinicia en cada relevo/cierre (es "desde el último relevo en este
+    // dispositivo", no el día completo de todas las cajas como el dato del
+    // servidor), por eso se marca con el badge "○ local" y no se pretende
+    // que sea el mismo total.
+    aplicarStatsLocal();
+    if (badge) badge.style.display = 'inline';
+  }
+}
+
+function aplicarStatsLocal() {
+  const movs = STATE.movimientos || [];
+  const entradas = movs.filter(m => m.tipo !== 'salida' && m.tipo !== 'perdido');
+  const cobros = movs.filter(m => m.tipo === 'salida' || m.tipo === 'perdido');
+  const monto = cobros.reduce((s,m) => s + (parseFloat(String(m.importe).replace('$','')) || 0), 0);
+  const capacidad = STATE.espacios_total || 40;
+  document.getElementById('stat-tickets').textContent = entradas.length;
+  document.getElementById('stat-pagados').textContent = cobros.length;
+  document.getElementById('stat-cobrado').textContent = monto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('stat-ocupados').textContent = Math.min(capacidad, ocupados.size);
+  document.getElementById('stat-capacidad').textContent = capacidad;
 }
 
 // Normaliza mayúsculas/minúsculas del nombre del cajero para agrupar (ej.
