@@ -1957,6 +1957,21 @@ function aplicarStatsLocal() {
   document.getElementById('stat-cobrado').textContent = monto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
   document.getElementById('stat-ocupados').textContent = Math.min(capacidad, ocupados.size);
   document.getElementById('stat-capacidad').textContent = capacidad;
+  // "Operadores hoy" se quedaba en "Cargando…" para siempre sin conexión —
+  // nunca se le pasaban datos porque renderResumenOperadores(rows) solo se
+  // llamaba en la rama de éxito del fetch. STATE.movimientos es siempre de
+  // UN solo cajero (el que tiene la sesión activa ahora mismo — el arreglo
+  // se reinicia en cada relevo/cierre), así que basta con reconstruir filas
+  // con la forma que ya espera renderResumenOperadores() y reusar esa misma
+  // función en vez de duplicar su lógica de conteo.
+  const cont = document.getElementById('resumen-operadores-body');
+  if (!USUARIO_ACTUAL) { if (cont) cont.textContent = 'Sin conexión'; return; }
+  const nombre = USUARIO_ACTUAL.nombre;
+  const rowsLocal = movs.map((m, i) => (m.tipo === 'salida' || m.tipo === 'perdido')
+    ? { cajero_salida: nombre, folio: m.tipo === 'perdido' ? 'PERDIDO-' + i : m.folio, estatus: 'cobrado', importe: parseFloat(String(m.importe).replace('$','')) || 0 }
+    : { cajero_entrada: nombre, folio: m.folio, hora_entrada: m.hora, estatus: 'abierto', importe: 0 }
+  );
+  renderResumenOperadores(rowsLocal);
 }
 
 // Normaliza mayúsculas/minúsculas del nombre del cajero para agrupar (ej.
