@@ -2684,7 +2684,18 @@ async function fetchEmpleadoIdsOcupados() {
   }
 }
 
+// Blindaje contra doble-tap/doble-F4: sin esto, dos llamadas encimadas
+// (mientras la primera todavía está cargando el catálogo o esperando que
+// el cajero elija en el modal) revisan "ocupados" contra el mismo estado
+// viejo — ninguna de las dos ve todavía el ticket que crea la otra — y
+// las dos terminan creando un boleto para el mismo empleado (bug real
+// visto en Pensión: 3 boletos duplicados de la misma pensión en el mismo
+// minuto). Mismo espíritu que el blindaje de confirmarCobro()/confirmarPerdido().
+let _procesandoEntradaEmpleado = false;
 async function registrarEntradaEmpleado() {
+  if (_procesandoEntradaEmpleado) return;
+  _procesandoEntradaEmpleado = true;
+  try {
   console.log('[F4] inicio');
   logBitacora('atajo_teclado', { tecla:'F4', accion:'Empleados' });
   showToast('Cargando empleados…', '#0A66C2');
@@ -2733,6 +2744,13 @@ async function registrarEntradaEmpleado() {
   const emp = disponibles.find(x => String(x.id) === String(elegidoId));
   logBitacora('seleccion', { tipo:'empleado', empleado_id: elegidoId, nombre: emp.nombre_completo });
 
+  // Última revisión justo antes de crear el ticket: si otra invocación
+  // encimada (doble-tap) ya le abrió boleto a este mismo empleado mientras
+  // este modal seguía abierto, STATE.tickets ya lo tendría — se aborta en
+  // vez de duplicar.
+  const yaOcupadoAhora = Object.values(STATE.tickets).some(t => t.ocupado && t.empleado_id === emp.id);
+  if (yaOcupadoAhora) { showToast('El empleado seleccionado ya cuenta con un ticket activo y no es posible asignarle un nuevo acceso hasta que registre su salida.', '#D93025'); return; }
+
   const folio = crearTicketSinCosto('EMP', 'empleado', '🪪 Empleado', '#1D3557',
     'Empleado · Sin costo', 'EMPLEADO', 'empleado', 'Empleado · '+emp.nombre_completo, {
       empleado_info: {
@@ -2742,6 +2760,7 @@ async function registrarEntradaEmpleado() {
       }
     }, null, emp.id);
   showToast('Empleado · '+emp.nombre_completo+' · '+folio,'#1D3557');
+  } finally { _procesandoEntradaEmpleado = false; }
 }
 
 // ── ENTRADA PENSIÓN (valida contra pensionados activos en Supabase) ──
@@ -2782,7 +2801,15 @@ async function fetchPensionIdsOcupadas() {
   }
 }
 
+// Mismo blindaje que registrarEntradaEmpleado() — evita que un doble-tap
+// de F5 (o dos clics seguidos en Pensión) genere dos boletos duplicados
+// de la misma pensión (bug real: 3 tickets PEN- de la misma pensión
+// creados en el mismo minuto por el mismo cajero).
+let _procesandoEntradaPension = false;
 async function registrarEntradaPension() {
+  if (_procesandoEntradaPension) return;
+  _procesandoEntradaPension = true;
+  try {
   console.log('[F5] inicio');
   logBitacora('atajo_teclado', { tecla:'F5', accion:'Pensión' });
   showToast('Cargando pensionados…', '#0A66C2');
@@ -2832,6 +2859,12 @@ async function registrarEntradaPension() {
   logBitacora('seleccion', { tipo:'pension', pension_id: elegidoId, cliente: nombreCliente });
   const TIPO_LABEL_PENSION = {dia:'Día (07:00–22:00)',noche:'Noche (22:00–07:00)','24h':'24 horas'};
 
+  // Última revisión justo antes de crear el ticket — mismo motivo que en
+  // Empleado: si otra invocación encimada ya le abrió boleto a esta misma
+  // pensión mientras este modal seguía abierto, se aborta en vez de duplicar.
+  const yaOcupadaAhora = Object.values(STATE.tickets).some(t => t.ocupado && t.pension_id === p.pension_id);
+  if (yaOcupadaAhora) { showToast('⚠ Esta pensión ya tiene un vehículo dentro de la plaza', '#D93025'); return; }
+
   const folio = crearTicketSinCosto('PEN', 'pension', '🅿️ Pensión', '#0D9457',
     'Pensión · '+nombreCliente, 'PENSION', 'pension', 'Pensión · '+nombreCliente, {
       pension_info: {
@@ -2844,6 +2877,7 @@ async function registrarEntradaPension() {
       }
     }, p.pension_id);
   showToast('Pensión válida · '+nombreCliente+' · '+folio,'#0D9457');
+  } finally { _procesandoEntradaPension = false; }
 }
 
 // ── MODAL COBRO ──
