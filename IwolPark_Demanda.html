@@ -123,6 +123,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <div class="filtros">
     <select id="sel-semanas" onchange="onCambioPeriodoDemanda()">
       <option value="actual" selected>Esta semana</option>
+      <option value="semana_pasada">Semana pasada</option>
       <option value="mes">Este mes</option>
       <option value="custom">Personalizado</option>
     </select>
@@ -276,6 +277,13 @@ async function cargarTicketsDemanda(periodo) {
   const hoy = new Date();
   let desde, hasta;
   if (periodo === 'mes') { desde = fmtFechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1)); hasta = fmtFechaLocal(hoy); }
+  else if (periodo === 'semana_pasada') {
+    // Lunes a domingo de la semana ANTERIOR (no incluye hoy).
+    const iniEstaSemana = lunesDeSemana(hoy);
+    const iniPasada = new Date(iniEstaSemana); iniPasada.setDate(iniEstaSemana.getDate() - 7);
+    const finPasada = new Date(iniEstaSemana); finPasada.setDate(iniEstaSemana.getDate() - 1);
+    desde = fmtFechaLocal(iniPasada); hasta = fmtFechaLocal(finPasada);
+  }
   else if (periodo === 'custom') {
     desde = document.getElementById('demanda-desde').value || fmtFechaLocal(lunesDeSemana(hoy));
     hasta = document.getElementById('demanda-hasta').value || fmtFechaLocal(hoy);
@@ -412,7 +420,8 @@ async function cargarYRenderCajeroDia(lunesStr) {
   const rango = lunes.getMonth() === domingo.getMonth()
     ? `${lunes.getDate()} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`
     : `${lunes.getDate()} ${MESES_CORTOS[lunes.getMonth()]} al ${domingo.getDate()} ${MESES_CORTOS[domingo.getMonth()]}`;
-  const rangoTxt = `Esta semana (${rango})`;
+  const esSemanaPasada = fmtFechaLocal(lunes) !== fmtFechaLocal(lunesDeSemana(new Date()));
+  const rangoTxt = `${esSemanaPasada ? 'Semana pasada' : 'Esta semana'} (${rango})`;
   const parteMetrica = METRICA==='ingresos' ? 'importe cobrado por día' : 'tickets por día';
   document.getElementById('cajero-dia-titulo').textContent = METRICA==='ingresos' ? '👤 Ingresos por cajero y día' : '👤 Tickets por cajero y día';
   document.getElementById('cajero-dia-sub').textContent = `${rangoTxt} · ${parteMetrica}`;
@@ -521,7 +530,14 @@ async function renderSemanaWidgets() {
   renderEvolucionLW(cerrados, lunesActualStr, lunesPasadoStr);
   const ticketsSemana = cerrados.filter(t => t.fecha_op >= lunesActualStr);
   renderDesgloseSemana(ticketsSemana);
-  cargarYRenderCajeroDia(lunesActualStr);
+  // "Tickets por cajero y día" solo tiene sentido para un rango de una
+  // semana (Cajero × Lun..Dom) — para "Esta semana"/"Semana pasada" del
+  // selector de arriba sí lo sigue; para "Este mes"/"Personalizado" (que
+  // pueden abarcar varias semanas) se queda en la semana actual, que es lo
+  // único que cabe en esta tabla.
+  const periodoSel = document.getElementById('sel-semanas').value;
+  const lunesParaCajeroDia = periodoSel === 'semana_pasada' ? lunesPasadoStr : lunesActualStr;
+  cargarYRenderCajeroDia(lunesParaCajeroDia);
 }
 
 // Construye {dia:{hora:valor}} — 'autos' = promedio de entradas por hora en ese

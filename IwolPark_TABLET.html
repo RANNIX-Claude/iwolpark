@@ -2665,6 +2665,10 @@ async function fetchEmpleadosActivos() {
 // respaldo sin conexión — antes, sin wifi, se devolvía [] (nadie ocupado)
 // y el combo mostraba disponible a alguien que ya tenía boleto activo
 // (ej. se le podían dar 2 accesos al mismo empleado sin que nadie lo notara).
+// `fresh:true` = la lista viene de Supabase ahora mismo (dato real, se
+// puede confiar para corregir banderas locales obsoletas). `fresh:false` =
+// viene del caché (sin conexión), no se debe usar para "liberar" nada
+// localmente porque podría no incluir todavía un boleto creado offline.
 async function fetchEmpleadoIdsOcupados() {
   try {
     const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&empleado_id=not.is.null&select=empleado_id`, {
@@ -2674,13 +2678,13 @@ async function fetchEmpleadoIdsOcupados() {
     const rows = await r.json();
     const ids = rows.map(row => row.empleado_id);
     dbSet('store', 'empleados_ocupados_cache', JSON.stringify({ data: ids, ts: Date.now() })).catch(()=>{});
-    return ids;
+    return { ids, fresh: true };
   } catch (e) {
     try {
       const raw = await dbGet('store', 'empleados_ocupados_cache');
-      if (raw) return JSON.parse(raw).data || [];
+      if (raw) return { ids: JSON.parse(raw).data || [], fresh: false };
     } catch (e2) {}
-    return [];
+    return { ids: [], fresh: false };
   }
 }
 
@@ -2717,8 +2721,21 @@ async function registrarEntradaEmpleado() {
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
   console.log('[F4] antes de fetchEmpleadoIdsOcupados');
-  const idsOcupados = await fetchEmpleadoIdsOcupados();
-  console.log('[F4] idsOcupados=', idsOcupados);
+  const { ids: idsOcupados, fresh } = await fetchEmpleadoIdsOcupados();
+  console.log('[F4] idsOcupados=', idsOcupados, 'fresh=', fresh);
+  // Si el dato es fresco (recién bajado de Supabase), es la fuente de
+  // verdad: corrige banderas STATE.tickets[].ocupado que quedaron obsoletas
+  // porque el boleto se cerró desde OTRO lugar (ej. Cierre Administrativo
+  // en el dashboard de Admin/Corporativo, que nunca toca el STATE local de
+  // esta tablet) — bug real: un empleado quedaba "ocupado" para siempre en
+  // esta caseta aunque el ticket ya estuviera cerrado en la base.
+  if (fresh) {
+    const idsOcupadosSet = new Set(idsOcupados);
+    Object.values(STATE.tickets).forEach(t => {
+      if (t.ocupado && t.empleado_id != null && !idsOcupadosSet.has(t.empleado_id)) t.ocupado = false;
+    });
+    save().catch(()=>{});
+  }
   // Se suman los empleados con boleto abierto en ESTA sesión (STATE.tickets)
   // — si dos entradas seguidas al mismo empleado pasan sin conexión, la de
   // Supabase/caché todavía no se entera de la primera, pero STATE sí.
@@ -2782,6 +2799,9 @@ async function fetchPensionadosActivos() {
 // eso siga así, para no imprimir dos boletos activos de la misma pensión al
 // mismo tiempo. Igual que fetchEmpleadoIdsOcupados, se guarda en IndexedDB
 // y se usa como respaldo sin conexión en vez de devolver [] (nadie ocupado).
+// `fresh:true` = dato real de Supabase ahora mismo (se puede confiar para
+// corregir banderas locales obsoletas). `fresh:false` = viene del caché
+// (sin conexión), no sirve para "liberar" nada localmente.
 async function fetchPensionIdsOcupadas() {
   try {
     const r = await fetchConTimeout(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&pension_id=not.is.null&select=pension_id`, {
@@ -2791,13 +2811,13 @@ async function fetchPensionIdsOcupadas() {
     const rows = await r.json();
     const ids = rows.map(row => row.pension_id);
     dbSet('store', 'pensiones_ocupados_cache', JSON.stringify({ data: ids, ts: Date.now() })).catch(()=>{});
-    return ids;
+    return { ids, fresh: true };
   } catch (e) {
     try {
       const raw = await dbGet('store', 'pensiones_ocupados_cache');
-      if (raw) return JSON.parse(raw).data || [];
+      if (raw) return { ids: JSON.parse(raw).data || [], fresh: false };
     } catch (e2) {}
-    return [];
+    return { ids: [], fresh: false };
   }
 }
 
@@ -2833,8 +2853,19 @@ async function registrarEntradaPension() {
   if (desdeCache) showToast('⚠ Sin conexión · usando catálogo guardado localmente', '#E8A020');
 
   console.log('[F5] antes de fetchPensionIdsOcupadas');
-  const idsOcupados = await fetchPensionIdsOcupadas();
-  console.log('[F5] idsOcupados=', idsOcupados);
+  const { ids: idsOcupados, fresh } = await fetchPensionIdsOcupadas();
+  console.log('[F5] idsOcupados=', idsOcupados, 'fresh=', fresh);
+  // Mismo motivo que en Empleado: si el dato es fresco, corrige banderas
+  // STATE.tickets[].ocupado obsoletas por un cierre hecho fuera de esta
+  // tablet (ej. Cierre Administrativo) — bug real reportado: una pensión
+  // cerrada administrativamente seguía marcada como ocupada en la caseta.
+  if (fresh) {
+    const idsOcupadosSet = new Set(idsOcupados);
+    Object.values(STATE.tickets).forEach(t => {
+      if (t.ocupado && t.pension_id != null && !idsOcupadosSet.has(t.pension_id)) t.ocupado = false;
+    });
+    save().catch(()=>{});
+  }
   // Se suman las pensiones con boleto abierto en ESTA sesión (STATE.tickets)
   // — mismo motivo que en empleados: dos entradas seguidas a la misma
   // pensión sin conexión no se detectaban entre sí.

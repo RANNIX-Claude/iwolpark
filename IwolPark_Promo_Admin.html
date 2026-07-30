@@ -248,7 +248,7 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
       <div class="tabla-wrap">
         <table>
           <thead><tr>
-            <th>Local</th><th>Campaña</th><th>Tipo</th><th>Vigencia</th><th>Horario</th>
+            <th>Local</th><th>Campaña</th><th>Tipo</th><th>Fecha inicio</th><th>Fecha fin</th><th>Vigencia</th><th>Horario</th>
             <th>Días</th><th>Impactos</th><th>Estado</th><th>Acciones</th>
           </tr></thead>
           <tbody id="tabla-campanas"></tbody>
@@ -585,6 +585,17 @@ function estadoVisual(c) {
   return {key:'activa', label:'🟢 Activa'};
 }
 
+// Semáforo de VIGENCIA (fechas) — a propósito independiente de estadoVisual():
+// una campaña pausada a mano sigue mostrando aquí si su rango de fechas ya
+// venció, sigue vigente o todavía no arranca, sin que el apagado manual
+// tape esa información (antes "Pausada" ocultaba si además ya había vencido).
+function vigenciaFecha(c) {
+  const hoy = hoyStr();
+  if (c.fecha_inicio > hoy) return {key:'antes', label:'⚫ Aún no empieza'};
+  if (c.fecha_fin < hoy) return {key:'despues', label:'🔴 Ya terminó'};
+  return {key:'dentro', label:'🟢 Dentro del período'};
+}
+
 // ══ TAB LOCALES ══
 function renderLocales() {
   const tbody = document.getElementById('tabla-locales');
@@ -739,14 +750,16 @@ function renderCampanas() {
     const ev = estadoVisual(c);
     const dias = (c.dias_semana && c.dias_semana.length) ? c.dias_semana.join('-') : 'Todos';
     const horario = (c.hora_inicio==='00:00:00'||c.hora_inicio==='00:00') && (c.hora_fin==='23:59:00'||c.hora_fin==='23:59') ? 'Todo el día' : `${(c.hora_inicio||'').slice(0,5)}-${(c.hora_fin||'').slice(0,5)}`;
-    const vigencia = `${fmtFechaCorta(c.fecha_inicio)} - ${fmtFechaCorta(c.fecha_fin)}`;
+    const vf = vigenciaFecha(c);
     const puedeActivar = ev.key === 'pausada';
     const puedePausar = ev.key === 'activa' || ev.key === 'programada';
     return `<tr>
       <td>${l ? escapeHtml(l.nombre) : '—'}</td>
       <td><b>${escapeHtml(c.nombre_campana)}</b><br><span style="font-size:11px;color:var(--muted)">${escapeHtml(c.titulo_promo)}</span></td>
       <td>${TIPO_PROMO_LABEL[c.tipo_promo]||c.tipo_promo}</td>
-      <td>${vigencia}</td>
+      <td>${fmtFechaCorta(c.fecha_inicio)}</td>
+      <td>${fmtFechaCorta(c.fecha_fin)}</td>
+      <td><span class="estado-chip">${vf.label}</span></td>
       <td>${horario}</td>
       <td>${dias}</td>
       <td>${c.impactos||0}</td>

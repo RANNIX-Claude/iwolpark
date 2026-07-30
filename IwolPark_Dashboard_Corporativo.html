@@ -317,6 +317,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <option value="sabado">Sábado</option>
         <option value="domingo">Domingo</option>
         <option value="semana">Esta semana</option>
+        <option value="semana_pasada">Semana pasada</option>
         <option value="mes">Este mes</option>
         <option value="custom">Personalizado</option>
       </select>
@@ -1294,9 +1295,10 @@ function actualizarPeriodoLabel() {
   const DIA_IDX_LBL = { domingo:0, lunes:1, martes:2, miercoles:3, jueves:4, viernes:5, sabado:6 };
   if (p === 'hoy' || p in DIA_IDX_LBL) {
     el.textContent = capitalizarAdm(fmtFechaLargaAdm(desde));
-  } else if (p === 'semana') {
+  } else if (p === 'semana' || p === 'semana_pasada') {
     const d1 = new Date(desde+'T12:00:00'), d2 = new Date(hasta+'T12:00:00');
-    el.textContent = `Semana del ${d1.getDate()} al ${d2.getDate()} de ${MESES_LARGOS_ADM[d2.getMonth()]} de ${d2.getFullYear()}`;
+    const prefijo = p === 'semana_pasada' ? 'Semana pasada — del ' : 'Semana del ';
+    el.textContent = `${prefijo}${d1.getDate()} al ${d2.getDate()} de ${MESES_LARGOS_ADM[d2.getMonth()]} de ${d2.getFullYear()}`;
   } else if (p === 'mes') {
     const d = new Date(desde+'T12:00:00');
     el.textContent = capitalizarAdm(MESES_LARGOS_ADM[d.getMonth()]) + ' ' + d.getFullYear();
@@ -1331,6 +1333,14 @@ function getFechas() {
     // SIGUIENTE, no la actual) — (getDay()+6)%7 funciona los 7 días.
     const ini = new Date(hoy); ini.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
     return { desde: fmt(ini), hasta: fmt(hoy) };
+  }
+  if (p === 'semana_pasada') {
+    // Lunes a domingo de la semana ANTERIOR (no incluye hoy) — el lunes de
+    // esta semana menos 7 días, hasta el domingo de esa misma semana pasada.
+    const iniEstaSemana = new Date(hoy); iniEstaSemana.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    const iniPasada = new Date(iniEstaSemana); iniPasada.setDate(iniEstaSemana.getDate() - 7);
+    const finPasada = new Date(iniEstaSemana); finPasada.setDate(iniEstaSemana.getDate() - 1);
+    return { desde: fmt(iniPasada), hasta: fmt(finPasada) };
   }
   if (p === 'mes') {
     return { desde: fmt(new Date(hoy.getFullYear(),hoy.getMonth(),1)), hasta: fmt(hoy) };
