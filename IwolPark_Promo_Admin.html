@@ -329,6 +329,8 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
     <div class="modal-body">
       <input type="hidden" id="campana-id">
       <input type="hidden" id="campana-origen-id">
+      <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:2;min-width:320px;display:flex;flex-direction:column;gap:18px">
 
       <div class="param-card">
         <h3>Información de la campaña</h3>
@@ -369,13 +371,6 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
         <div class="row">
           <div class="field"><label>Texto del voucher</label>
             <textarea id="campana-texto" oninput="actualizarVistaPreviaVoucher()" placeholder="ej. Presenta este voucher en tu próxima visita"></textarea></div>
-        </div>
-      </div>
-
-      <div class="param-card">
-        <h3>Vista previa del ticket</h3>
-        <div style="display:flex;justify-content:center;padding:10px;background:#EDEDED;border-radius:8px">
-          <div class="vp-wrap" id="voucher-preview-body"></div>
         </div>
       </div>
 
@@ -429,6 +424,17 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
       </div>
 
       <div class="field"><label>Notas internas</label><textarea id="campana-notas"></textarea></div>
+
+      </div>
+      <div style="flex:1;min-width:260px;position:sticky;top:0">
+        <div class="param-card">
+          <h3>Vista previa del ticket</h3>
+          <div style="display:flex;justify-content:center;padding:10px;background:#EDEDED;border-radius:8px">
+            <div class="vp-wrap" id="voucher-preview-body"></div>
+          </div>
+        </div>
+      </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn outline" onclick="cerrarModalCampana()">Cancelar</button>
@@ -848,8 +854,8 @@ function actualizarVistaPreviaVoucher() {
     ${local && local.logo_base64 ? `<img src="${local.logo_base64}" style="display:block;width:42mm;margin:2mm auto">` : ''}
     <div class="vp-center" style="font-size:12pt;font-weight:900;font-family:Arial,Helvetica,sans-serif">${escapeHtml(nombreCampana)}</div>
     <div class="vp-dashed"></div>
+    ${subtitulo ? `<div class="vp-center" style="font-size:11pt;font-weight:800;font-family:Arial,Helvetica,sans-serif;margin-bottom:1mm">${escapeHtml(subtitulo)}</div>` : ''}
     <div class="vp-center" style="background:#000;color:#fff;padding:2.5mm 0;margin:1mm 0;font-size:28pt;font-weight:900;font-family:'Arial Black',Arial,sans-serif;letter-spacing:1px;text-transform:uppercase">${escapeHtml(titulo)}</div>
-    ${subtitulo ? `<div class="vp-center" style="font-size:11pt;font-weight:800;font-family:Arial,Helvetica,sans-serif;margin-top:1mm">${escapeHtml(subtitulo)}</div>` : ''}
     <div class="vp-center" style="font-size:13pt;font-weight:700;font-family:Arial,Helvetica,sans-serif;margin-top:2mm">${escapeHtml(texto)}</div>
     ${tipoPromo === 'codigo' ? `<div class="vp-center" style="font-size:16pt;font-weight:900;border:1px dashed #000;margin:2mm;padding:1mm">${escapeHtml(valorPromo)}</div>` : ''}
     <div class="vp-dashed"></div>
