@@ -294,7 +294,12 @@ async function cargarTicketsDemanda(periodo) {
     // calcular) para poder mostrar el detalle real al hacer clic en una
     // celda, sin tener que pedirlo aparte.
     const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,fecha_op,hora_entrada,hora_salida,tipo,cajero,importe,estatus&order=fecha_op.asc`;
-    return await fetchPaginado(base, SB_HEADERS, 15000);
+    const rows = await fetchPaginado(base, SB_HEADERS, 15000);
+    // Mismo filtro que ya usan "Tickets por cajero y día" y el resumen
+    // semanal (cargarSemanaActualYAnterior): sin esto, el heatmap contaba
+    // también boletos abiertos/cancelados y sus totales no cuadraban con
+    // los de esas otras tablas que sí los excluyen (bug real reportado).
+    return rows.filter(t => t.estatus!=='abierto' && t.estatus!=='cancelado');
   } catch (e) { return []; }
 }
 
