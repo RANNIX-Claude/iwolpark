@@ -122,6 +122,14 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
   display:flex; align-items:center; justify-content:center; overflow:hidden; background:#FAFAFA; flex-shrink:0; }
 .logo-preview img { max-width:100%; max-height:100%; }
 
+/* VISTA PREVIA DEL VOUCHER — mismas clases/tamaños que imprimirVoucher() en
+   IwolPark_TABLET.html, para que la proporción (52mm reales) y las fuentes
+   coincidan con lo que de verdad sale impreso. */
+.vp-wrap { width:52mm; max-width:52mm; margin:0 auto; background:#fff;
+  color:#000; padding:3mm 0; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+.vp-center { text-align:center; }
+.vp-dashed { border-top:1px dashed #000; margin:1.5mm 0; }
+
 /* MÉTRICAS */
 .metric-card { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; }
 .metric-nums { display:flex; gap:22px; flex-wrap:wrap; margin:10px 0; }
@@ -315,6 +323,7 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="modal-box wide">
     <div class="modal-head">
       <span class="modal-title" id="campana-modal-title">📣 Nueva campaña</span>
+      <button class="btn sm outline" id="btn-toggle-estado-campana" style="display:none;margin-left:auto" onclick="toggleEstadoCampanaModal()"></button>
       <button class="modal-close" onclick="cerrarModalCampana()">✕</button>
     </div>
     <div class="modal-body">
@@ -325,10 +334,10 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
         <h3>Información de la campaña</h3>
         <div class="row">
           <div class="field"><label>Local</label>
-            <select id="campana-local"></select>
+            <select id="campana-local" onchange="actualizarVistaPreviaVoucher()"></select>
           </div>
           <div class="field"><label>Nombre de la campaña</label>
-            <input id="campana-nombre" placeholder='ej. "Promo Julio 2026"'></div>
+            <input id="campana-nombre" oninput="actualizarVistaPreviaVoucher()" placeholder='ej. "Promo Julio 2026"'></div>
         </div>
       </div>
 
@@ -336,7 +345,7 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
         <h3>Tipo y mensaje</h3>
         <div class="row">
           <div class="field"><label>Tipo de promo</label>
-            <select id="campana-tipo-promo" onchange="onCambioTipoPromo()">
+            <select id="campana-tipo-promo" onchange="onCambioTipoPromo();actualizarVistaPreviaVoucher()">
               <option value="descuento_pct">Descuento %</option>
               <option value="descuento_fijo">Descuento fijo</option>
               <option value="2x1">2x1</option>
@@ -346,16 +355,27 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
           </div>
           <div class="field" id="campana-valor-wrap">
             <label id="campana-valor-label">¿Cuánto? (%)</label>
-            <input id="campana-valor-promo" placeholder="20">
+            <input id="campana-valor-promo" oninput="actualizarVistaPreviaVoucher()" placeholder="20">
           </div>
         </div>
         <div class="row">
           <div class="field"><label>Título (grande en el voucher)</label>
-            <input id="campana-titulo" placeholder='ej. "20% de descuento"'></div>
+            <input id="campana-titulo" oninput="actualizarVistaPreviaVoucher()" placeholder='ej. "20% de descuento"'></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Subtítulo (debajo del título, ej. "a solo", "Aprovecha")</label>
+            <input id="campana-subtitulo" maxlength="100" oninput="actualizarVistaPreviaVoucher()" placeholder='ej. "a solo"'></div>
         </div>
         <div class="row">
           <div class="field"><label>Texto del voucher</label>
-            <textarea id="campana-texto" placeholder="ej. Presenta este voucher en tu próxima visita"></textarea></div>
+            <textarea id="campana-texto" oninput="actualizarVistaPreviaVoucher()" placeholder="ej. Presenta este voucher en tu próxima visita"></textarea></div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <h3>Vista previa del ticket</h3>
+        <div style="display:flex;justify-content:center;padding:10px;background:#EDEDED;border-radius:8px">
+          <div class="vp-wrap" id="voucher-preview-body"></div>
         </div>
       </div>
 
@@ -363,13 +383,13 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
         <h3>Vigencia</h3>
         <div class="row">
           <div class="field"><label>Fecha inicio</label><input type="date" id="campana-fecha-inicio"></div>
-          <div class="field"><label>Fecha fin</label><input type="date" id="campana-fecha-fin"></div>
+          <div class="field"><label>Fecha fin</label><input type="date" id="campana-fecha-fin" onchange="actualizarVistaPreviaVoucher()"></div>
           <div class="field"><label>Presupuesto de impactos (vacío = sin límite)</label>
             <input type="number" id="campana-presupuesto" min="0" placeholder="ej. 500"></div>
         </div>
         <div class="row">
           <div class="field"><label>Vigencia (texto libre en el voucher, vacío = usa la fecha fin)</label>
-            <input id="campana-vigencia-texto" maxlength="100" placeholder='ej. "Válido únicamente durante el mes de Febrero"'></div>
+            <input id="campana-vigencia-texto" maxlength="100" oninput="actualizarVistaPreviaVoucher()" placeholder='ej. "Válido únicamente durante el mes de Febrero"'></div>
         </div>
       </div>
 
@@ -763,6 +783,7 @@ function abrirModalCampana(id, clonDe) {
   document.getElementById('campana-tipo-promo').value = base.tipo_promo || 'descuento_pct';
   document.getElementById('campana-valor-promo').value = base.valor_promo || '';
   document.getElementById('campana-titulo').value = base.titulo_promo || '';
+  document.getElementById('campana-subtitulo').value = base.subtitulo_promo || '';
   document.getElementById('campana-texto').value = base.texto_promo || '';
   document.getElementById('campana-fecha-inicio').value = (!c && !origen) ? hoyStr() : (base.fecha_inicio || '');
   document.getElementById('campana-fecha-fin').value = base.fecha_fin || '';
@@ -780,7 +801,61 @@ function abrirModalCampana(id, clonDe) {
   const tiposDefault = (c || origen) ? (base.tipos_cliente || []) : ['normal','preferencial','pension'];
   document.getElementById('chips-tipo-cliente').innerHTML = chipsHtml('chips-tipo-cliente', TIPOS_CLIENTE_PROMO, tiposDefault);
 
+  const btnToggle = document.getElementById('btn-toggle-estado-campana');
+  if (c) { btnToggle.style.display = 'inline-flex'; actualizarBotonToggleEstado(c); }
+  else { btnToggle.style.display = 'none'; }
+
+  actualizarVistaPreviaVoucher();
   document.getElementById('modal-campana').classList.add('open');
+}
+function actualizarBotonToggleEstado(c) {
+  const btn = document.getElementById('btn-toggle-estado-campana');
+  const pausada = estadoVisual(c).key === 'pausada';
+  btn.textContent = pausada ? '▶ Encender' : '⏸ Apagar';
+  btn.className = pausada ? 'btn sm green' : 'btn sm outline';
+}
+// Apaga/enciende la campaña independientemente del rango de fechas — para
+// una urgencia (ej. el local cerró temporalmente) sin tener que tocar la
+// vigencia configurada. Reusa cambiarEstadoCampana(), ya usado en la lista.
+async function toggleEstadoCampanaModal() {
+  const id = parseInt(document.getElementById('campana-id').value, 10);
+  if (!id) return;
+  const c = CAMPANAS.find(x => x.id === id);
+  if (!c) return;
+  const nuevoEstado = estadoVisual(c).key === 'pausada' ? 'activa' : 'pausada';
+  await cambiarEstadoCampana(id, nuevoEstado);
+  const actualizado = CAMPANAS.find(x => x.id === id);
+  if (actualizado) actualizarBotonToggleEstado(actualizado);
+}
+// Recrea en vivo, con las mismas clases/tamaños que imprimirVoucher() en
+// IwolPark_TABLET.html, lo que el cajero va a ver impreso — para que el
+// admin no tenga que adivinar cómo se va a ver el voucher real.
+function actualizarVistaPreviaVoucher() {
+  const cont = document.getElementById('voucher-preview-body');
+  if (!cont) return;
+  const local = localPorId(document.getElementById('campana-local').value);
+  const nombreCampana = document.getElementById('campana-nombre').value.trim();
+  const titulo = document.getElementById('campana-titulo').value.trim() || 'Título';
+  const subtitulo = document.getElementById('campana-subtitulo').value.trim();
+  const texto = document.getElementById('campana-texto').value.trim();
+  const tipoPromo = document.getElementById('campana-tipo-promo').value;
+  const valorPromo = document.getElementById('campana-valor-promo').value.trim();
+  const vigenciaTexto = document.getElementById('campana-vigencia-texto').value.trim();
+  const fechaFin = document.getElementById('campana-fecha-fin').value;
+  cont.innerHTML = `
+    <div class="vp-dashed"></div>
+    <div class="vp-center" style="font-size:9pt;color:#888">PROMOCIÓN PLAZA IWOL</div>
+    ${local && local.logo_base64 ? `<img src="${local.logo_base64}" style="display:block;width:42mm;margin:2mm auto">` : ''}
+    <div class="vp-center" style="font-size:12pt;font-weight:900;font-family:Arial,Helvetica,sans-serif">${escapeHtml(nombreCampana)}</div>
+    <div class="vp-dashed"></div>
+    <div class="vp-center" style="background:#000;color:#fff;padding:2.5mm 0;margin:1mm 0;font-size:28pt;font-weight:900;font-family:'Arial Black',Arial,sans-serif;letter-spacing:1px;text-transform:uppercase">${escapeHtml(titulo)}</div>
+    ${subtitulo ? `<div class="vp-center" style="font-size:11pt;font-weight:800;font-family:Arial,Helvetica,sans-serif;margin-top:1mm">${escapeHtml(subtitulo)}</div>` : ''}
+    <div class="vp-center" style="font-size:13pt;font-weight:700;font-family:Arial,Helvetica,sans-serif;margin-top:2mm">${escapeHtml(texto)}</div>
+    ${tipoPromo === 'codigo' ? `<div class="vp-center" style="font-size:16pt;font-weight:900;border:1px dashed #000;margin:2mm;padding:1mm">${escapeHtml(valorPromo)}</div>` : ''}
+    <div class="vp-dashed"></div>
+    <div class="vp-center" style="font-size:11pt;font-weight:700;font-family:Arial,Helvetica,sans-serif">${escapeHtml(vigenciaTexto || ('Vigente hasta: ' + (fechaFin || '—')))}</div>
+    <div class="vp-dashed"></div>
+  `;
 }
 function cerrarModalCampana() { document.getElementById('modal-campana').classList.remove('open'); }
 function clonarCampana(id) {
@@ -804,6 +879,7 @@ async function guardarCampana() {
     local_id: document.getElementById('campana-local').value,
     nombre_campana: nombre,
     titulo_promo: titulo,
+    subtitulo_promo: document.getElementById('campana-subtitulo').value.trim() || null,
     texto_promo: texto,
     tipo_promo: document.getElementById('campana-tipo-promo').value,
     valor_promo: document.getElementById('campana-valor-promo').value.trim() || null,
@@ -822,24 +898,20 @@ async function guardarCampana() {
     updated_at: new Date().toISOString()
   };
   if (origenId) body.campana_origen_id = parseInt(origenId,10);
+  // vigencia_texto/subtitulo_promo requieren el ALTER TABLE (ver migración) —
+  // si aún no se corrió en este ambiente, no queremos que TODO el guardado de
+  // la campaña falle por columnas nuevas; se reintenta una vez sin ellas.
+  const COLS_NUEVAS = ['vigencia_texto', 'subtitulo_promo'];
   try {
-    let r;
-    if (id) {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(body) });
-      // vigencia_texto requiere el ALTER TABLE (ver migración) — si aún no se
-      // corrió, no queremos que TODO el guardado de la campaña falle por una
-      // sola columna nueva; se reintenta una vez sin ella.
-      if (!r.ok && body.vigencia_texto !== undefined) {
-        const { vigencia_texto, ...bodySinVigencia } = body;
-        r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(bodySinVigencia) });
-      }
-    } else {
-      body.estado = 'activa'; body.impactos = 0;
-      r = await fetch(`${SUPABASE_URL}/rest/v1/campanas`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(body) });
-      if (!r.ok && body.vigencia_texto !== undefined) {
-        const { vigencia_texto, ...bodySinVigencia } = body;
-        r = await fetch(`${SUPABASE_URL}/rest/v1/campanas`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(bodySinVigencia) });
-      }
+    const url = id ? `${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}` : `${SUPABASE_URL}/rest/v1/campanas`;
+    const metodo = id ? 'PATCH' : 'POST';
+    const headers = id ? SB_HEADERS : {...SB_HEADERS, Prefer:'return=minimal'};
+    if (!id) { body.estado = 'activa'; body.impactos = 0; }
+    let r = await fetch(url, { method: metodo, headers, body: JSON.stringify(body) });
+    if (!r.ok) {
+      const bodySinNuevas = {...body};
+      COLS_NUEVAS.forEach(k => delete bodySinNuevas[k]);
+      r = await fetch(url, { method: metodo, headers, body: JSON.stringify(bodySinNuevas) });
     }
     if (!r.ok) throw new Error(await r.text());
     logBitacora('promo_campana_guardada', { id: id||null, nombre });
