@@ -367,6 +367,10 @@ tr.clickable:hover td { background:#FAFAFE; cursor:pointer; }
           <div class="field"><label>Presupuesto de impactos (vacío = sin límite)</label>
             <input type="number" id="campana-presupuesto" min="0" placeholder="ej. 500"></div>
         </div>
+        <div class="row">
+          <div class="field"><label>Vigencia (texto libre en el voucher, vacío = usa la fecha fin)</label>
+            <input id="campana-vigencia-texto" maxlength="100" placeholder='ej. "Válido únicamente durante el mes de Febrero"'></div>
+        </div>
       </div>
 
       <div class="param-card">
@@ -763,6 +767,7 @@ function abrirModalCampana(id, clonDe) {
   document.getElementById('campana-fecha-inicio').value = (!c && !origen) ? hoyStr() : (base.fecha_inicio || '');
   document.getElementById('campana-fecha-fin').value = base.fecha_fin || '';
   document.getElementById('campana-presupuesto').value = base.presupuesto_impactos != null ? base.presupuesto_impactos : '';
+  document.getElementById('campana-vigencia-texto').value = base.vigencia_texto || '';
   document.getElementById('campana-hora-inicio').value = (base.hora_inicio||'00:00').slice(0,5);
   document.getElementById('campana-hora-fin').value = (base.hora_fin||'23:59').slice(0,5);
   document.getElementById('campana-costo-fijo').value = base.costo_campana != null ? base.costo_campana : '';
@@ -809,6 +814,7 @@ async function guardarCampana() {
     dias_semana: chipsSeleccionados('chips-dias'),
     tipos_cliente: chipsSeleccionados('chips-tipo-cliente'),
     presupuesto_impactos: presupuesto ? parseInt(presupuesto,10) : null,
+    vigencia_texto: document.getElementById('campana-vigencia-texto').value.trim() || null,
     costo_campana: parseFloat(document.getElementById('campana-costo-fijo').value) || 0,
     costo_por_impacto: parseFloat(document.getElementById('campana-costo-impacto').value) || 0,
     notas: document.getElementById('campana-notas').value.trim() || null,
@@ -820,9 +826,20 @@ async function guardarCampana() {
     let r;
     if (id) {
       r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(body) });
+      // vigencia_texto requiere el ALTER TABLE (ver migración) — si aún no se
+      // corrió, no queremos que TODO el guardado de la campaña falle por una
+      // sola columna nueva; se reintenta una vez sin ella.
+      if (!r.ok && body.vigencia_texto !== undefined) {
+        const { vigencia_texto, ...bodySinVigencia } = body;
+        r = await fetch(`${SUPABASE_URL}/rest/v1/campanas?id=eq.${id}`, { method:'PATCH', headers: SB_HEADERS, body: JSON.stringify(bodySinVigencia) });
+      }
     } else {
       body.estado = 'activa'; body.impactos = 0;
       r = await fetch(`${SUPABASE_URL}/rest/v1/campanas`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(body) });
+      if (!r.ok && body.vigencia_texto !== undefined) {
+        const { vigencia_texto, ...bodySinVigencia } = body;
+        r = await fetch(`${SUPABASE_URL}/rest/v1/campanas`, { method:'POST', headers: {...SB_HEADERS, Prefer:'return=minimal'}, body: JSON.stringify(bodySinVigencia) });
+      }
     }
     if (!r.ok) throw new Error(await r.text());
     logBitacora('promo_campana_guardada', { id: id||null, nombre });
