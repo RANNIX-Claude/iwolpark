@@ -2687,25 +2687,19 @@ function aplicarPeriodoRapidoCobroMovAdmin() {
 async function cargarMovimientosDBAdmin() {
   const desde = document.getElementById('filtro-desde-mov').value || fmtLocal(new Date());
   const hasta = document.getElementById('filtro-hasta-mov').value || fmtLocal(new Date());
-  // Fecha de cobro (hora_salida_at) — cuando está activa, REEMPLAZA al
-  // filtro de fecha_op en vez de sumarse a él (si se aplicaran las dos como
-  // AND, un boleto que entró un día distinto al que se cobró nunca
-  // aparecería, que es justo el caso que se quería poder buscar: un boleto
-  // que entró el 6 y se cobró el 7 no tiene fecha_op=7, así que exigir
-  // fecha_op=hoy además de fecha de cobro=hoy lo dejaría fuera igual).
+  // Fecha de cobro (hora_salida_at) se combina con fecha de entrada (AND),
+  // no la reemplaza — así se puede buscar justo el caso real: "entró ayer
+  // Y se cobró hoy" (Fecha entrada=Ayer + Fecha de cobro=Hoy). Si solo se
+  // quiere buscar por fecha de cobro sin importar cuándo entró, hay que
+  // ampliar el rango de "Fecha entrada" a mano (ej. un mes atrás a hoy).
   const cobroDesde = document.getElementById('filtro-cobro-desde-mov').value;
   const cobroHasta = document.getElementById('filtro-cobro-hasta-mov').value;
-  const usaFiltroCobro = !!(cobroDesde || cobroHasta);
   try {
     const select = 'select=*,empleados(nombre_completo,puesto,area),' +
       'pensiones(tipo,estado,clientes(nombre),vehiculos(placas,marca,modelo))';
-    let base = `${SUPABASE_URL}/rest/v1/tickets?`;
-    if (usaFiltroCobro) {
-      if (cobroDesde) base += `hora_salida_at=gte.${cobroDesde}T00:00:00-06:00&`;
-      if (cobroHasta) { const sig = new Date(cobroHasta+'T00:00:00'); sig.setDate(sig.getDate()+1); base += `hora_salida_at=lt.${fmtLocal(sig)}T00:00:00-06:00&`; }
-    } else {
-      base += `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&`;
-    }
+    let base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&`;
+    if (cobroDesde) base += `hora_salida_at=gte.${cobroDesde}T00:00:00-06:00&`;
+    if (cobroHasta) { const sig = new Date(cobroHasta+'T00:00:00'); sig.setDate(sig.getDate()+1); base += `hora_salida_at=lt.${fmtLocal(sig)}T00:00:00-06:00&`; }
     base += `${select}&order=created_at.desc`;
     const rows = await fetchPaginado(base, SB_HEADERS_PARAM, 10000);
     return ticketsAMovimientosAdm(rows);
@@ -2743,7 +2737,7 @@ async function actualizarMovimientosAdmin() {
   MOVS_ACTUALES_ADM = desdeDB || [];
   const usaFiltroCobro = !!(document.getElementById('filtro-cobro-desde-mov').value || document.getElementById('filtro-cobro-hasta-mov').value);
   if (badge) {
-    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos` + (usaFiltroCobro ? ' (por fecha de cobro, ignora fecha de entrada)' : ' en el rango'); badge.style.color = 'var(--green)'; }
+    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos` + (usaFiltroCobro ? ' (entrada Y cobro combinados)' : ' en el rango'); badge.style.color = 'var(--green)'; }
     else { badge.textContent = '○ No se pudo consultar'; badge.style.color = 'var(--red)'; }
   }
   poblarFiltrosMovimientosAdmin(MOVS_ACTUALES_ADM);
