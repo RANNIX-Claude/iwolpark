@@ -797,7 +797,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
 <div class="tab-section" id="tab-movimientos">
 
   <div class="filtros" style="margin-bottom:10px">
-    <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Rango</label>
+    <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Fecha entrada:</label>
     <select id="filtro-periodo-rapido-mov" onchange="aplicarPeriodoRapidoMovAdmin()">
       <option value="hoy" selected>Hoy</option>
       <option value="ayer">Ayer</option>
@@ -813,6 +813,21 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     </select>
     <input type="date" id="filtro-desde-mov">
     <input type="date" id="filtro-hasta-mov">
+    <!-- Filtro independiente por fecha de COBRO (hora_salida_at), no por
+         fecha_op (día operativo de la entrada) — sin esto, un boleto que
+         entró un día y se cobró al siguiente (ej. Empleado/Pensión que
+         sale muy temprano) era imposible de encontrar buscando "hoy" si
+         "hoy" significa el día en que se cobró, no en que entró. -->
+    <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:14px">Fecha de cobro:</label>
+    <select id="filtro-periodo-rapido-cobro-mov" onchange="aplicarPeriodoRapidoCobroMovAdmin()">
+      <option value="" selected>Sin filtro</option>
+      <option value="hoy">Hoy</option>
+      <option value="ayer">Ayer</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes">Este mes</option>
+    </select>
+    <input type="date" id="filtro-cobro-desde-mov" onchange="actualizarMovimientosAdmin()">
+    <input type="date" id="filtro-cobro-hasta-mov" onchange="actualizarMovimientosAdmin()">
     <button class="btn-filtro" onclick="actualizarMovimientosAdmin()">↻ Buscar</button>
     <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="mov-fuente-adm"></span>
   </div>
@@ -2652,13 +2667,46 @@ function aplicarPeriodoRapidoMovAdmin() {
   actualizarMovimientosAdmin();
 }
 
+// Mismo cálculo de rangos que "Fecha entrada" (getFechasPeriodoRapidoMovAdmin),
+// pero aplicado a las fechas de COBRO en vez de a fecha_op.
+function aplicarPeriodoRapidoCobroMovAdmin() {
+  const valor = document.getElementById('filtro-periodo-rapido-cobro-mov').value;
+  if (!valor) { // "Sin filtro": limpia el rango de cobro y deja de restringir por él
+    document.getElementById('filtro-cobro-desde-mov').value = '';
+    document.getElementById('filtro-cobro-hasta-mov').value = '';
+    actualizarMovimientosAdmin();
+    return;
+  }
+  const rango = getFechasPeriodoRapidoMovAdmin(valor);
+  if (!rango) return;
+  document.getElementById('filtro-cobro-desde-mov').value = rango.desde;
+  document.getElementById('filtro-cobro-hasta-mov').value = rango.hasta;
+  actualizarMovimientosAdmin();
+}
+
 async function cargarMovimientosDBAdmin() {
   const desde = document.getElementById('filtro-desde-mov').value || fmtLocal(new Date());
   const hasta = document.getElementById('filtro-hasta-mov').value || fmtLocal(new Date());
+  // Fecha de cobro (hora_salida_at) — cuando está activa, REEMPLAZA al
+  // filtro de fecha_op en vez de sumarse a él (si se aplicaran las dos como
+  // AND, un boleto que entró un día distinto al que se cobró nunca
+  // aparecería, que es justo el caso que se quería poder buscar: un boleto
+  // que entró el 6 y se cobró el 7 no tiene fecha_op=7, así que exigir
+  // fecha_op=hoy además de fecha de cobro=hoy lo dejaría fuera igual).
+  const cobroDesde = document.getElementById('filtro-cobro-desde-mov').value;
+  const cobroHasta = document.getElementById('filtro-cobro-hasta-mov').value;
+  const usaFiltroCobro = !!(cobroDesde || cobroHasta);
   try {
     const select = 'select=*,empleados(nombre_completo,puesto,area),' +
       'pensiones(tipo,estado,clientes(nombre),vehiculos(placas,marca,modelo))';
-    const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&${select}&order=created_at.desc`;
+    let base = `${SUPABASE_URL}/rest/v1/tickets?`;
+    if (usaFiltroCobro) {
+      if (cobroDesde) base += `hora_salida_at=gte.${cobroDesde}T00:00:00-06:00&`;
+      if (cobroHasta) { const sig = new Date(cobroHasta+'T00:00:00'); sig.setDate(sig.getDate()+1); base += `hora_salida_at=lt.${fmtLocal(sig)}T00:00:00-06:00&`; }
+    } else {
+      base += `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&`;
+    }
+    base += `${select}&order=created_at.desc`;
     const rows = await fetchPaginado(base, SB_HEADERS_PARAM, 10000);
     return ticketsAMovimientosAdm(rows);
   } catch (e) {
@@ -2693,8 +2741,9 @@ async function actualizarMovimientosAdmin() {
   if (badge) { badge.textContent = 'Consultando base de datos…'; badge.style.color = 'var(--muted)'; }
   const desdeDB = await cargarMovimientosDBAdmin();
   MOVS_ACTUALES_ADM = desdeDB || [];
+  const usaFiltroCobro = !!(document.getElementById('filtro-cobro-desde-mov').value || document.getElementById('filtro-cobro-hasta-mov').value);
   if (badge) {
-    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos en el rango`; badge.style.color = 'var(--green)'; }
+    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos` + (usaFiltroCobro ? ' (por fecha de cobro, ignora fecha de entrada)' : ' en el rango'); badge.style.color = 'var(--green)'; }
     else { badge.textContent = '○ No se pudo consultar'; badge.style.color = 'var(--red)'; }
   }
   poblarFiltrosMovimientosAdmin(MOVS_ACTUALES_ADM);
@@ -2702,6 +2751,9 @@ async function actualizarMovimientosAdmin() {
 }
 
 function limpiarFiltrosMovimientosAdmin() {
+  document.getElementById('filtro-periodo-rapido-cobro-mov').value = '';
+  document.getElementById('filtro-cobro-desde-mov').value = '';
+  document.getElementById('filtro-cobro-hasta-mov').value = '';
   document.getElementById('filtro-folio-mov').value = '';
   document.getElementById('filtro-tipo-mov').value = 'todos';
   document.getElementById('filtro-franja-mov').value = 'todas';
@@ -2722,7 +2774,10 @@ function limpiarFiltrosMovimientosAdmin() {
   document.getElementById('filtro-pension-id-mov').value = '';
   document.getElementById('filtro-pension-cliente-mov').value = '';
   document.getElementById('filtro-pension-tipo-mov').value = 'todos';
-  refrescarMovimientosAdmin();
+  // A diferencia de los demás filtros (solo re-filtran en el cliente), el de
+  // fecha de cobro afecta la consulta al servidor — hay que volver a pedir
+  // los datos, no solo refrescar la tabla con lo ya cargado.
+  actualizarMovimientosAdmin();
 }
 
 function toggleFiltrosAvanzadosMovAdmin() {
