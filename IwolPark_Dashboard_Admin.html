@@ -89,8 +89,14 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 /* KPI CARDS */
 .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr);
             gap:10px; margin-bottom:10px; }
-@media (max-width:1100px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
-@media (max-width:600px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
+/* !important necesario: renderAdminTab() fija gridTemplateColumns como
+   estilo en línea en #kpi-grid-main/#charts-row1 (repeat(6,1fr) o
+   repeat(3,1fr) según la sub-pestaña) — un estilo en línea siempre le
+   gana a cualquier regla de hoja de estilos, incluida una con @media,
+   así que sin !important estos breakpoints nunca se aplicaban (ni en
+   escritorio angosto ni en celular). */
+@media (max-width:1100px) { .kpi-grid { grid-template-columns:repeat(3,1fr) !important; } }
+@media (max-width:600px)  { .kpi-grid { grid-template-columns:repeat(2,1fr) !important; } }
 .kpi-card { background:var(--white); border-radius:10px;
             border:1px solid var(--border); padding:10px 12px;
             box-shadow:var(--card-sh); cursor:pointer;
@@ -110,7 +116,7 @@ nav { background:#fff; border-bottom:1px solid var(--border);
 /* CHARTS GRID */
 .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px;
                margin-bottom:10px; }
-@media (max-width:900px) { .charts-grid { grid-template-columns:1fr; } }
+@media (max-width:900px) { .charts-grid { grid-template-columns:1fr !important; } }
 .chart-card { background:var(--white); border-radius:10px;
               border:1px solid var(--border); padding:12px;
               box-shadow:var(--card-sh); }
@@ -246,6 +252,59 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   .container { max-width:100%; padding:0; }
   .card, .chart-card { box-shadow:none; border:1px solid #ccc; break-inside:avoid; }
   .grid2, .grid3, .charts-grid { break-inside:avoid; }
+}
+
+/* ══ CELULAR (piloto responsivo) ══
+   Nada de esto toca el layout de escritorio (arriba de 768px sigue exacto
+   igual) — son overrides que solo aplican en pantallas angostas, para que
+   PC y celular compartan el mismo archivo sin duplicar código. */
+@media (max-width:768px) {
+  /* NAV: en escritorio es una sola fila; en celular no caben todos los
+     botones + reloj + usuario + versión sin desbordarse. Se deja que la
+     fila se parta en 2 líneas y se ocultan los datos menos críticos
+     (reloj, versión, nombre de plaza) — el usuario y los botones de
+     acción siguen visibles porque sí importan en celular. */
+  nav { flex-wrap:wrap; height:auto; min-height:52px; padding:8px 12px; row-gap:6px; }
+  .nav-clock, #app-version, .nav-plaza { display:none; }
+  .nav-right { gap:8px; flex-wrap:wrap; width:100%; justify-content:flex-end; }
+  .nav-right button, .nav-right .btn-refresh { padding:6px 10px; font-size:11px; }
+  .nav-menu-list { right:0; left:auto; }
+
+  /* TABS: en vez de romper línea (que empuja el contenido hacia abajo y
+     corta texto), se deja una sola fila con scroll horizontal — patrón
+     estándar de "swipe" en apps móviles. */
+  .tabs { overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0 10px; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tab { padding:12px 14px; font-size:12px; white-space:nowrap; flex-shrink:0; }
+
+  .container { padding:8px 10px; }
+
+  /* FILTROS: en vez de una fila apretada con varios selects/fechas, cada
+     control ocupa el ancho completo — más fácil de tocar y de leer. */
+  .filtros { flex-direction:column; align-items:stretch; gap:8px; }
+  .filtros > span[style*="display:flex"] { flex-direction:column; align-items:stretch; width:100%; }
+  .filtros select, .filtros input[type=date], .btn-filtro { width:100%; }
+
+  /* KPIs: a partir de 400px de ancho (celular angosto real, no tablet)
+     una sola columna para que el número grande siga siendo legible. */
+  .kpi-value { font-size:20px; }
+
+  /* MODALES: menos padding para aprovechar el ancho limitado; el modal ya
+     es 100% del ancho disponible (max-width:720px con width:100%), solo
+     se ajustan los márgenes internos. */
+  .modal-body { padding:14px 16px; gap:14px; }
+  .modal-head { padding:14px 16px; }
+  .param-row { flex-direction:column; align-items:stretch; }
+  .param-row input, .param-row select { min-width:0; }
+
+  /* TABLAS: siguen con scroll horizontal (.tabla-wrap ya tiene
+     overflow-x:auto), pero más compactas para que quepan más columnas
+     visibles antes de tener que hacer scroll. */
+  table { font-size:12px; }
+  th, td { padding:7px 8px; }
+}
+@media (max-width:400px) {
+  .kpi-grid { grid-template-columns:repeat(1,1fr) !important; }
 }
 </style>
 </head>

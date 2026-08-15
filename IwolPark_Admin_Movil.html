@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IwolPark · Admin Móvil</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IwolPark Admin">
+<meta name="theme-color" content="#7B5EA7">
+<style>
+:root {
+  --bg:      #F5F5F7;
+  --white:   #FFFFFF;
+  --border:  #D2D2D7;
+  --accent:  #7B5EA7;
+  --accent2: #0A66C2;
+  --green:   #0D9457;
+  --red:     #D93025;
+  --gold:    #F5A623;
+  --text:    #1D1D1F;
+  --muted:   #6E6E73;
+  --card-sh: 0 2px 12px rgba(0,0,0,.08);
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+       color:var(--text); min-height:100vh; padding-bottom:24px; }
+
+/* Esta pantalla nace pensada para celular primero (a diferencia del resto
+   de IwolPark, que nace en escritorio y se adapta hacia abajo) — por eso
+   no hay tablas anchas, filtros de varias columnas ni menús con muchas
+   opciones: es solo para ver números rápido, no para operar el sistema. */
+
+nav { background:#fff; border-bottom:1px solid var(--border);
+      padding:10px 16px; display:flex; align-items:center; gap:10px;
+      position:sticky; top:0; z-index:100; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.nav-logo { font-size:18px; font-weight:900; color:var(--accent); }
+.nav-title { font-size:14px; font-weight:800; }
+.nav-badge { font-size:9px; font-weight:700; background:var(--accent);
+             color:#fff; border-radius:4px; padding:2px 7px; }
+.nav-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.btn-icon { background:none; border:1px solid var(--border); border-radius:8px;
+            padding:6px 10px; font-size:11px; color:var(--muted); cursor:pointer; }
+.btn-refresh { background:var(--accent); color:#fff; border:none;
+               border-radius:8px; padding:7px 12px; font-size:11px;
+               font-weight:700; cursor:pointer; }
+
+.container { max-width:520px; margin:0 auto; padding:14px 14px 0; }
+
+/* PERIODO */
+.periodo-chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;
+                  -webkit-overflow-scrolling:touch; margin-bottom:12px; }
+.periodo-chips::-webkit-scrollbar { display:none; }
+.chip-periodo { flex-shrink:0; border:1.5px solid var(--border); border-radius:99px;
+  padding:8px 16px; font-size:13px; font-weight:700; color:var(--muted);
+  background:#fff; cursor:pointer; white-space:nowrap; }
+.chip-periodo.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+#periodo-label { font-size:12px; color:var(--muted); margin-bottom:10px; text-align:center; }
+
+/* KPIs — una sola columna, números grandes, pensado para leer de un
+   vistazo sin tener que acercar el celular a los ojos. */
+.kpi-grid { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.kpi-card { background:var(--white); border-radius:14px; border:1px solid var(--border);
+            padding:16px 18px; box-shadow:var(--card-sh); display:flex;
+            align-items:center; justify-content:space-between; gap:10px; }
+.kpi-label { font-size:11px; font-weight:700; color:var(--muted);
+             text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.kpi-value { font-size:30px; font-weight:900; line-height:1; }
+.kpi-sub   { font-size:11px; color:var(--muted); margin-top:3px; }
+.kpi-icon  { font-size:28px; flex-shrink:0; opacity:.85; }
+
+.kpi-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.kpi-mini { background:var(--white); border-radius:12px; border:1px solid var(--border);
+            padding:12px 14px; box-shadow:var(--card-sh); text-align:center; }
+.kpi-mini .kpi-value { font-size:22px; }
+
+/* MOVIMIENTOS — lista de tarjetas, no tabla (nada que hacer scroll de
+   lado en un celular). */
+.card-section-title { font-size:12px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--muted); margin:18px 0 8px 2px; display:flex;
+  align-items:center; gap:8px; }
+.mov-list { display:flex; flex-direction:column; gap:8px; }
+.mov-row { background:var(--white); border-radius:12px; border:1px solid var(--border);
+  padding:11px 14px; box-shadow:var(--card-sh); display:flex; align-items:center; gap:10px; }
+.mov-tipo-badge { width:34px; height:34px; border-radius:9px; display:flex;
+  align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.mov-info { flex:1; min-width:0; }
+.mov-folio { font-size:13px; font-weight:800; }
+.mov-meta { font-size:11px; color:var(--muted); }
+.mov-importe { font-size:15px; font-weight:900; text-align:right; flex-shrink:0; }
+.b-normal   { background:#EFF6FF; color:#0A66C2; }
+.b-pref     { background:#F3F0FF; color:#7B5EA7; }
+.b-perdido  { background:#FEE2E2; color:#D93025; }
+.b-cortesia { background:#F5F5F5; color:#6E6E73; }
+.b-empleado { background:#EEF2FF; color:#1D3557; }
+.b-pension  { background:#E6F7EF; color:#0D9457; }
+.b-abierto  { background:#FFF7E6; color:#B45309; }
+
+.empty-state { text-align:center; padding:30px 20px; color:var(--muted); font-size:13px; }
+.loading-state { text-align:center; padding:30px 20px; color:var(--muted); font-size:13px; }
+
+/* LOGIN — mismo patrón que el resto de IwolPark */
+#iwol-login-overlay { position:fixed; inset:0; background:#1D1D1F; z-index:999999;
+  display:flex; align-items:center; justify-content:center; }
+#iwol-login-overlay.hidden { display:none; }
+.iwol-login-box { background:#fff; border-radius:16px; padding:32px 28px; width:90%; max-width:340px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; }
+.iwol-login-box h2 { font-size:18px; font-weight:900; margin-bottom:4px; }
+.iwol-login-box p { font-size:12px; color:#6E6E73; margin-bottom:18px; }
+.iwol-login-box input { width:100%; border:1.5px solid #D2D2D7; border-radius:8px; padding:12px 12px;
+  font-size:16px; margin-bottom:10px; box-sizing:border-box; }
+.iwol-login-box button { width:100%; background:#7B5EA7; color:#fff; border:none; border-radius:8px;
+  padding:13px; font-size:15px; font-weight:700; cursor:pointer; }
+.iwol-login-error { color:#D93025; font-size:12px; margin-top:8px; min-height:16px; }
+
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(60px);
+         background:#1D1D1F; color:#fff; border-radius:10px; padding:12px 18px;
+         font-size:13px; font-weight:600; z-index:9999; opacity:0; transition:all .3s; }
+.toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="iwol-login-overlay" class="hidden">
+  <div class="iwol-login-box">
+    <h2>🔒 Iniciar sesión</h2>
+    <p>IwolPark · <span id="iwol-login-app-nombre"></span></p>
+    <input type="text" id="iwol-login-usuario" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="iwol-login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button onclick="iwolIntentarLogin()">Entrar</button>
+    <div class="iwol-login-error" id="iwol-login-error"></div>
+  </div>
+</div>
+
+<nav>
+  <span class="nav-logo">·iwol·</span>
+  <span class="nav-title">Admin Móvil</span>
+  <span class="nav-badge">RESUMEN</span>
+  <div class="nav-right">
+    <button class="btn-refresh" onclick="cargarDatos()">↻</button>
+    <button class="btn-icon" onclick="cerrarSesion()">Salir</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="periodo-chips" id="periodo-chips">
+    <div class="chip-periodo" data-p="hoy" onclick="cambiarPeriodo('hoy')">Hoy</div>
+    <div class="chip-periodo" data-p="ayer" onclick="cambiarPeriodo('ayer')">Ayer</div>
+    <div class="chip-periodo" data-p="semana" onclick="cambiarPeriodo('semana')">Esta semana</div>
+    <div class="chip-periodo" data-p="semana_pasada" onclick="cambiarPeriodo('semana_pasada')">Semana pasada</div>
+    <div class="chip-periodo" data-p="mes" onclick="cambiarPeriodo('mes')">Este mes</div>
+  </div>
+  <div id="periodo-label">Cargando…</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Ingresos</div>
+        <div class="kpi-value" style="color:var(--gold)" id="kpi-ingresos">$0</div>
+        <div class="kpi-sub" id="kpi-ingresos-sub">0 cobrados</div>
+      </div>
+      <div class="kpi-icon">💰</div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Tickets del período</div>
+        <div class="kpi-value" style="color:var(--accent)" id="kpi-tickets">0</div>
+        <div class="kpi-sub" id="kpi-tickets-sub">0 aún abiertos</div>
+      </div>
+      <div class="kpi-icon">🎫</div>
+    </div>
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-label">Autos en plaza ahora</div>
+        <div class="kpi-value" style="color:var(--accent2)" id="kpi-ocupacion-num">0</div>
+        <div class="kpi-sub" id="kpi-ocupacion-sub">de 0 lugares</div>
+      </div>
+      <div class="kpi-icon">🅿️</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid-2">
+    <div class="kpi-mini">
+      <div class="kpi-value" style="color:var(--green)" id="kpi-ticket-prom">$0</div>
+      <div class="kpi-sub">Ticket promedio</div>
+    </div>
+    <div class="kpi-mini">
+      <div class="kpi-value" style="color:var(--red)" id="kpi-perdidos">0</div>
+      <div class="kpi-sub">Boletos perdidos</div>
+    </div>
+  </div>
+
+  <div class="card-section-title">📋 Movimientos recientes</div>
+  <div class="mov-list" id="mov-list">
+    <div class="loading-state">Cargando…</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://gbciwuprgrzllagtlqij.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdiY2l3dXByZ3J6bGxhZ3RscWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDMzNzcsImV4cCI6MjEwMDAxOTM3N30.vmFhOv4eI3atO4TmBP5rEN-zz1mpXDLlKbxaaYPsm3o';
+const HEADERS = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+
+function fmt$(n) { return '$' + (n||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtLocal(d) { const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._tt); window._tt = setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// ══ PERIODO — mismos 5 casos que el selector rápido de Admin/Corporativo,
+// autocontenido aquí (esta pantalla no depende de las funciones globales
+// del dashboard completo, es un archivo aparte a propósito). ══
+let PERIODO_ACTUAL = 'hoy';
+function getFechasMovil(p) {
+  const hoy = new Date();
+  if (p === 'hoy') return { desde: fmtLocal(hoy), hasta: fmtLocal(hoy) };
+  if (p === 'ayer') { const d = new Date(hoy); d.setDate(d.getDate()-1); return { desde: fmtLocal(d), hasta: fmtLocal(d) }; }
+  if (p === 'semana') {
+    const ini = new Date(hoy); ini.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    return { desde: fmtLocal(ini), hasta: fmtLocal(hoy) };
+  }
+  if (p === 'semana_pasada') {
+    const iniEsta = new Date(hoy); iniEsta.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    const iniPasada = new Date(iniEsta); iniPasada.setDate(iniEsta.getDate()-7);
+    const finPasada = new Date(iniEsta); finPasada.setDate(iniEsta.getDate()-1);
+    return { desde: fmtLocal(iniPasada), hasta: fmtLocal(finPasada) };
+  }
+  if (p === 'mes') return { desde: fmtLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: fmtLocal(hoy) };
+  return { desde: fmtLocal(hoy), hasta: fmtLocal(hoy) };
+}
+const MESES_LARGOS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS_LARGOS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function etiquetaPeriodo(p, desde, hasta) {
+  const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+  if (p === 'hoy' || p === 'ayer') {
+    const d = new Date(desde+'T12:00:00');
+    return cap(DIAS_LARGOS[d.getDay()]) + ' ' + d.getDate() + ' de ' + MESES_LARGOS[d.getMonth()];
+  }
+  if (p === 'mes') { const d = new Date(desde+'T12:00:00'); return cap(MESES_LARGOS[d.getMonth()]) + ' ' + d.getFullYear(); }
+  const d1 = new Date(desde+'T12:00:00'), d2 = new Date(hasta+'T12:00:00');
+  const prefijo = p === 'semana_pasada' ? 'Semana pasada — ' : '';
+  return `${prefijo}${d1.getDate()} al ${d2.getDate()} de ${MESES_LARGOS[d2.getMonth()]}`;
+}
+function cambiarPeriodo(p) {
+  PERIODO_ACTUAL = p;
+  document.querySelectorAll('.chip-periodo').forEach(c => c.classList.toggle('active', c.dataset.p === p));
+  cargarDatos();
+}
+
+// ══ PAGINADO — mismo patrón que el resto de IwolPark, por si el período
+// (ej. "Este mes") trae más de 1000 filas. ══
+async function fetchPaginado(urlBase, maxTotal) {
+  let todas = []; let offset = 0; const pageSize = 1000;
+  while (true) {
+    const sep = urlBase.includes('?') ? '&' : '?';
+    const r = await fetch(`${urlBase}${sep}limit=${pageSize}&offset=${offset}`, { headers: HEADERS });
+    if (!r.ok) { if (offset === 0) throw new Error('http ' + r.status); break; }
+    const pagina = await r.json();
+    todas = todas.concat(pagina);
+    if (pagina.length < pageSize || todas.length >= (maxTotal||50000)) break;
+    offset += pageSize;
+  }
+  return todas;
+}
+
+const TIPO_ICONO = { normal:'⬇', preferencial:'★', perdido:'⚠', cortesia:'🎁', empleado:'🪪', pension:'🅿️' };
+const TIPO_CLASE = { normal:'b-normal', preferencial:'b-pref', perdido:'b-perdido', cortesia:'b-cortesia', empleado:'b-empleado', pension:'b-pension' };
+const TIPO_LABEL = { normal:'Normal', preferencial:'Preferencial', perdido:'Perdido', cortesia:'Cortesía', empleado:'Empleado', pension:'Pensión' };
+
+async function cargarDatos() {
+  document.getElementById('periodo-label').textContent = 'Cargando…';
+  document.getElementById('mov-list').innerHTML = '<div class="loading-state">Cargando…</div>';
+  try {
+    const { desde, hasta } = getFechasMovil(PERIODO_ACTUAL);
+    document.getElementById('periodo-label').textContent = etiquetaPeriodo(PERIODO_ACTUAL, desde, hasta);
+
+    // Igual que cargarDatos() en Admin.html: se excluyen cancelados de raíz
+    // (no son una operación real), y "cobrados" solo cuenta lo que ya
+    // generó ingreso real (importe>0) — mismos criterios, mismos números.
+    const rows = (await fetchPaginado(
+      `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=folio,tipo,estatus,cajero,cajero_entrada,cajero_salida,hora_entrada,hora_salida,importe,created_at&order=created_at.desc`
+    , 15000)).filter(t => t.estatus !== 'cancelado');
+
+    const cobros = rows.filter(t => (Number(t.importe)||0) > 0);
+    const totalIngresos = cobros.reduce((s,t) => s + (Number(t.importe)||0), 0);
+    const abiertosDelPeriodo = rows.filter(t => t.estatus === 'abierto').length;
+    const perdidos = rows.filter(t => t.tipo === 'perdido');
+
+    document.getElementById('kpi-ingresos').textContent = fmt$(totalIngresos);
+    document.getElementById('kpi-ingresos-sub').textContent = cobros.length + ' cobrados';
+    document.getElementById('kpi-tickets').textContent = rows.length;
+    document.getElementById('kpi-tickets-sub').textContent = abiertosDelPeriodo + ' aún abiertos';
+    document.getElementById('kpi-ticket-prom').textContent = fmt$(cobros.length ? totalIngresos/cobros.length : 0);
+    document.getElementById('kpi-perdidos').textContent = perdidos.length;
+
+    // Ocupación EN VIVO (autos en plaza ahora mismo) — consulta aparte sin
+    // filtro de período, igual que Admin.html: un auto que entró ayer y
+    // sigue adentro cuenta aunque el filtro esté en "Hoy" o "Este mes".
+    try {
+      const hoyStr = fmtLocal(new Date());
+      const [rAbiertos, rCap] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/tickets?estatus=eq.abierto&fecha_op=eq.${hoyStr}&select=folio&limit=1000`, { headers: HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/dim_plaza?select=capacidad_total&limit=1`, { headers: HEADERS }),
+      ]);
+      const abiertos = rAbiertos.ok ? await rAbiertos.json() : [];
+      const capRows = rCap.ok ? await rCap.json() : [];
+      const capacidad = capRows[0]?.capacidad_total || 40;
+      document.getElementById('kpi-ocupacion-num').textContent = abiertos.length;
+      document.getElementById('kpi-ocupacion-sub').textContent = 'de ' + capacidad + ' lugares';
+    } catch (e) {}
+
+    renderMovimientos(rows.slice(0, 25));
+  } catch (e) {
+    document.getElementById('periodo-label').textContent = 'Sin conexión';
+    document.getElementById('mov-list').innerHTML = '<div class="empty-state">No se pudo cargar — revisa tu conexión</div>';
+    showToast('Error: ' + e.message);
+  }
+}
+
+function renderMovimientos(rows) {
+  const cont = document.getElementById('mov-list');
+  if (!rows.length) { cont.innerHTML = '<div class="empty-state">Sin movimientos en este período</div>'; return; }
+  cont.innerHTML = rows.map(t => {
+    const tipo = t.tipo || 'normal';
+    const cajero = t.estatus === 'abierto' ? (t.cajero_entrada || t.cajero || '—') : (t.cajero_salida || t.cajero || '—');
+    const hora = t.estatus === 'abierto' ? (t.hora_entrada || '—') : (t.hora_salida || t.hora_entrada || '—');
+    const importeTxt = (Number(t.importe)||0) > 0 ? fmt$(Number(t.importe)) : (t.estatus === 'abierto' ? '—' : 'Sin costo');
+    const badgeClase = t.estatus === 'abierto' ? 'b-abierto' : (TIPO_CLASE[tipo] || 'b-normal');
+    return `<div class="mov-row">
+      <div class="mov-tipo-badge ${badgeClase}">${TIPO_ICONO[tipo] || '🎫'}</div>
+      <div class="mov-info">
+        <div class="mov-folio">${t.folio}</div>
+        <div class="mov-meta">${TIPO_LABEL[tipo]||tipo} · ${cajero} · ${hora}${t.estatus==='abierto' ? ' · en plaza' : ''}</div>
+      </div>
+      <div class="mov-importe" style="color:${(Number(t.importe)||0)>0 ? 'var(--green)' : 'var(--muted)'}">${importeTxt}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══ LOGIN — mismo patrón que el resto de IwolPark (login_cajero RPC vía
+// Supabase, sesión en sessionStorage mientras dure la pestaña). ══
+function iwolUsuarioActual() {
+  try { return JSON.parse(sessionStorage.getItem('iwol_usuario') || 'null'); } catch(e) { return null; }
+}
+function cerrarSesion() { sessionStorage.removeItem('iwol_usuario'); location.reload(); }
+let _iwolRolesPermitidos = [];
+let _iwolLoginResolve = null;
+function requerirLogin(rolesPermitidos, nombreApp) {
+  _iwolRolesPermitidos = rolesPermitidos;
+  const actual = iwolUsuarioActual();
+  if (actual && rolesPermitidos.includes(actual.rol)) return Promise.resolve(actual);
+  document.getElementById('iwol-login-app-nombre').textContent = nombreApp || '';
+  document.getElementById('iwol-login-overlay').classList.remove('hidden');
+  document.getElementById('iwol-login-usuario').focus();
+  return new Promise(res => { _iwolLoginResolve = res; });
+}
+async function sha256Hex(texto) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function iwolIntentarLogin() {
+  const usuario = document.getElementById('iwol-login-usuario').value.trim();
+  const password = document.getElementById('iwol-login-password').value;
+  const errEl = document.getElementById('iwol-login-error');
+  errEl.textContent = '';
+  if (!usuario || !password) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  try {
+    const hash = await sha256Hex(password);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/login_cajero`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_usuario: usuario, p_password_hash: hash })
+    });
+    if (!r.ok) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; return; }
+    const rows = await r.json();
+    const cajero = rows[0];
+    if (!cajero) { errEl.textContent = 'Usuario o contraseña incorrectos'; return; }
+    if (!_iwolRolesPermitidos.includes(cajero.rol)) { errEl.textContent = 'Tu usuario no tiene permiso para entrar aquí'; return; }
+    const datosUsuario = { cajero_id: cajero.cajero_id, nombre: cajero.nombre, usuario: cajero.usuario, rol: cajero.rol };
+    sessionStorage.setItem('iwol_usuario', JSON.stringify(datosUsuario));
+    document.getElementById('iwol-login-overlay').classList.add('hidden');
+    document.getElementById('iwol-login-usuario').value = '';
+    document.getElementById('iwol-login-password').value = '';
+    if (_iwolLoginResolve) { _iwolLoginResolve(datosUsuario); _iwolLoginResolve = null; }
+  } catch (e) { errEl.textContent = 'No se pudo validar (revisa tu conexión)'; }
+}
+document.addEventListener('keydown', e => {
+  const overlay = document.getElementById('iwol-login-overlay');
+  if (e.key === 'Enter' && overlay && !overlay.classList.contains('hidden')) iwolIntentarLogin();
+});
+
+// ══ ARRANQUE ══
+let USUARIO_ACTUAL = null;
+(async () => {
+  USUARIO_ACTUAL = await requerirLogin(['admin_plaza','super_admin'], 'Admin Móvil');
+  document.querySelector('.chip-periodo[data-p="hoy"]').classList.add('active');
+  await cargarDatos();
+  // Refresco automático cada 60s — pensado para dejarlo abierto en el
+  // celular y que los números se mantengan al día sin tocar nada.
+  setInterval(cargarDatos, 60000);
+})();
+</script>
+</body>
+</html>
