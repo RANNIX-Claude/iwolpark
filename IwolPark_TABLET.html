@@ -2166,7 +2166,6 @@ async function sincronizarContadoresFolio() {
 // de Producción, aunque fuera detrás de un NIP, es un riesgo que no vale la
 // pena — si algún día hace falta limpiar Producción de verdad, se hace
 // aparte y con cuidado, no desde un botón de uso diario.
-const SUPABASE_PROJECT_ID_QA = 'gbciwuprgrzllagtlqij';
 const NIP_LIMPIEZA_FOLIOS = '2329';
 // Botón "↺ Folios" del nav: primero solo CONSULTA (sin NIP, sin tocar
 // nada) el folio actual guardado en esta tablet — el punto de partida
@@ -2190,40 +2189,17 @@ async function mostrarInfoFolios() {
   if (continuar) await resincronizarFoliosManual();
 }
 async function resincronizarFoliosManual() {
-  const esQA = SUPABASE_URL.includes(SUPABASE_PROJECT_ID_QA);
-  if (esQA) {
-    const datosQA = await mostrarInputModal('↺ Limpiar tickets de hoy (QA)', [
-      { id: 'nip', label: 'NIP de autorización', type: 'password', placeholder: '••••' }
-    ]);
-    if (!datosQA) return;
-    if (datosQA.nip !== NIP_LIMPIEZA_FOLIOS) {
-      showToast('NIP incorrecto · no se hizo ningún cambio', '#D93025');
-      return;
-    }
-    const autorizado = await mostrarConfirmModal(
-      'Esto va a BORRAR todos los tickets de HOY en la base de QA, para poder repetir la prueba desde folio 001.\n\nEsta acción no se puede deshacer.',
-      '⚠ Limpiar tickets de hoy (QA)', 'Sí, borrar y resincronizar'
-    );
-    if (autorizado) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/tickets?fecha_op=eq.${fechaOp(new Date())}`, {
-          method: 'DELETE',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-        });
-      } catch (e) {}
-    }
-  } else {
-    // Producción (o cualquier ambiente que no sea QA): solo reinicia el
-    // contador local — nunca borra tickets. El NIP es un control temporal
-    // para que no cualquiera lo use sin saber qué hace.
-    const datos = await mostrarInputModal('↺ Reiniciar contador de folios', [
-      { id: 'nip', label: 'NIP de autorización', type: 'password', placeholder: '••••' }
-    ]);
-    if (!datos) { return; }
-    if (datos.nip !== NIP_LIMPIEZA_FOLIOS) {
-      showToast('NIP incorrecto · no se hizo ningún cambio', '#D93025');
-      return;
-    }
+  // Solo reinicia el contador local de folios de esta tablet. NUNCA borra
+  // tickets: el borrado masivo en QA se retiró (2026-08-29) porque la guarda
+  // vivia en el navegador y la base aceptaba el DELETE de cualquiera. Si hay
+  // que limpiar QA, se hace desde el panel de Supabase.
+  const datos = await mostrarInputModal('↺ Reiniciar contador de folios', [
+    { id: 'nip', label: 'NIP de autorizacion', type: 'password', placeholder: '••••' }
+  ]);
+  if (!datos) { return; }
+  if (datos.nip !== NIP_LIMPIEZA_FOLIOS) {
+    showToast('NIP incorrecto · no se hizo ningun cambio', '#D93025');
+    return;
   }
   STATE.folio_counters = {};
   await sincronizarContadoresFolio();
