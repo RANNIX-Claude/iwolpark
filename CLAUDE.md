@@ -49,8 +49,8 @@ del repo apunta aquí. Trabajar en local = trabajar contra QA.
 | Netlify | `iwolpark-produccion2.netlify.app` → **iwol.click** |
 | Site ID | `0143f712-153f-4afd-919b-7cde0a300ce9` |
 | Deploy | `./deploy_prod2.sh` |
-| Credenciales | `.env.prod2` → `PROD2_SUPABASE_URL`, `PROD2_SUPABASE_KEY` (**no versionado**) |
-| Contador | `.prod2_version` (**no versionado**) |
+| Credenciales | `.env.prod2` → `PROD2_SUPABASE_URL`, `PROD2_SUPABASE_KEY` (**no versionado**, se reconstruye con `./bootstrap_local.sh`) |
+| Contador | `.prod2_version` (**no versionado**, idem) |
 | Banner | morado `#5E3B9C` — "PRODUCCIÓN (COPIA PARALELA · SERVIDOR PROPIO)" |
 
 **Este es el sistema en vivo del cliente.** Datos reales de operación.
@@ -92,8 +92,19 @@ Un `git clone` limpio **no** puede desplegar a producción. Falta:
 *_PRODUCCION.html  copias locales con credenciales reales
 ```
 
-Se reconstruyen desde el dashboard de Supabase (Project Settings → API) y desde la
-tabla `versiones_app` de cada base.
+Para PROD2 esto ya no se hace a mano:
+
+```bash
+./bootstrap_local.sh   # escribe .env.prod2 y .prod2_version, no despliega nada
+```
+
+El script pide la anon key (o la toma de `PROD2_SUPABASE_KEY`, o de un
+`*_PRODUCCION.html` local que aún la tenga), la **valida contra el servidor antes
+de escribir nada**, y saca el contador de `versiones_app`. Es idempotente: si un
+archivo ya existe no lo pisa, y aborta si `.gitignore` no cubre ambos.
+
+El ambiente **legado** (`.env.prod`, `.prod_version`) sigue siendo manual: su
+proyecto Supabase no está registrado en el repo (ver Pendientes).
 
 ### 🔴 Recuperar el contador ANTES del primer deploy
 
@@ -102,6 +113,9 @@ resultado a `versiones_app`, que es lo que dispara la actualización forzada en 
 terminal. Sin el archivo, el deploy publica **v1** y anuncia v1 a tablets que corren
 v101: nunca ven una versión mayor y **la actualización forzada queda rota en
 silencio, en la plaza del cliente**.
+
+`bootstrap_local.sh` existe para que esto no dependa de que alguien se acuerde. A
+mano, el equivalente es:
 
 ```sql
 -- correr en el SQL Editor de la base destino
@@ -112,6 +126,7 @@ echo <version_real> > .prod2_version
 ```
 
 **QA y Producción usan numeraciones independientes.** No son comparables entre sí.
+Al 06-sep-2026: QA `VERSION` = 187, PROD2 `versiones_app` = 101 en las tres apps.
 
 ---
 
@@ -125,15 +140,18 @@ echo <version_real> > .prod2_version
 | `IwolPark_Dashboard_Admin.html` | Admin de plaza | KPIs, movimientos, reportes |
 | `IwolPark_Admin_Movil.html` | Admin móvil | versión responsiva |
 | `IwolPark_Dashboard_Corporativo.html` | Corporativo | consolidado |
-| `corporativo.html` | Corporativo (PROD2) | nombre corto, solo iwol.click |
+| `corporativo.html` | Corporativo (PROD2) | nombre corto, solo iwol.click; se despliega únicamente por `deploy_prod2.sh` |
 | `IwolPark_Dashboard_Cajeros.html` | Rendimiento de cajeros | productividad por operador |
 | `IwolPark_Demanda.html` | Análisis de demanda | mapa de calor, embebido en iframe |
 | `IwolPark_Promo_Admin.html` | Promociones | vouchers, toggle general |
 | `IwolPark_Central.html` | Consola central | |
 
-### Archivos duplicados a limpiar
-`IwolPark_Dashboard_Corporativo - copia.html`, `IwolPark_Dashboard_Corporativo_.html`,
-`IwolPark_Demanda-DESKTOP-HTN791F.html` — residuos de edición, no se despliegan.
+### Archivos duplicados — eliminados (06-sep-2026)
+`IwolPark_Dashboard_Corporativo - copia.html`, `IwolPark_Dashboard_Corporativo_.html`
+y `IwolPark_Demanda-DESKTOP-HTN791F.html` eran residuos de edición sin una sola
+referencia en el repo. Se borraron; siguen en el historial de git si hiciera falta
+rescatar algo (`git log -- "<archivo>"`). Nota: `deploy.sh` despliega `--dir=.`, así
+que mientras existieron se publicaban al sitio de QA sin que nadie los usara.
 
 ---
 
@@ -190,6 +208,7 @@ Romper cualquiera de esos cuatro pasos rompe la actualización forzada.
 ## Deploy
 
 ```bash
+./bootstrap_local.sh       # Reconstruye .env.prod2 y .prod2_version en un clon limpio. No despliega.
 ./deploy.sh                # QA — commitea, pushea y despliega. Bumpea VERSION.
 ./deploy_prod_preview.sh   # URL única de preview con credenciales reales. No toca el sitio vivo.
 ./deploy_prod2.sh          # PRODUCCIÓN iwol.click. Requiere .env.prod2 + .prod2_version.
@@ -215,9 +234,15 @@ en el escritorio y configura la impresora POS-58 como predeterminada.
 NIPs default: cajero `1111`, admin `111111` — cambiar en parámetros tras instalar.
 
 ⚠️ **El `.bat` copia los HTML del directorio donde está**, que traen credenciales de
-**QA**. Correrlo desde un clon limpio instala QA en la caja del cliente. Para
-producción hay que correr antes `generar_locales_produccion.sh` y copiar los
-`*_PRODUCCION.html`. El instalador no lo advierte.
+**QA**. Correrlo desde un clon limpio instala QA en la caja del cliente: la caja
+cobra, imprime y cuadra, pero contra la base de pruebas.
+
+Desde el 06-sep-2026 el instalador lo detecta. Antes de copiar nada busca el ref de
+QA (`gbciwuprgrzllagtlqij`) en los HTML de su carpeta y, si lo encuentra, muestra la
+advertencia y exige que se escriba `INSTALAR-QA` para continuar; cualquier otra cosa
+cancela sin copiar. Si encuentra el ref de PROD2 lo anuncia como producción. Para
+instalar producción: correr `generar_locales_produccion.sh`, quitar el sufijo
+`_PRODUCCION` de los nombres en una carpeta aparte, y correr el instalador desde ahí.
 
 ---
 
@@ -233,9 +258,20 @@ key. Configurado en `.mcp.json` apuntando a **QA**. Instalar con
 
 - Las anon keys son públicas por diseño (van al navegador). **La única defensa real
   es RLS en Supabase.** Cualquier tabla nueva necesita sus políticas.
-- ⚠️ `corporativo.html` está versionado con las credenciales de **Producción
-  (`syryisrelcjgdulxmgro`)**, no de QA como el resto. En un repositorio público.
-  Revisar RLS de esa base y considerar normalizar el archivo al patrón de los demás.
+- ⚠️ **La anon key de Producción estuvo expuesta en este repositorio.**
+  `corporativo.html` era el único de los 13 HTML versionado con credenciales de
+  **Producción (`syryisrelcjgdulxmgro`)** en vez de QA. Se normalizó a QA el
+  06-sep-2026, pero **la key sigue en el historial de git** (entró en el commit
+  `928f8aa`, "Conectar Corporativo a Supabase productivo"): normalizar el archivo
+  detiene la exposición hacia adelante, no la borra hacia atrás. Cualquiera con
+  acceso al historial puede recuperarla. Mientras no se rote, **la única defensa de
+  esa base es su RLS** — revisarla. Rotar la key es decisión del dueño y se hace en
+  el dashboard de Supabase (ver Pendientes); si se rota, hay que regenerar
+  `.env.prod2` (`rm .env.prod2 && ./bootstrap_local.sh`).
+- Efecto colateral del arreglo: `deploy_prod2.sh` sustituye las credenciales de QA
+  por las de PROD2 con `sed` sobre una copia efímera. Como `corporativo.html` ya
+  traía PROD2 adentro, ese `sed` no encontraba nada que sustituir y el deploy
+  funcionaba **por accidente**. Ahora sustituye de verdad.
 - Nunca commitear `.env.prod`, `.env.prod2` ni archivos `*_PRODUCCION.html`.
 
 ---
@@ -245,8 +281,21 @@ key. Configurado en `.mcp.json` apuntando a **QA**. Instalar con
 1. **Ante la duda, el ambiente es QA.** Producción solo por `deploy_prod2.sh` y con
    `deploy_prod_preview.sh` validado antes.
 2. **Nunca commitear credenciales de Producción.**
-3. **Recuperar `.prod2_version` desde `versiones_app`** antes del primer deploy tras
-   un clon nuevo.
+3. **Correr `./bootstrap_local.sh`** en todo clon nuevo antes del primer deploy a
+   producción. Es lo que recupera `.prod2_version` desde `versiones_app`.
 4. **Aplicar los `sql_*.sql` en todos los ambientes**, no solo en QA.
 5. **No romper el patrón de copia efímera** de los scripts de producción.
-6. Las páginas se despliegan como archivos estáticos: **sin build, sin dependencias**.
+6. **Todo archivo fuente apunta a QA**, sin excepciones. Si una página necesita otro
+   ambiente, lo resuelve el script de deploy con su `sed`, nunca el archivo del repo.
+7. Las páginas se despliegan como archivos estáticos: **sin build, sin dependencias**.
+
+---
+
+## Pendientes (sin resolver al 06-sep-2026)
+
+- **Ref de Supabase del ambiente legado** — sigue sin identificar. Solo vivía en
+  `.env.prod`, que no está versionado y se perdió. Sin él no se puede saber si esa
+  base sigue viva ni desplegar a `keen-chebakia-9df9bf`. Se recupera del dashboard de
+  Netlify (variables del sitio) o del de Supabase, comparando proyectos.
+- **Rotar o no la anon key de Producción expuesta** — decisión del dueño, se ejecuta
+  en Supabase. Ver Seguridad.

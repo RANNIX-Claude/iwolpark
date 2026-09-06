@@ -9,6 +9,52 @@ echo   RANNIX Consulting 2026
 echo  ============================================
 echo.
 
+:: --- Verificacion de ambiente: QA vs PRODUCCION -----------------------
+:: Este .bat copia los HTML que estan en SU MISMA CARPETA. Los del
+:: repositorio traen las credenciales de QA adentro, asi que instalarlos
+:: tal cual manda el turno completo a la base de pruebas: la caja cobra,
+:: imprime y cuadra, pero nada de eso existe en la operacion real. Antes
+:: no habia forma de notarlo hasta revisar los reportes.
+set QA_DETECTADA=
+set PROD_DETECTADA=
+for %%F in (IwolPark_TABLET.html IwolPark_Pensiones.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html) do findstr /m /c:"gbciwuprgrzllagtlqij" "%~dp0%%F" >nul 2>&1 && set QA_DETECTADA=1
+for %%F in (IwolPark_TABLET.html IwolPark_Pensiones.html IwolPark_Dashboard_Admin.html IwolPark_Dashboard_Corporativo.html) do findstr /m /c:"syryisrelcjgdulxmgro" "%~dp0%%F" >nul 2>&1 && set PROD_DETECTADA=1
+
+if defined QA_DETECTADA (
+  color 0E
+  echo  [0/6] Ambiente detectado: QA ^(base de pruebas^)
+  echo.
+  echo  ============================================
+  echo   ADVERTENCIA - ESTOS ARCHIVOS APUNTAN A QA
+  echo  ============================================
+  echo.
+  echo   Los HTML de esta carpeta usan la base de datos de QA
+  echo   ^(gbciwuprgrzllagtlqij^), NO la de produccion.
+  echo.
+  echo   Si instalas asi en una caja de la plaza, todo lo que
+  echo   cobre el cajero se guarda en la base de PRUEBAS y no
+  echo   aparece en ningun reporte real. No hay aviso en pantalla
+  echo   mientras opera: se ve identico al sistema bueno.
+  echo.
+  echo   Para instalar PRODUCCION:
+  echo     1. Desde Git Bash, corre generar_locales_produccion.sh
+  echo     2. Copia los *_PRODUCCION.html a una carpeta aparte y
+  echo        quitales el sufijo _PRODUCCION del nombre
+  echo     3. Corre este instalador desde ESA carpeta
+  echo.
+  echo   Los archivos de produccion abren con una franja de color
+  echo   arriba. Si no ves franja al abrirlos, son de QA.
+  echo.
+)
+if defined QA_DETECTADA set /p CONFIRMA=  Escribe INSTALAR-QA y Enter para continuar de todos modos: 
+if defined QA_DETECTADA if /i not "%CONFIRMA%"=="INSTALAR-QA" ( echo. & echo   Instalacion cancelada. No se copio ningun archivo. & echo. & color 0A & pause & exit /b 1 )
+if defined QA_DETECTADA echo.
+if defined QA_DETECTADA echo   Continuando con archivos de QA por confirmacion explicita.
+if defined QA_DETECTADA echo.
+if defined PROD_DETECTADA echo  [0/6] Ambiente detectado: PRODUCCION ^(iwol.click^)
+if not defined QA_DETECTADA if not defined PROD_DETECTADA echo  [0/6] Ambiente: no identificado en los archivos de esta carpeta
+color 0A
+
 :: Crear carpeta destino
 set DEST=C:\Park\files
 if not exist "%DEST%" mkdir "%DEST%"
