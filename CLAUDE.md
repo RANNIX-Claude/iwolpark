@@ -148,6 +148,29 @@ echo <version_real> > .prod2_version
 **Vistas KPI** — `v_kpi_dia`, `v_kpi_franja`, `v_kpi_cajero`, `v_resumen_mensual`,
 `v_pensiones_estado`, `v_cobranza_mes`
 
+### 🔴 Tablas SIN DDL versionado
+
+`IwolPark_schema.sql` no las contiene: se crearon a mano en el SQL Editor y solo
+existen en la base. El repositorio únicamente tiene los `alter table` que las
+parcharon después, así que **el sistema no se puede levantar desde cero desde el
+repo**, y esto es lo que bloquea la integración en IRP.
+
+| Tabla | Qué es | Rastro en el repo |
+|---|---|---|
+| `tickets` | **la tabla central del negocio** (boletos) | `sql_folio_salida.sql`, `sql_pension_id_tickets.sql`, `sql_pension_id_fk.sql`, `sql_empleado_id.sql` |
+| `bitacora` | auditoría de acciones (`logBitacora`) | `sql_bitacora_ip.sql` |
+| `cortes` | cortes de caja por turno (`syncCorte`) | ninguno — solo `mcp-iwolpark/server.js` |
+| `empleados` | empleados con boleto propio | ninguno — solo la FK de `sql_empleado_id.sql` |
+
+Para recuperarlas: `sql_introspeccion_tickets_bitacora.sql` lee el catálogo de
+Postgres y devuelve columnas con tipo exacto, defaults, PK/FK/CHECK, índices, RLS,
+GRANTs y triggers en un solo resultado. No modifica nada. Correrlo en el SQL Editor
+de **QA y de Producción**: comparar ambas salidas es lo único que prueba si hay
+deriva de esquema entre ambientes.
+
+La lista de tablas está en un solo punto del query (CTE `objetivo`); trae `tickets`
+y `bitacora`, y agregar `cortes` y `empleados` es editar esa línea.
+
 ### Migraciones incrementales
 No hay herramienta de migraciones. Son scripts sueltos que se corren **a mano en el
 SQL Editor de cada ambiente**, en orden, y hay que aplicarlos en QA **y** en cada
@@ -166,6 +189,9 @@ base de Producción:
 | `sql_historico_mensual.sql` | hechos: histórico mensual de ingresos |
 | `sql_promo_migracion.sql` | módulo de Promociones |
 | `sql_promociones_toggle.sql` | interruptor general de Promociones |
+
+`sql_introspeccion_tickets_bitacora.sql` **no** es una migración: no modifica nada,
+solo lee el catálogo. No hace falta aplicarlo en ningún ambiente.
 
 ⚠️ **Deriva de esquema**: al no estar automatizado, QA y Producción pueden divergir.
 Verificar que el script esté aplicado en destino antes de desplegar código que lo use.
