@@ -26,11 +26,11 @@ with objetivo as (
   select c.oid, c.relname, c.relrowsecurity, c.relforcerowsecurity
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
-  -- ÚNICO lugar donde se elige qué tablas mirar. `cortes` y `empleados`
-  -- están en la misma situación (se usan y no tienen DDL versionado):
-  -- agregarlas aquí y el resto del query las incluye solo.
+  -- ÚNICO lugar donde se elige qué tablas mirar. Las cuatro están en la
+  -- misma situación: se usan en producción y no tienen DDL versionado.
+  -- Para mirar otra tabla, agregarla aquí y el resto del query la incluye solo.
   where n.nspname = 'public'
-    and c.relname in ('tickets', 'bitacora')
+    and c.relname in ('tickets', 'bitacora', 'cortes', 'empleados')
 ),
 columnas as (
   select
@@ -151,21 +151,21 @@ order by 1, 2, 3;
 
 -- B3 · Índices
 -- select indexname, indexdef from pg_indexes
--- where schemaname = 'public' and tablename in ('tickets','bitacora')
+-- where schemaname = 'public' and tablename in ('tickets','bitacora','cortes','empleados')
 -- order by tablename, indexname;
 
 -- B4 · RLS: interruptor de la tabla + políticas
 -- select relname, relrowsecurity, relforcerowsecurity
--- from pg_class where oid in ('public.tickets'::regclass, 'public.bitacora'::regclass);
+-- from pg_class where oid in ('public.tickets'::regclass, 'public.bitacora'::regclass, 'public.cortes'::regclass, 'public.empleados'::regclass);
 -- select tablename, policyname, permissive, cmd, roles, qual, with_check
 -- from pg_policies
--- where schemaname = 'public' and tablename in ('tickets','bitacora')
+-- where schemaname = 'public' and tablename in ('tickets','bitacora','cortes','empleados')
 -- order by tablename, policyname;
 
 -- B5 · Privilegios del anon key
 -- select table_name, grantee, privilege_type
 -- from information_schema.role_table_grants
--- where table_schema = 'public' and table_name in ('tickets','bitacora')
+-- where table_schema = 'public' and table_name in ('tickets','bitacora','cortes','empleados')
 --   and grantee in ('anon','authenticated','service_role')
 -- order by table_name, grantee, privilege_type;
 
