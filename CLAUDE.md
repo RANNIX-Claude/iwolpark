@@ -190,8 +190,26 @@ base de Producción:
 | `sql_promo_migracion.sql` | módulo de Promociones |
 | `sql_promociones_toggle.sql` | interruptor general de Promociones |
 
-`sql_introspeccion_tickets_bitacora.sql` **no** es una migración: no modifica nada,
-solo lee el catálogo. No hace falta aplicarlo en ningún ambiente.
+`sql_introspeccion_tickets_bitacora.sql` y `sql_diagnostico_rendimiento_tickets.sql`
+**no** son migraciones: no modifican nada, solo leen el catálogo y las estadísticas.
+No hace falta aplicarlos en ningún ambiente.
+
+### Rendimiento de los tableros
+
+Los dashboards **no consultan datos pre-agregados**: cada gráfica baja los tickets
+crudos del período y los suma en el navegador. El Histórico con "Este mes" pide
+`tickets?fecha_op=gte.…&lte.…&order=created_at.desc` **sin `select=`**, o sea las ~27
+columnas, paginado de 1000 en 1000 en llamadas encadenadas — unos 2 MB de JSON por
+carga, más una segunda pasada para el período anterior.
+
+Medido en una reproducción local con 12,040 tickets: la consulta del mes corre en
+**3.9 ms sin ningún índice** y 1.9 ms con `(fecha_op, created_at desc)`. El volumen
+no es el problema; el peso del payload y el número de viajes sí.
+
+⚠️ Cuando esa carga falla, `cargarDatos()` cae al `catch` y pinta
+`generarDatosDemo()` — **números inventados, con nombres de cajeros ficticios, en un
+tablero de producción**. El único aviso es el texto "Sin conexión · datos demo" en
+una esquina. Ver `sql_diagnostico_rendimiento_tickets.sql`.
 
 ⚠️ **Deriva de esquema**: al no estar automatizado, QA y Producción pueden divergir.
 Verificar que el script esté aplicado en destino antes de desplegar código que lo use.
