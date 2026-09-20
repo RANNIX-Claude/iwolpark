@@ -204,7 +204,31 @@ carga, más una segunda pasada para el período anterior.
 
 Medido en una reproducción local con 12,040 tickets: la consulta del mes corre en
 **3.9 ms sin ningún índice** y 1.9 ms con `(fecha_op, created_at desc)`. El volumen
-no es el problema; el peso del payload y el número de viajes sí.
+en la base no es el problema.
+
+**El congelamiento de pantalla es del navegador, no de Postgres.** `renderTabla()`
+(`IwolPark_Dashboard_Admin.html:1858`) arma **un `<tr>` por operación del período,
+sin tope ni paginación**, en un solo `innerHTML`: 466 caracteres y 12 elementos DOM
+por fila, más un `onclick` inline por fila.
+
+| Rango | Ops | String HTML | Elementos DOM |
+|---|---|---|---|
+| Hoy | 170 | 0.1 MB | 2,040 |
+| Este mes | 3,000 | 1.3 MB | 36,000 |
+| Personalizado, 3 meses | 9,000 | 4.0 MB | 108,000 |
+| Personalizado, tope de 15,000 | 15,000 | 6.7 MB | 180,000 |
+
+Con esa tabla montada, **cualquier reflow posterior es lento** — incluido el
+`style.display` que revela los dos `<input type="date">` al elegir "Personalizado"
+(`onFiltroCambio()`, línea 1255). Por eso el bloqueo se siente al abrir el control
+de fechas y no al mostrar los datos.
+
+El mismo patrón está en los cuatro tableros: `corporativo.html:1756`,
+`IwolPark_Dashboard_Corporativo.html:1872`, `IwolPark_Central.html:1862`.
+
+Y hay un tope silencioso: `fetchPaginado(..., 15000)` corta en 15,000 filas sin
+avisar. A ~1,200 tickets por semana, un rango largo muestra datos incompletos como
+si fueran completos.
 
 ⚠️ Cuando esa carga falla, `cargarDatos()` cae al `catch` y pinta
 `generarDatosDemo()` — **números inventados, con nombres de cajeros ficticios, en un
