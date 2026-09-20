@@ -168,8 +168,8 @@ GRANTs y triggers en un solo resultado. No modifica nada. Correrlo en el SQL Edi
 de **QA y de Producción**: comparar ambas salidas es lo único que prueba si hay
 deriva de esquema entre ambientes.
 
-La lista de tablas está en un solo punto del query (CTE `objetivo`); trae `tickets`
-y `bitacora`, y agregar `cortes` y `empleados` es editar esa línea.
+Cubre las cuatro tablas de una sola corrida. La lista está en un solo punto del
+query (CTE `objetivo`), por si hiciera falta agregar otra.
 
 ### Migraciones incrementales
 No hay herramienta de migraciones. Son scripts sueltos que se corren **a mano en el
