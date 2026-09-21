@@ -843,6 +843,8 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <tbody id="tabla-ops"></tbody>
       </table>
     </div>
+    <div id="tabla-tope" style="padding:10px 14px;font-size:12px;color:var(--muted);
+         border-top:1px solid rgba(0,0,0,.06);display:none"></div>
     <div id="tabla-empty" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;display:none">
       Sin operaciones para el período seleccionado
     </div>
@@ -1360,6 +1362,9 @@ async function fetchPaginado(urlBase, headers, maxTotal) {
 }
 
 // ══ DATOS (Supabase o DEMO) ══
+// Se levanta cuando fetchPaginado alcanzó su tope y los datos del período
+// quedaron incompletos (ver renderTabla).
+let _datosTruncados = false;
 async function cargarDatos() {
   try {
     const {desde, hasta} = getFechas();
@@ -1367,15 +1372,25 @@ async function cargarDatos() {
     const cajeroFiltro = document.getElementById('filtro-cajero')?.value || '';
 
     // Query a Supabase: tabla 'tickets' del período
-    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&order=created_at.desc`;
+    // Solo las 11 columnas que este tablero realmente lee. Sin `select=`,
+    // PostgREST devuelve las ~27 de tickets: medido sobre un mes de 3,440
+    // tickets son 2,028 kB contra 953 kB así. Ordenar por created_at no
+    // exige traerla.
+    const COLS_TABLERO = 'folio,tipo,estatus,cajero,cajero_entrada,cajero_salida,' +
+                         'hora_entrada,hora_salida,minutos_estancia,importe,fecha_op';
+    let query = `fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=${COLS_TABLERO}&order=created_at.desc`;
     if(cajeroFiltro) query += `&cajero=eq.${encodeURIComponent(cajeroFiltro)}`;
 
     const headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY};
     // Los tickets cancelados (error del cajero, corregido con motivo y rastro
     // en bitácora) se excluyen de raíz de todos los reportes/KPIs — no son
     // una operación real, no deben contar como boleto emitido ni como ingreso.
-    const rows = (await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000))
-      .filter(o => o.estatus !== 'cancelado');
+    const rowsCrudas = await fetchPaginado(`${SUPABASE_URL}/rest/v1/tickets?${query}`, headers, 15000);
+    // fetchPaginado corta en maxTotal en silencio. Si tocó el tope, el
+    // período tiene más tickets de los que se trajeron y todo lo que se
+    // calcula abajo queda incompleto — renderTabla lo avisa en pantalla.
+    _datosTruncados = rowsCrudas.length >= 15000;
+    const rows = rowsCrudas.filter(o => o.estatus !== 'cancelado');
 
     // Total de tickets del período SIN filtrar por estatus — antes solo se
     // veían los ya cerrados en "N operaciones", así que un día con muchos
@@ -1855,15 +1870,43 @@ function renderRankingCajeros(ops) {
     </div>`).join('');
 }
 
-function renderTabla(ops) {
+// La tabla de detalle se pinta TOPADA. Antes generaba un <tr> por cada
+// operación del período, sin límite: un rango personalizado de 3 meses son
+// ~9,000 filas = 108,000 elementos en el DOM. Con esa tabla montada,
+// cualquier reflow posterior —incluido el style.display que revela los
+// <input type="date"> al elegir "Personalizado"— dejaba la pantalla
+// congelada varios segundos.
+//
+// El Export CSV NO se ve afectado: exportarCSV() lee DATOS.operaciones en
+// memoria, no el DOM, así que sigue bajando el período completo.
+const TABLA_TOPE_INICIAL = 300;
+const TABLA_TOPE_PASO    = 500;
+let _tablaTope = TABLA_TOPE_INICIAL;
+let _tablaOps  = [];
+
+function mostrarMasTabla() {
+  _tablaTope += TABLA_TOPE_PASO;
+  renderTabla(_tablaOps, true);
+}
+
+function renderTabla(ops, conservarTope) {
   const el = document.getElementById('tabla-ops');
   const em = document.getElementById('tabla-empty');
+  const aviso = document.getElementById('tabla-tope');
+  _tablaOps = ops;
+  // Cada carga nueva vuelve al tope inicial; solo "Mostrar más" lo conserva.
+  if (!conservarTope) _tablaTope = TABLA_TOPE_INICIAL;
+  if (aviso) aviso.style.display = 'none';
   if (!ops.length) { el.innerHTML=''; em.style.display='block'; return; }
   em.style.display='none';
   const badgeClass = {normal:'b-normal',preferencial:'b-pref',perdido:'b-perdido',cortesia:'b-cortesia'};
   const badgeLabel = {normal:'Normal',preferencial:'Pref',perdido:'Perdido',cortesia:'Cortesía'};
-  el.innerHTML = ops.map(o => `
-    <tr onclick="drillTicket('${o.folio}')">
+  const visibles = ops.slice(0, _tablaTope);
+  // data-folio en vez de un onclick inline por fila: 9,000 filas eran 9,000
+  // closures que el navegador tenía que crear y conservar. Ahora es un solo
+  // listener en el <tbody> (ver abajo).
+  el.innerHTML = visibles.map(o => `
+    <tr data-folio="${o.folio}">
       <td><span style="font-family:monospace;font-weight:700">${o.folio}</span></td>
       <td><span class="badge ${badgeClass[o.tipo]||'b-normal'}">${badgeLabel[o.tipo]||o.tipo}</span></td>
       <td>${o.cajero}</td>
@@ -1875,6 +1918,31 @@ function renderTabla(ops) {
         ${o.importe?fmt$(o.importe):'$0.00'}
       </td>
     </tr>`).join('');
+  // Asignar onclick (en vez de addEventListener) es idempotente: no se
+  // acumulan listeners aunque renderTabla corra en cada carga.
+  el.onclick = ev => {
+    const tr = ev.target.closest('tr[data-folio]');
+    if (tr) drillTicket(tr.dataset.folio);
+  };
+  if (aviso) {
+    const partes = [];
+    if (ops.length > visibles.length) {
+      partes.push(`Mostrando <strong>${visibles.length.toLocaleString('es-MX')}</strong> de ` +
+                  `<strong>${ops.length.toLocaleString('es-MX')}</strong> operaciones`);
+      partes.push(`<button onclick="mostrarMasTabla()" style="background:var(--accent);color:#fff;` +
+                  `border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;` +
+                  `cursor:pointer">Mostrar ${TABLA_TOPE_PASO} más</button>`);
+      partes.push(`el Export CSV incluye las ${ops.length.toLocaleString('es-MX')} del período`);
+    }
+    // fetchPaginado corta en 15,000 filas sin avisar. Si llegó al tope, lo
+    // que se ve abajo está incompleto y hay que decirlo: un número mal en un
+    // reporte es peor que una pantalla lenta.
+    if (_datosTruncados) {
+      partes.push(`<strong style="color:#D93025">⚠ El período supera el máximo de 15,000 tickets ` +
+                  `que el tablero puede traer — estos totales están INCOMPLETOS. Acorta el rango.</strong>`);
+    }
+    if (partes.length) { aviso.innerHTML = partes.join(' · '); aviso.style.display = ''; }
+  }
 }
 
 // ══ DRILL-DOWN ══

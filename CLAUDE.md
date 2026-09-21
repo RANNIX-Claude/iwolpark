@@ -207,28 +207,34 @@ Medido en una reproducción local con 12,040 tickets: la consulta del mes corre 
 en la base no es el problema.
 
 **El congelamiento de pantalla es del navegador, no de Postgres.** `renderTabla()`
-(`IwolPark_Dashboard_Admin.html:1858`) arma **un `<tr>` por operación del período,
-sin tope ni paginación**, en un solo `innerHTML`: 466 caracteres y 12 elementos DOM
-por fila, más un `onclick` inline por fila.
+armaba **un `<tr>` por operación del período, sin tope ni paginación**, en un solo
+`innerHTML`, con un `onclick` inline por fila: 466 caracteres y 12 elementos DOM
+por fila.
 
-| Rango | Ops | String HTML | Elementos DOM |
+Medido en Chromium con 9,000 operaciones (un rango personalizado de ~3 meses):
+
+| | Filas | Elementos DOM | Pintar la tabla |
 |---|---|---|---|
-| Hoy | 170 | 0.1 MB | 2,040 |
-| Este mes | 3,000 | 1.3 MB | 36,000 |
-| Personalizado, 3 meses | 9,000 | 4.0 MB | 108,000 |
-| Personalizado, tope de 15,000 | 15,000 | 6.7 MB | 180,000 |
+| Antes | 9,000 | 108,000 | **2,187 ms** |
+| Ahora (tope 300) | 300 | 3,600 | 112 ms |
 
-Con esa tabla montada, **cualquier reflow posterior es lento** — incluido el
-`style.display` que revela los dos `<input type="date">` al elegir "Personalizado"
-(`onFiltroCambio()`, línea 1255). Por eso el bloqueo se siente al abrir el control
-de fechas y no al mostrar los datos.
+**Arreglado (20-sep-2026)** en los cuatro tableros:
 
-El mismo patrón está en los cuatro tableros: `corporativo.html:1756`,
-`IwolPark_Dashboard_Corporativo.html:1872`, `IwolPark_Central.html:1862`.
+1. `renderTabla()` pinta hasta `TABLA_TOPE_INICIAL` (300) y ofrece "Mostrar 500
+   más". El **Export CSV no se topa**: `exportarCSV()` lee `DATOS.operaciones` en
+   memoria, no el DOM, y sigue bajando el período completo.
+2. `data-folio` + un solo listener en el `<tbody>` en vez de 9,000 `onclick`
+   inline. Se asigna con `el.onclick =` (idempotente), no `addEventListener`, para
+   que no se acumulen listeners en cada carga.
+3. La consulta lleva `select=` con las 11 columnas que el tablero lee, en vez de
+   las ~27 de `tickets`: 953 kB por mes en lugar de 2,028 kB.
+4. `fetchPaginado(..., 15000)` cortaba en silencio; ahora, si alcanza el tope, la
+   pantalla avisa que **los totales están incompletos**. A ~1,200 tickets por
+   semana ese techo se alcanza con rangos de más de ~3 meses.
 
-Y hay un tope silencioso: `fetchPaginado(..., 15000)` corta en 15,000 filas sin
-avisar. A ~1,200 tickets por semana, un rango largo muestra datos incompletos como
-si fueran completos.
+⚠️ Lo que **no** está resuelto: los tableros siguen sin datos pre-agregados. Cada
+gráfica baja los tickets crudos y los suma en el navegador. El arreglo de fondo es
+una función RPC que devuelva los agregados ya calculados desde Postgres.
 
 ⚠️ Cuando esa carga falla, `cargarDatos()` cae al `catch` y pinta
 `generarDatosDemo()` — **números inventados, con nombres de cajeros ficticios, en un
