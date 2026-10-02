@@ -329,7 +329,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v189</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v190</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -2869,10 +2869,19 @@ function limpiarFiltrosMovimientosAdmin() {
   document.getElementById('filtro-pension-id-mov').value = '';
   document.getElementById('filtro-pension-cliente-mov').value = '';
   document.getElementById('filtro-pension-tipo-mov').value = 'todos';
+  // La fecha de ENTRADA tambien es un filtro, y el mas determinante: si se
+  // queda con un mes viejo seleccionado, limpiar los demas deja la vista en
+  // un universo de tiempo que ya no corresponde a lo que se cree estar
+  // viendo, y todo lo demas se filtra sobre ese rango. Vuelve al estado de
+  // arranque de la pagina: Hoy.
+  document.getElementById('filtro-periodo-rapido-mov').value = 'hoy';
+
   // A diferencia de los demás filtros (solo re-filtran en el cliente), el de
   // fecha de cobro afecta la consulta al servidor — hay que volver a pedir
   // los datos, no solo refrescar la tabla con lo ya cargado.
-  actualizarMovimientosAdmin();
+  // aplicarPeriodoRapidoMovAdmin escribe las dos fechas de entrada y ya llama
+  // a actualizarMovimientosAdmin(), asi que no se consulta dos veces.
+  aplicarPeriodoRapidoMovAdmin();
 }
 
 function toggleFiltrosAvanzadosMovAdmin() {
