@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v187</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v188</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -592,8 +592,15 @@ async function render() {
 // histórico mensual), no aquí — esta vista también la ve Corporativo.
 // Combina 3 fuentes por mes: (1) años previos al sistema, capturados a mano
 // (origen='manual', nunca se sobreescriben); (2) meses ya cerrados,
-// calculados una vez desde 'tickets' y guardados (origen='sistema'); (3) el
+// calculados desde 'tickets' y guardados (origen='sistema'); (3) el
 // mes en curso, que SIEMPRE se recalcula en vivo.
+//
+// Sobre (2): un mes NO queda firme por haber terminado, sino por haberse
+// guardado despues de terminar. Lo que se escribe mientras el mes corre es
+// parcial — corresponde a la ultima vez que alguien abrio el tablero ese
+// mes, no al cierre. Por eso un mes cerrado cuyo monto se sello antes del
+// fin de mes se recalcula UNA vez mas (ver finDeMes / selladoYaCerrado) y
+// ya entonces queda definitivo.
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 let PLAZA_ID_DEM = null;
 async function obtenerPlazaIdDem() {
@@ -627,10 +634,10 @@ async function cargarHistoricoMensual() {
   sub.textContent = `${anioAnterior} vs ${anioActual} · importe cobrado por mes`;
 
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?plaza_id=eq.${plazaId}&anio=in.(${anioAnterior},${anioActual})&select=anio,mes,monto_total,origen`, { headers: SB_HEADERS });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/historico_mensual?plaza_id=eq.${plazaId}&anio=in.(${anioAnterior},${anioActual})&select=anio,mes,monto_total,origen,actualizado_en`, { headers: SB_HEADERS });
     const filas = r.ok ? await r.json() : [];
-    const mapa = {}; // mapa[anio][mes] = {monto, origen}
-    filas.forEach(f => { (mapa[f.anio] = mapa[f.anio]||{})[f.mes] = { monto: Number(f.monto_total)||0, origen: f.origen }; });
+    const mapa = {}; // mapa[anio][mes] = {monto, origen, actualizado_en}
+    filas.forEach(f => { (mapa[f.anio] = mapa[f.anio]||{})[f.mes] = { monto: Number(f.monto_total)||0, origen: f.origen, actualizado_en: f.actualizado_en }; });
 
     const porGuardar = [];
     for (const anio of [anioAnterior, anioActual]) {
@@ -638,14 +645,23 @@ async function cargarHistoricoMensual() {
       for (let mes = 1; mes <= tope; mes++) {
         const existente = mapa[anio] && mapa[anio][mes];
         const esMesActual = anio === anioActual && mes === mesActual;
-        if (existente && !esMesActual) continue; // ya guardado (manual o sistema) y cerrado
+        // Un mes cerrado se recalcula UNA vez mas si su valor guardado se
+        // escribio mientras el mes todavia corria: ese monto es parcial,
+        // quedo sellado la ultima vez que alguien abrio el tablero ese mes,
+        // no al terminarlo. Solo se da por definitivo lo guardado DESPUES
+        // del fin de mes. Lo capturado a mano (origen manual) nunca se pisa.
+        const finDeMes = new Date(anio, mes, 1); // 00:00 del dia 1 del mes siguiente
+        const selladoYaCerrado = existente && existente.actualizado_en &&
+          new Date(existente.actualizado_en) >= finDeMes;
+        if (existente && !esMesActual &&
+            (existente.origen === "manual" || selladoYaCerrado)) continue;
         const { monto, tickets } = await calcularMesDesdeTickets(anio, mes);
         // Si el sistema no tiene NINGÚN ticket ese mes (y no es el mes en
         // curso), NO se guarda ni se muestra $0 — $0 diría "hubo cero
         // ingresos" cuando la realidad es "no tenemos ese dato" (el sistema
         // solo tiene historial de las últimas semanas). Se deja en "—".
         if (tickets > 0 || esMesActual) {
-          (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema' };
+          (mapa[anio] = mapa[anio]||{})[mes] = { monto, origen: 'sistema', actualizado_en: new Date().toISOString() };
           porGuardar.push({ plaza_id: plazaId, anio, mes, monto_total: monto, tickets_totales: tickets, origen: 'sistema', actualizado_en: new Date().toISOString() });
         }
       }
