@@ -329,7 +329,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v190</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v191</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -858,6 +858,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
   <div class="filtros" style="margin-bottom:10px">
     <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Fecha entrada:</label>
     <select id="filtro-periodo-rapido-mov" onchange="aplicarPeriodoRapidoMovAdmin()">
+      <option value="">Sin filtro</option>
       <option value="hoy" selected>Hoy</option>
       <option value="ayer">Ayer</option>
       <option value="lunes">Lunes</option>
@@ -2761,6 +2762,15 @@ function poblarMesesCompletosMovAdmin() {
 
 function aplicarPeriodoRapidoMovAdmin() {
   const valor = document.getElementById('filtro-periodo-rapido-mov').value;
+  // "Sin filtro": sin rango de entrada la consulta trae todo el historico.
+  // Es el unico caso en que las dos cajas de fecha quedan vacias, y
+  // cargarMovimientosDBAdmin lo lee como "no restrinjas por fecha_op".
+  if (!valor) {
+    document.getElementById('filtro-desde-mov').value = '';
+    document.getElementById('filtro-hasta-mov').value = '';
+    actualizarMovimientosAdmin();
+    return;
+  }
   const rango = getFechasPeriodoRapidoMovAdmin(valor);
   if (!rango) return;
   document.getElementById('filtro-desde-mov').value = rango.desde;
@@ -2785,9 +2795,15 @@ function aplicarPeriodoRapidoCobroMovAdmin() {
   actualizarMovimientosAdmin();
 }
 
+// Se pone en true cuando la consulta alcanzo el tope y quedaron registros
+// fuera; lo lee el badge de actualizarMovimientosAdmin().
+let MOVS_TRUNCADOS_ADM = false;
 async function cargarMovimientosDBAdmin() {
-  const desde = document.getElementById('filtro-desde-mov').value || fmtLocal(new Date());
-  const hasta = document.getElementById('filtro-hasta-mov').value || fmtLocal(new Date());
+  // Vacias = "Sin filtro": no se restringe por fecha_op y entra todo el
+  // historico. Antes caian a "hoy" por defecto, lo que hacia imposible
+  // consultar sin rango alguno.
+  const desde = document.getElementById('filtro-desde-mov').value;
+  const hasta = document.getElementById('filtro-hasta-mov').value;
   // Fecha de cobro (hora_salida_at) se combina con fecha de entrada (AND),
   // no la reemplaza — así se puede buscar justo el caso real: "entró ayer
   // Y se cobró hoy" (Fecha entrada=Ayer + Fecha de cobro=Hoy). Si solo se
@@ -2796,13 +2812,21 @@ async function cargarMovimientosDBAdmin() {
   const cobroDesde = document.getElementById('filtro-cobro-desde-mov').value;
   const cobroHasta = document.getElementById('filtro-cobro-hasta-mov').value;
   try {
+    MOVS_TRUNCADOS_ADM = false; // se recalcula con esta consulta
     const select = 'select=*,empleados(nombre_completo,puesto,area),' +
       'pensiones(tipo,estado,clientes(nombre),vehiculos(placas,marca,modelo))';
-    let base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&`;
+    let base = `${SUPABASE_URL}/rest/v1/tickets?`;
+    if (desde) base += `fecha_op=gte.${desde}&`;
+    if (hasta) base += `fecha_op=lte.${hasta}&`;
     if (cobroDesde) base += `hora_salida_at=gte.${cobroDesde}T00:00:00-06:00&`;
     if (cobroHasta) { const sig = new Date(cobroHasta+'T00:00:00'); sig.setDate(sig.getDate()+1); base += `hora_salida_at=lt.${fmtLocal(sig)}T00:00:00-06:00&`; }
     base += `${select}&order=created_at.desc`;
-    const rows = await fetchPaginado(base, SB_HEADERS_PARAM, 10000);
+    // El tope existe para no colgar el navegador. Si se alcanza, la tabla
+    // estaria mostrando solo una parte sin decirlo — se marca para avisarlo
+    // en el badge en vez de dar un total incompleto como si fuera el total.
+    const TOPE_MOV = 50000;
+    const rows = await fetchPaginado(base, SB_HEADERS_PARAM, TOPE_MOV);
+    MOVS_TRUNCADOS_ADM = rows.length >= TOPE_MOV;
     return ticketsAMovimientosAdm(rows);
   } catch (e) {
     return null;
@@ -2838,7 +2862,19 @@ async function actualizarMovimientosAdmin() {
   MOVS_ACTUALES_ADM = desdeDB || [];
   const usaFiltroCobro = !!(document.getElementById('filtro-cobro-desde-mov').value || document.getElementById('filtro-cobro-hasta-mov').value);
   if (badge) {
-    if (desdeDB) { badge.textContent = `● ${desdeDB.length} movimientos` + (usaFiltroCobro ? ' (entrada Y cobro combinados)' : ' en el rango'); badge.style.color = 'var(--green)'; }
+    if (desdeDB) {
+      const sinRango = !document.getElementById('filtro-desde-mov').value &&
+                       !document.getElementById('filtro-hasta-mov').value;
+      let txt = '● ' + desdeDB.length + ' movimientos';
+      if (usaFiltroCobro) txt += ' (entrada Y cobro combinados)';
+      else if (sinRango) txt += ' (historico completo, sin filtro de fecha)';
+      else txt += ' en el rango';
+      if (MOVS_TRUNCADOS_ADM) {
+        txt += ' — TOPE ALCANZADO: faltan registros, acota el rango';
+        badge.style.color = 'var(--gold)';
+      } else { badge.style.color = 'var(--green)'; }
+      badge.textContent = txt;
+    }
     else { badge.textContent = '○ No se pudo consultar'; badge.style.color = 'var(--red)'; }
   }
   poblarFiltrosMovimientosAdmin(MOVS_ACTUALES_ADM);
@@ -2874,7 +2910,7 @@ function limpiarFiltrosMovimientosAdmin() {
   // un universo de tiempo que ya no corresponde a lo que se cree estar
   // viendo, y todo lo demas se filtra sobre ese rango. Vuelve al estado de
   // arranque de la pagina: Hoy.
-  document.getElementById('filtro-periodo-rapido-mov').value = 'hoy';
+  document.getElementById('filtro-periodo-rapido-mov').value = '';
 
   // A diferencia de los demás filtros (solo re-filtran en el cliente), el de
   // fecha de cobro afecta la consulta al servidor — hay que volver a pedir
