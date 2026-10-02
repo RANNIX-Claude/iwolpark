@@ -329,7 +329,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v188</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v189</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -2714,7 +2714,49 @@ function getFechasPeriodoRapidoMovAdmin(valor) {
   if (valor === 'mes') {
     return { desde: fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), hasta: fmt(hoy) };
   }
+  // "mes:AAAA-MM" — mes calendario COMPLETO, del dia 1 al ultimo. Distinto de
+  // 'mes' ("Este mes"), que corta en hoy porque el mes va corriendo.
+  // new Date(anio, mes, 0) da el ultimo dia del mes pedido (mes 1-based), asi
+  // que febrero y los meses de 30 dias salen bien sin tabla de dias.
+  if (typeof valor === 'string' && valor.startsWith('mes:')) {
+    const [anio, mes] = valor.slice(4).split('-').map(Number);
+    if (!anio || !mes) return null;
+    return { desde: fmt(new Date(anio, mes - 1, 1)), hasta: fmt(new Date(anio, mes, 0)) };
+  }
   return null;
+}
+
+// Meses cerrados ("Agosto 2026") en los dos combos de Movimientos. Se generan
+// los 12 anteriores al mes en curso en vez de escribirlos en el HTML: asi la
+// lista sigue vigente al cambiar de mes o de anio sin tocar el fuente. El mes
+// actual no se repite — ya esta arriba como "Este mes" (dia 1 a hoy).
+const MESES_NOMBRE_MOV_ADM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function poblarMesesCompletosMovAdmin() {
+  const hoy = new Date();
+  const opciones = [];
+  for (let i = 1; i <= 12; i++) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    opciones.push({
+      valor: 'mes:' + d.getFullYear() + '-' + mes,
+      texto: MESES_NOMBRE_MOV_ADM[d.getMonth()] + ' ' + d.getFullYear()
+    });
+  }
+  for (const id of ['filtro-periodo-rapido-mov', 'filtro-periodo-rapido-cobro-mov']) {
+    const sel = document.getElementById(id);
+    if (!sel || sel.querySelector('optgroup[data-meses]')) continue;
+    const g = document.createElement('optgroup');
+    g.label = 'Mes completo';
+    g.setAttribute('data-meses', '1');
+    for (const o of opciones) {
+      const op = document.createElement('option');
+      op.value = o.valor;
+      op.textContent = o.texto;
+      g.appendChild(op);
+    }
+    sel.appendChild(g);
+  }
 }
 
 function aplicarPeriodoRapidoMovAdmin() {
@@ -3668,6 +3710,7 @@ let USUARIO_ACTUAL = null;
   document.getElementById('nav-usuario').textContent = '👤 ' + USUARIO_ACTUAL.nombre;
   logBitacora('login', { app: 'admin' });
   document.getElementById('filtro-periodo').value = 'hoy';
+  poblarMesesCompletosMovAdmin();
   aplicarModoTab();
   cargarDatos();
   setInterval(cargarDatos, 60000); // auto-refresh cada minuto
