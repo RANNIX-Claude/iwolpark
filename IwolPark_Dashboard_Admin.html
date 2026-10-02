@@ -329,7 +329,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
     <span id="nav-usuario" style="font-size:12px;color:var(--accent);font-weight:700"></span>
     <span class="nav-plaza" id="nav-plaza">Plaza IWOL</span>
     <span class="nav-clock" id="nav-clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v191</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);margin-right:8px">v192</span>
     <div class="nav-menu-wrap">
       <button class="btn-refresh" style="background:var(--text)" onclick="toggleNavMenu(event)">☰ Menú</button>
       <div class="nav-menu-list" id="nav-menu-list">
@@ -1026,6 +1026,7 @@ tr:hover td { background:#FAFAFE; cursor:pointer; }
         <span>Estatus</span>
       </div>
       <div id="mov-lista-adm"></div>
+      <div id="mov-paginacion-adm"></div>
     </div>
   </div>
 
@@ -2928,7 +2929,45 @@ function toggleFiltrosAvanzadosMovAdmin() {
   btn.textContent = abierto ? '▾ Más filtros' : '▴ Menos filtros';
 }
 
+// ── Paginacion de la tabla de Movimientos ──
+// Es paginacion de PINTADO, no de consulta: se sigue trayendo y filtrando todo
+// el conjunto, y solo se dibuja una pagina. Asi el resumen de totales y el CSV
+// siguen cubriendo TODO lo filtrado — partir la consulta los dejaria mintiendo.
+// Lo que se parte es el DOM: cada fila son 15 nodos, y 13 mil movimientos
+// ponen al navegador de rodillas.
+const MOV_POR_PAGINA_ADM = 200;
+let MOV_PAGINA_ADM = 0;
+
+function renderPaginacionMovAdmin(total, ini, enPagina, totalPag) {
+  const cont = document.getElementById('mov-paginacion-adm');
+  if (!cont) return;
+  if (totalPag <= 1) { cont.innerHTML = ''; return; }
+  const btn = (txt, delta, activo) =>
+    '<button class="btn-filtro" onclick="irPaginaMovAdmin(' + delta + ')"' +
+    (activo ? '' : ' disabled style="opacity:.35;cursor:default"') +
+    '>' + txt + '</button>';
+  cont.innerHTML =
+    '<div style="display:flex;gap:12px;align-items:center;justify-content:center;' +
+    'padding:12px;font-size:12px;color:var(--muted)">' +
+    btn('◀ Anterior', -1, MOV_PAGINA_ADM > 0) +
+    '<span>Pagina ' + (MOV_PAGINA_ADM + 1) + ' de ' + totalPag +
+    ' · mostrando ' + (ini + 1) + '–' + (ini + enPagina) +
+    ' de ' + total + '</span>' +
+    btn('Siguiente ▶', 1, MOV_PAGINA_ADM < totalPag - 1) +
+    '</div>';
+}
+
+function irPaginaMovAdmin(delta) {
+  MOV_PAGINA_ADM += delta;
+  // Se vuelve a pintar sin reiniciar la pagina (eso solo lo hace un cambio de
+  // filtros, en refrescarMovimientosAdmin).
+  renderMovimientosAdminTab(MOVS_ACTUALES_ADM);
+  const lista = document.getElementById('mov-lista-adm');
+  if (lista) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function refrescarMovimientosAdmin() {
+  MOV_PAGINA_ADM = 0; // cambio de filtros: de vuelta a la primera pagina
   renderMovimientosAdminTab(MOVS_ACTUALES_ADM);
 }
 
@@ -3013,13 +3052,20 @@ function renderMovimientosAdminTab(movs) {
   const lista = document.getElementById('mov-lista-adm');
   if (!filtrados.length) {
     lista.innerHTML='<div style="text-align:center;padding:28px;color:var(--muted);font-size:14px">Sin movimientos en el rango/filtros seleccionados</div>';
+    renderPaginacionMovAdmin(0, 0, 0, 1);
     renderResumenMovimientosAdmin([]);
     return;
   }
 
   const estatusLabel = {abierto:'Abierto', cobrado:'Cobrado', perdido:'Perdido', cortesia:'Cortesía'};
 
-  lista.innerHTML = filtrados.map(m => {
+  const totalPagMov = Math.max(1, Math.ceil(filtrados.length / MOV_POR_PAGINA_ADM));
+  if (MOV_PAGINA_ADM >= totalPagMov) MOV_PAGINA_ADM = totalPagMov - 1;
+  if (MOV_PAGINA_ADM < 0) MOV_PAGINA_ADM = 0;
+  const iniMov = MOV_PAGINA_ADM * MOV_POR_PAGINA_ADM;
+  const paginaMov = filtrados.slice(iniMov, iniMov + MOV_POR_PAGINA_ADM);
+
+  lista.innerHTML = paginaMov.map(m => {
     const color  = colorMap[m.tipo] || '#888';
     const icon   = iconMap[m.tipo]  || '·';
     const label  = tipoLabel[m.tipo] || m.tipo;
@@ -3053,6 +3099,7 @@ function renderMovimientosAdminTab(movs) {
     </div>`;
   }).join('');
 
+  renderPaginacionMovAdmin(filtrados.length, iniMov, paginaMov.length, totalPagMov);
   renderResumenMovimientosAdmin(filtrados);
 }
 
