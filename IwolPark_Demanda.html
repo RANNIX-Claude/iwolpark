@@ -102,7 +102,7 @@ nav{background:#1D1D1F;padding:0 24px;height:52px;display:flex;align-items:cente
   <span class="nav-logo">·iwol·</span>
   <span style="font-size:14px;font-weight:700;color:#fff">IwolPark</span>
   <span class="nav-badge">DEMANDA</span>
-  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v192</span>
+  <span id="app-version" style="font-size:11px;color:#888;margin-left:auto">v193</span>
   <button onclick="window.print()" class="nav-back" style="margin-left:12px">🖨 Imprimir</button>
   <a href="IwolPark_Dashboard_Corporativo.html" class="nav-back" id="link-volver" style="margin-left:8px">
     ← Volver al dashboard
@@ -612,16 +612,36 @@ async function obtenerPlazaIdDem() {
   } catch (e) { PLAZA_ID_DEM = null; }
   return PLAZA_ID_DEM;
 }
+// El DWH se llena por hora_salida_at (CUANDO SE COBRO), no por fecha_op
+// (cuando entro el coche): un boleto que entra el 30 y se paga el 1 es ingreso
+// del mes siguiente, no del anterior. De paso los boletos abiertos quedan
+// fuera solos — sin hora_salida_at no hay cobro que sumar.
 async function calcularMesDesdeTickets(anio, mes) {
-  const desde = `${anio}-${String(mes).padStart(2,'0')}-01`;
-  const ultimoDia = new Date(anio, mes, 0).getDate();
-  const hasta = `${anio}-${String(mes).padStart(2,'0')}-${String(ultimoDia).padStart(2,'0')}`;
-  const base = `${SUPABASE_URL}/rest/v1/tickets?fecha_op=gte.${desde}&fecha_op=lte.${hasta}&select=importe,estatus`;
+  const p2 = n => String(n).padStart(2, '0');
+  const desde = `${anio}-${p2(mes)}-01`;
+  // Rango [desde, siguiente) sobre el primer dia del mes siguiente, para no
+  // depender del ultimo instante del mes ni de cuantos dias tiene.
+  const sigAnio = mes === 12 ? anio + 1 : anio;
+  const sigMes  = mes === 12 ? 1 : mes + 1;
+  const siguiente = `${sigAnio}-${p2(sigMes)}-01`;
+  const base = `${SUPABASE_URL}/rest/v1/tickets` +
+    `?hora_salida_at=gte.${desde}T00:00:00-06:00` +
+    `&hora_salida_at=lt.${siguiente}T00:00:00-06:00` +
+    `&select=importe,estatus`;
   const rows = await fetchPaginado(base, SB_HEADERS, 20000);
-  const validos = rows.filter(t => t.estatus !== 'cancelado');
+  // 'abierto' no entra: un boleto sin cerrar no es dinero cobrado. Normalmente
+  // ni llegaria hasta aqui (sin hora_salida_at cae fuera del rango), pero hay
+  // al menos un registro incoherente -- UFC-260924002, con hora de salida
+  // ANTES de la de entrada -- que si la trae y colaba $12 en septiembre.
+  const validos = rows.filter(t => t.estatus !== 'cancelado' && t.estatus !== 'abierto');
   const monto = validos.reduce((s,t) => s + (Number(t.importe)||0), 0);
   return { monto, tickets: validos.length };
 }
+// Momento en que el DWH cambio de criterio (fecha_op -> hora_salida_at). Un
+// mes guardado ANTES de esto trae la suma vieja, asi que se recalcula una vez
+// aunque ya estuviera cerrado y sellado; al reescribirse queda con fecha
+// posterior y vuelve a darse por firme, sin repetirse en cada carga.
+const CRITERIO_DWH_DESDE = Date.parse('2026-10-03T00:00:00Z');
 async function cargarHistoricoMensual() {
   const cont = document.getElementById('tabla-historico-mensual');
   const sub = document.getElementById('historico-sub');
@@ -652,7 +672,8 @@ async function cargarHistoricoMensual() {
         // del fin de mes. Lo capturado a mano (origen manual) nunca se pisa.
         const finDeMes = new Date(anio, mes, 1); // 00:00 del dia 1 del mes siguiente
         const selladoYaCerrado = existente && existente.actualizado_en &&
-          new Date(existente.actualizado_en) >= finDeMes;
+          new Date(existente.actualizado_en) >= finDeMes &&
+          Date.parse(existente.actualizado_en) >= CRITERIO_DWH_DESDE;
         if (existente && !esMesActual &&
             (existente.origen === "manual" || selladoYaCerrado)) continue;
         const { monto, tickets } = await calcularMesDesdeTickets(anio, mes);
