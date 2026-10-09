@@ -125,7 +125,7 @@ tr:hover td{background:#FAFAFE}
     <button class="btn-nav" onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     <button class="btn-nav" style="background:none;border:1px solid #444" onclick="window.print()">🖨 Imprimir</button>
     <span style="font-size:12px;color:#888" id="clock">--:--:--</span>
-    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v195</span>
+    <span id="app-version" style="font-size:11px;color:#888;margin-left:8px">v196</span>
   </div>
 </nav>
 
@@ -181,7 +181,6 @@ tr:hover td{background:#FAFAFE}
         </tr></thead>
         <tbody id="tabla-semaforo"></tbody>
       </table>
-      <div id="semaforo-pie" style="padding:10px 2px 0;font-size:12px"></div>
     </div>
   </div>
 </div>
@@ -231,7 +230,10 @@ tr:hover td{background:#FAFAFE}
         <div class="card-title">Registro de pensionados</div>
         <div class="card-sub">Clientes con pensión activa o histórica</div>
       </div>
-      <button class="btn btn-primary btn-sm" style="margin-left:auto"
+      <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+        <input type="checkbox" id="ver-vencidos-pen" onchange="renderPensionados()"> Ver contratos vencidos
+      </label>
+      <button class="btn btn-primary btn-sm"
               onclick="abrirModalNuevaPension()">+ Nueva pensión</button>
     </div>
     <div class="tabla-wrap">
@@ -605,30 +607,15 @@ function renderSemaforo(filtro='todos') {
   // "Total activos" no cuenta las de contrato vencido: salen de los
   // listados y del conteo, pero su registro y su historial se conservan.
   document.getElementById('cnt-total').textContent   = PENSIONADOS.filter(p=>p.semaforo!=='inactiva').length;
-  // Las de contrato vencido NO salen en la lista: ni en "todos" ni en los
-  // filtros del semaforo. Se llega a ellas solo por el enlace de abajo
-  // (filtro 'inactiva'), que es tambien la unica via para reactivarlas.
-  const list = filtro==='inactiva'
-    ? PENSIONADOS.filter(p=>p.semaforo==='inactiva')
-    : filtro==='todos'
-      ? PENSIONADOS.filter(p=>p.semaforo!=='inactiva')
-      : PENSIONADOS.filter(p=>p.semaforo===filtro && p.semaforo!=='inactiva');
+  // Las de contrato vencido nunca salen en esta pantalla: es la vista
+  // operativa del dia. El padron (pestana Pensionados) las puede mostrar.
+  const list = filtro==='todos'
+    ? PENSIONADOS.filter(p=>p.semaforo!=='inactiva')
+    : PENSIONADOS.filter(p=>p.semaforo===filtro && p.semaforo!=='inactiva');
   const titulos={todos:'Todos los pensionados activos',al_corriente:'✅ Al corriente',
                  por_vencer:'🟡 Por vencer — pagar antes del día '+DIAS_GRACIA_PENSION,
-                 vencido:'🔴 Vencidos — requieren atención',
-                 inactiva:'🗂 Contratos vencidos — fuera de los activos'};
+                 vencido:'🔴 Vencidos — requieren atención'};
   document.getElementById('semaforo-titulo').textContent = titulos[filtro]||'Pensionados';
-  // Puerta de regreso: sin esto, una pension marcada por error desaparece de
-  // la interfaz y ya no hay forma de reactivarla sin tocar la base.
-  const bajas = PENSIONADOS.filter(p=>p.semaforo==='inactiva').length;
-  const pie = document.getElementById('semaforo-pie');
-  if (pie) {
-    pie.innerHTML = filtro==='inactiva'
-      ? `<a href="#" onclick="filtrarSemaforo('todos');return false" style="color:var(--purple)">← Volver a los pensionados activos</a>`
-      : (bajas
-          ? `<a href="#" onclick="filtrarSemaforo('inactiva');return false" style="color:var(--muted)">🗂 ${bajas} con contrato vencido · ver</a>`
-          : '');
-  }
 
   document.getElementById('tabla-semaforo').innerHTML = list.map(p=>`
     <tr>
@@ -739,8 +726,12 @@ async function generarCarteraDelMes() {
 
 // ── PENSIONADOS ──
 function renderPensionados() {
-  // Misma regla que el semaforo: las de contrato vencido no se listan aqui.
-  document.getElementById('tabla-pensionados').innerHTML = PENSIONADOS.filter(p=>p.estado!=='cancelado').map(p=>`
+  // El padron puede mostrar los contratos vencidos, pero apagado por defecto:
+  // con decenas de bajas al mes la lista se volveria ilegible. Es tambien la
+  // unica via para reactivar una pension marcada por error.
+  const verVencidos = document.getElementById('ver-vencidos-pen')?.checked;
+  const lista = verVencidos ? PENSIONADOS : PENSIONADOS.filter(p=>p.estado!=='cancelado');
+  document.getElementById('tabla-pensionados').innerHTML = lista.map(p=>`
     <tr>
       <td><strong>${p.nombre}</strong></td>
       <td>${p.tel}<br><span style="font-size:11px;color:var(--muted)">${p.wa?'WA: '+p.wa:''}</span></td>
@@ -994,10 +985,10 @@ async function cambiarEstadoPension(id, nombre, nuevoEstado, mensaje) {
 // pagos (38 en total). Poner ON DELETE CASCADE "arreglaria" el boton
 // destruyendo pagos y tickets — no se hace.
 // Pasa a estado 'cancelado': desaparece de los listados y del total de
-// activos, conserva su historial, y se recupera desde el enlace
-// "con contrato vencido · ver" del semaforo.
+// activos, conserva su historial, y se recupera marcando "Ver contratos
+// vencidos" en la pestana Pensionados.
 async function marcarContratoVencido(id, nombre) {
-  if (!confirm(`¿Marcar como CONTRATO VENCIDO la pensión de "${nombre}"?\n\nDesaparece de la lista de pensiones y del total de activos. Se conservan sus pagos y sus tickets, y puedes reactivarla desde el enlace "con contrato vencido · ver".`)) return;
+  if (!confirm(`¿Marcar como CONTRATO VENCIDO la pensión de "${nombre}"?\n\nDesaparece de la lista de pensiones y del total de activos. Se conservan sus pagos y sus tickets; para verla o reactivarla, en la pestaña Pensionados marca "Ver contratos vencidos".`)) return;
   await cambiarEstadoPension(id, nombre, 'cancelado', `🗂 ${nombre} · contrato vencido`);
 }
 
